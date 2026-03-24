@@ -1,0 +1,172 @@
+import uuid
+from datetime import datetime
+from typing import Optional
+
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import JSON
+
+from .database import Base
+
+
+def generate_uuid() -> str:
+    return str(uuid.uuid4())
+
+
+class Community(Base):
+    __tablename__ = "communities"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    platform: Mapped[str] = mapped_column(String, nullable=False)  # reddit | chatroom | forum
+    platform_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    rules: Mapped[list["Rule"]] = relationship("Rule", back_populates="community", cascade="all, delete-orphan")
+    decisions: Mapped[list["Decision"]] = relationship("Decision", back_populates="community", cascade="all, delete-orphan")
+
+
+class Rule(Base):
+    __tablename__ = "rules"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    community_id: Mapped[str] = mapped_column(String, ForeignKey("communities.id"), nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    rule_type: Mapped[str] = mapped_column(String, nullable=False, default="actionable")
+    # actionable | procedural | meta | informational
+    rule_type_reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    community: Mapped["Community"] = relationship("Community", back_populates="rules")
+    checklist_items: Mapped[list["ChecklistItem"]] = relationship(
+        "ChecklistItem", back_populates="rule", cascade="all, delete-orphan",
+        foreign_keys="ChecklistItem.rule_id"
+    )
+    example_links: Mapped[list["ExampleRuleLink"]] = relationship(
+        "ExampleRuleLink", back_populates="rule", cascade="all, delete-orphan"
+    )
+    suggestions: Mapped[list["Suggestion"]] = relationship(
+        "Suggestion", back_populates="rule", cascade="all, delete-orphan"
+    )
+
+
+class ChecklistItem(Base):
+    __tablename__ = "checklist_items"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    rule_id: Mapped[str] = mapped_column(String, ForeignKey("rules.id"), nullable=False)
+    order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    parent_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("checklist_items.id"), nullable=True
+    )
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    rule_text_anchor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    item_type: Mapped[str] = mapped_column(String, nullable=False)  # deterministic | structural | subjective
+    logic: Mapped[dict] = mapped_column(JSON, nullable=False)
+    combine_mode: Mapped[str] = mapped_column(String, nullable=False, default="all_must_pass")
+    # all_must_pass | any_must_pass
+    fail_action: Mapped[str] = mapped_column(String, nullable=False, default="flag")
+    # remove | flag | continue
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    rule: Mapped["Rule"] = relationship("Rule", back_populates="checklist_items", foreign_keys=[rule_id])
+    children: Mapped[list["ChecklistItem"]] = relationship(
+        "ChecklistItem",
+        back_populates="parent",
+        cascade="all, delete-orphan",
+        foreign_keys="ChecklistItem.parent_id",
+    )
+    parent: Mapped[Optional["ChecklistItem"]] = relationship(
+        "ChecklistItem",
+        back_populates="children",
+        remote_side="ChecklistItem.id",
+        foreign_keys="ChecklistItem.parent_id",
+    )
+    suggestions: Mapped[list["Suggestion"]] = relationship(
+        "Suggestion", back_populates="checklist_item", cascade="all, delete-orphan"
+    )
+
+
+class Example(Base):
+    __tablename__ = "examples"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    content: Mapped[dict] = mapped_column(JSON, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)  # positive | negative | borderline
+    source: Mapped[str] = mapped_column(String, nullable=False, default="manual")
+    # manual | moderator_decision | generated
+    moderator_reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    rule_links: Mapped[list["ExampleRuleLink"]] = relationship(
+        "ExampleRuleLink", back_populates="example", cascade="all, delete-orphan"
+    )
+
+
+class ExampleRuleLink(Base):
+    __tablename__ = "example_rule_links"
+
+    example_id: Mapped[str] = mapped_column(String, ForeignKey("examples.id"), primary_key=True)
+    rule_id: Mapped[str] = mapped_column(String, ForeignKey("rules.id"), primary_key=True)
+    relevance_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    example: Mapped["Example"] = relationship("Example", back_populates="rule_links")
+    rule: Mapped["Rule"] = relationship("Rule", back_populates="example_links")
+
+
+class Decision(Base):
+    __tablename__ = "decisions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    community_id: Mapped[str] = mapped_column(String, ForeignKey("communities.id"), nullable=False)
+    post_content: Mapped[dict] = mapped_column(JSON, nullable=False)
+    post_platform_id: Mapped[str] = mapped_column(String, nullable=False)
+    agent_verdict: Mapped[str] = mapped_column(String, nullable=False)  # approve | remove | flag
+    agent_confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    agent_reasoning: Mapped[dict] = mapped_column(JSON, nullable=False)
+    triggered_rules: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    moderator_verdict: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    # approve | remove | flag | pending
+    moderator_reasoning_category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # rule_doesnt_apply | edge_case_allow | rule_needs_update | agent_wrong_interpretation | agree
+    moderator_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    was_override: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    community: Mapped["Community"] = relationship("Community", back_populates="decisions")
+
+
+class Suggestion(Base):
+    __tablename__ = "suggestions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    rule_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("rules.id"), nullable=True)
+    checklist_item_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("checklist_items.id"), nullable=True
+    )
+    suggestion_type: Mapped[str] = mapped_column(String, nullable=False)
+    # checklist | rule_text | example
+    content: Mapped[dict] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    # pending | accepted | dismissed
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    rule: Mapped[Optional["Rule"]] = relationship("Rule", back_populates="suggestions")
+    checklist_item: Mapped[Optional["ChecklistItem"]] = relationship(
+        "ChecklistItem", back_populates="suggestions"
+    )
