@@ -3,20 +3,20 @@
 from typing import Any
 
 
-# Verdict precedence: REMOVE > FLAG > APPROVE
-VERDICT_PRECEDENCE = {"remove": 3, "flag": 2, "approve": 1}
+# Verdict precedence: REMOVE > REVIEW > APPROVE
+VERDICT_PRECEDENCE = {"remove": 3, "review": 2, "approve": 1}
 
 
 def resolve_verdict(rule_results: list[dict[str, Any]]) -> tuple[str, float]:
     """Aggregate rule results into final verdict + confidence.
 
     Each rule_result has:
-    - verdict: "approve" | "remove" | "flag"
+    - verdict: "approve" | "remove" | "review"
     - confidence: float 0.0-1.0
     - rule_id: str
 
     Returns (verdict, confidence).
-    Priority: REMOVE > FLAG > APPROVE.
+    Priority: REMOVE > REVIEW > APPROVE.
     Confidence is the average of all rule confidences, weighted toward the worst case.
     """
     if not rule_results:
@@ -44,41 +44,6 @@ def resolve_verdict(rule_results: list[dict[str, Any]]) -> tuple[str, float]:
 
     return best_verdict, round(avg_confidence, 3)
 
-
-def merge_item_results(item_results: list[dict[str, Any]], combine_mode: str) -> tuple[bool, float]:
-    """Merge multiple item evaluation results according to combine_mode.
-
-    Returns (passes, confidence).
-    """
-    if not item_results:
-        return True, 1.0
-
-    passes_list = [r.get("passes", True) for r in item_results]
-    confidences = [r.get("confidence", 0.5) for r in item_results]
-
-    if combine_mode == "all_must_pass":
-        passes = all(passes_list)
-        # Confidence: min confidence of failing items (or avg if all pass)
-        if not passes:
-            failing_confs = [c for p, c in zip(passes_list, confidences) if not p]
-            confidence = min(failing_confs) if failing_confs else 0.5
-        else:
-            confidence = sum(confidences) / len(confidences)
-
-    elif combine_mode == "any_must_pass":
-        passes = any(passes_list)
-        if passes:
-            passing_confs = [c for p, c in zip(passes_list, confidences) if p]
-            confidence = max(passing_confs) if passing_confs else 0.5
-        else:
-            confidence = sum(confidences) / len(confidences)
-
-    else:
-        # Default: all must pass
-        passes = all(passes_list)
-        confidence = sum(confidences) / len(confidences)
-
-    return passes, round(confidence, 3)
 
 
 def determine_was_override(agent_verdict: str, moderator_verdict: str) -> bool:

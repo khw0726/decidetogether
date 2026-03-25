@@ -50,12 +50,14 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
       verdict,
       reasoningCategory,
       notes,
+      ruleIds,
     }: {
       decisionId: string
       verdict: string
       reasoningCategory?: string
       notes?: string
-    }) => resolveDecision(decisionId, { verdict, reasoning_category: reasoningCategory, notes }),
+      ruleIds?: string[]
+    }) => resolveDecision(decisionId, { verdict, reasoning_category: reasoningCategory, notes, rule_ids: ruleIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['decisions', communityId] })
       queryClient.invalidateQueries({ queryKey: ['stats', communityId] })
@@ -100,7 +102,7 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             <option value="">All verdicts</option>
             <option value="approve">Approve</option>
             <option value="remove">Remove</option>
-            <option value="flag">Flag</option>
+            <option value="review">Review</option>
           </select>
         </div>
       </div>
@@ -127,12 +129,13 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             key={decision.id}
             decision={decision}
             rulesMap={rulesMap}
-            onResolve={(verdict, reasoningCategory, notes) =>
+            onResolve={(verdict, reasoningCategory, notes, ruleIds) =>
               resolveMutation.mutate({
                 decisionId: decision.id,
                 verdict,
                 reasoningCategory,
                 notes,
+                ruleIds,
               })
             }
             resolving={resolveMutation.isPending && resolveMutation.variables?.decisionId === decision.id}
@@ -151,20 +154,25 @@ function DecisionCard({
 }: {
   decision: Decision
   rulesMap: Record<string, { title: string }>
-  onResolve: (verdict: string, reasoningCategory?: string, notes?: string) => void
+  onResolve: (verdict: string, reasoningCategory?: string, notes?: string, ruleIds?: string[]) => void
   resolving: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedVerdict, setSelectedVerdict] = useState<string | null>(null)
   const [reasoningCategory, setReasoningCategory] = useState('')
   const [notes, setNotes] = useState('')
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
+
+  // Rule picker is needed when agent approved (no triggered rules) but moderator disagrees
+  const agentApproved = decision.agent_verdict === 'approve'
+  const needsRulePicker = agentApproved && selectedVerdict && selectedVerdict !== 'approve'
 
   const isPending = decision.moderator_verdict === 'pending'
 
   const verdictColors: Record<string, string> = {
     approve: 'bg-green-100 text-green-800 border-green-200',
     remove: 'bg-red-100 text-red-800 border-red-200',
-    flag: 'bg-amber-100 text-amber-800 border-amber-200',
+    review: 'bg-amber-100 text-amber-800 border-amber-200',
     pending: 'bg-gray-100 text-gray-700 border-gray-200',
   }
 
@@ -177,8 +185,14 @@ function DecisionCard({
 
   const handleResolve = () => {
     if (!selectedVerdict) return
-    onResolve(selectedVerdict, reasoningCategory || undefined, notes || undefined)
+    onResolve(
+      selectedVerdict,
+      reasoningCategory || undefined,
+      notes || undefined,
+      needsRulePicker ? selectedRuleIds : undefined,
+    )
     setSelectedVerdict(null)
+    setSelectedRuleIds([])
   }
 
   return (
@@ -232,11 +246,11 @@ function DecisionCard({
                 Remove
               </button>
               <button
-                className={`btn text-xs bg-amber-500 text-white hover:bg-amber-600 ${selectedVerdict === 'flag' ? 'ring-2 ring-amber-500' : ''}`}
-                onClick={() => setSelectedVerdict('flag')}
+                className={`btn text-xs bg-amber-500 text-white hover:bg-amber-600 ${selectedVerdict === 'review' ? 'ring-2 ring-amber-500' : ''}`}
+                onClick={() => setSelectedVerdict('review')}
               >
                 <Flag size={13} />
-                Flag
+                Review
               </button>
             </>
           ) : (
@@ -259,6 +273,27 @@ function DecisionCard({
         {/* Resolution form */}
         {selectedVerdict && isPending && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+            {needsRulePicker && (
+              <div>
+                <p className="text-xs text-amber-700 font-medium mb-1">
+                  Agent did not trigger any rules — which rule(s) does this post violate?
+                </p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {Object.entries(rulesMap).map(([id, rule]) => (
+                    <label key={id} className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedRuleIds.includes(id)}
+                        onChange={e => setSelectedRuleIds(prev =>
+                          e.target.checked ? [...prev, id] : prev.filter(r => r !== id)
+                        )}
+                      />
+                      {rule.title}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <select
               className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none"
               value={reasoningCategory}
@@ -308,14 +343,14 @@ function DecisionCard({
                     </span>
                     <span className="text-gray-400">{Math.round(((r.confidence as number) || 0) * 100)}%</span>
                   </div>
-                  {r.item_reasoning && (
+                  {!!r.item_reasoning && (
                     <div className="space-y-1 mt-2">
                       {Object.entries(r.item_reasoning as Record<string, unknown>).map(([itemId, itemR]) => {
                         const ir = itemR as Record<string, unknown>
                         return (
-                          <div key={itemId} className={`pl-3 border-l-2 ${ir.passes ? 'border-green-300' : 'border-red-300'}`}>
+                          <div key={itemId} className={`pl-3 border-l-2 ${ir.triggered ? 'border-red-300' : 'border-green-300'}`}>
                             <span className="text-gray-500">{ir.description as string}: </span>
-                            <span className={ir.passes ? 'text-green-700' : 'text-red-700'}>
+                            <span className={ir.triggered ? 'text-red-700' : 'text-green-700'}>
                               {ir.reasoning as string}
                             </span>
                           </div>

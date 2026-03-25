@@ -111,7 +111,7 @@ class EvaluationEngine:
                 "triggered_items": rule_result["triggered_items"],
             }
 
-            if rule_verdict in ("remove", "flag"):
+            if rule_verdict in ("remove", "review"):
                 triggered_rule_ids.append(rule.id)
 
         # 5. Aggregate verdict
@@ -130,12 +130,23 @@ class EvaluationEngine:
             if norms_result.get("violates_norms"):
                 norms_confidence = norms_result.get("confidence", 0.5)
                 full_reasoning["__community_norms__"] = {
-                    "verdict": "flag",
+                    "rule_title": "Community norms (inferred)",
+                    "verdict": "review",
                     "confidence": norms_confidence,
-                    "reasoning": norms_result.get("reasoning", ""),
+                    "item_reasoning": {
+                        "community_norms": {
+                            "triggered": True,
+                            "description": "Community norms check",
+                            "reasoning": norms_result.get("reasoning", ""),
+                            "confidence": norms_confidence,
+                            "action": "flag",
+                            "item_type": "subjective",
+                        }
+                    },
+                    "triggered_items": ["community_norms"],
                 }
                 if agent_verdict == "approve":
-                    agent_verdict = "flag"
+                    agent_verdict = "review"
                     agent_confidence = norms_confidence
 
         # 7. Create Decision record

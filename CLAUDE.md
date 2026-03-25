@@ -67,7 +67,7 @@ admin/           JS frontend with React + Vite
 
 - All decisions require human verification (no autonomous moderation in v1)
 - Every checklist item carries `intent` (why it exists) and `rule_text_anchor` (which phrase in the rule it implements) for transparency and recompile stability
-- The "community norms" FLAG (post feels off but violates no explicit rule) is a separate evaluation path from the rule-based system
+- The "community norms" REVIEW verdict (post feels off but violates no explicit rule) is a separate evaluation path from the rule-based system
 - Decision queue sorted by agent confidence ascending — lowest confidence gets human attention first
 - Moderator overrides automatically create labeled examples for the relevant rules
 

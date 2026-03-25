@@ -76,9 +76,7 @@ class ChecklistItem(Base):
     rule_text_anchor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     item_type: Mapped[str] = mapped_column(String, nullable=False)  # deterministic | structural | subjective
     logic: Mapped[dict] = mapped_column(JSON, nullable=False)
-    combine_mode: Mapped[str] = mapped_column(String, nullable=False, default="all_must_pass")
-    # all_must_pass | any_must_pass
-    fail_action: Mapped[str] = mapped_column(String, nullable=False, default="flag")
+    action: Mapped[str] = mapped_column(String, nullable=False, default="flag")
     # remove | flag | continue
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -135,12 +133,12 @@ class Decision(Base):
     community_id: Mapped[str] = mapped_column(String, ForeignKey("communities.id"), nullable=False)
     post_content: Mapped[dict] = mapped_column(JSON, nullable=False)
     post_platform_id: Mapped[str] = mapped_column(String, nullable=False)
-    agent_verdict: Mapped[str] = mapped_column(String, nullable=False)  # approve | remove | flag
+    agent_verdict: Mapped[str] = mapped_column(String, nullable=False)  # approve | remove | review
     agent_confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
     agent_reasoning: Mapped[dict] = mapped_column(JSON, nullable=False)
     triggered_rules: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     moderator_verdict: Mapped[str] = mapped_column(String, nullable=False, default="pending")
-    # approve | remove | flag | pending
+    # approve | remove | review | pending
     moderator_reasoning_category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # rule_doesnt_apply | edge_case_allow | rule_needs_update | agent_wrong_interpretation | agree
     moderator_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

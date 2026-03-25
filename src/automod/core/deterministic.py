@@ -9,11 +9,10 @@ from ..db.models import ChecklistItem
 def evaluate_deterministic(item: ChecklistItem, post: dict[str, Any]) -> tuple[bool, str]:
     """Evaluate a deterministic checklist item using regex/pattern matching.
 
-    Returns (passes, reasoning) where passes=True means the item's criterion is satisfied
-    (i.e., the post does NOT violate this particular check, or the pattern matches and
-    negate=False means it IS a violation, so passes=False).
+    Returns (triggered, reasoning) where triggered=True means the item's question
+    is answered YES (violation detected).
 
-    Convention: passes=True → OK (no violation); passes=False → violation detected.
+    Convention: triggered=True → violation detected; triggered=False → no violation.
     """
     logic = item.logic
     patterns = logic.get("patterns", [])
@@ -40,7 +39,6 @@ def evaluate_deterministic(item: ChecklistItem, post: dict[str, Any]) -> tuple[b
             if re.search(regex, text, flags):
                 matched_patterns.append(regex)
         except re.error as e:
-            # Invalid regex — treat as no match, log the error
             import logging
             logging.getLogger(__name__).warning(f"Invalid regex {regex!r}: {e}")
 
@@ -49,20 +47,19 @@ def evaluate_deterministic(item: ChecklistItem, post: dict[str, Any]) -> tuple[b
     else:  # all
         pattern_hit = len(matched_patterns) == len(patterns)
 
-    # If negate=False: pattern_hit means the pattern IS found → violation (passes=False)
-    # If negate=True: pattern_hit means the pattern IS found → actually fine (passes=True)
-    # E.g. "post must contain [OC] tag" → negate=True, pattern=[OC], so if NOT found → violation
+    # negate=False: pattern found → triggered (violation)
+    # negate=True: pattern NOT found → triggered (e.g. required tag is missing)
     if negate:
-        passes = not pattern_hit
-        if pattern_hit:
-            reasoning = f"Pattern found (negate mode — expected NOT to match): {matched_patterns}"
+        triggered = not pattern_hit
+        if triggered:
+            reasoning = "Required pattern not found — violation detected."
         else:
-            reasoning = f"No pattern match found — expected absence confirmed."
+            reasoning = f"Required pattern present — no violation: {matched_patterns}"
     else:
-        passes = not pattern_hit  # pattern found → violation → passes=False
-        if pattern_hit:
+        triggered = pattern_hit
+        if triggered:
             reasoning = f"Violation detected — matched patterns: {matched_patterns}"
         else:
             reasoning = "No violation patterns matched."
 
-    return passes, reasoning
+    return triggered, reasoning

@@ -34,8 +34,7 @@ def _item_to_read(item: ChecklistItem) -> ChecklistItemRead:
         rule_text_anchor=item.rule_text_anchor,
         item_type=item.item_type,
         logic=item.logic,
-        combine_mode=item.combine_mode,
-        fail_action=item.fail_action,
+        action=item.action,
         updated_at=item.updated_at,
         children=[],
     )
@@ -96,10 +95,8 @@ async def update_checklist_item(
         item.item_type = body.item_type
     if body.logic is not None:
         item.logic = body.logic
-    if body.combine_mode is not None:
-        item.combine_mode = body.combine_mode
-    if body.fail_action is not None:
-        item.fail_action = body.fail_action
+    if body.action is not None:
+        item.action = body.action
     if body.order is not None:
         item.order = body.order
 
@@ -234,8 +231,7 @@ async def accept_recompile(
             rule_text_anchor=item_data.get("rule_text_anchor"),
             item_type=item_data.get("item_type", "subjective"),
             logic=item_data.get("logic", {}),
-            combine_mode=item_data.get("combine_mode", "all_must_pass"),
-            fail_action=item_data.get("fail_action", "flag"),
+            action=item_data.get("action", "flag"),
         )
         db.add(item)
 

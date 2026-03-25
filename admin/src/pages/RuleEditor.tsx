@@ -616,14 +616,14 @@ function TestingPanel({
 const VERDICT_STYLES: Record<string, string> = {
   approve: 'text-green-700 bg-green-50 border-green-200',
   remove: 'text-red-700 bg-red-50 border-red-200',
-  flag: 'text-amber-700 bg-amber-50 border-amber-200',
+  review: 'text-amber-700 bg-amber-50 border-amber-200',
   pending: 'text-gray-600 bg-gray-50 border-gray-200',
 }
 
 const VERDICT_HEADER_STYLES: Record<string, string> = {
   approve: 'bg-green-50 text-green-700',
   remove: 'bg-red-50 text-red-700',
-  flag: 'bg-amber-50 text-amber-700',
+  review: 'bg-amber-50 text-amber-700',
 }
 
 function TestResults({
@@ -688,11 +688,10 @@ function TestResults({
             {itemEntries.length > 0 && (
               <div>
                 {itemEntries.map(([itemId, itemData]) => {
-                  const passes = Boolean(itemData.passes)
-                  const isFailed = !passes
-                  // Show all items when there are violations visible; otherwise show failed only
-                  // Always show failed items; show passed items only if rule verdict is approve
-                  if (passes && hasViolations) return null
+                  const triggered = Boolean(itemData.triggered)
+                  const isFailed = triggered
+                  // Show triggered items always; hide non-triggered items when there are violations
+                  if (!triggered && hasViolations) return null
                   const description = String(
                     checklistMap[itemId]?.description || itemData.description || itemId
                   )
@@ -704,9 +703,9 @@ function TestResults({
                       key={itemId}
                       className={`flex items-start gap-2 px-3 py-1.5 text-xs border-t border-gray-100 ${isFailed ? 'bg-red-50' : ''}`}
                     >
-                      {passes
-                        ? <CheckCircle size={12} className="text-green-500 mt-0.5 flex-shrink-0" />
-                        : <XCircle size={12} className="text-red-500 mt-0.5 flex-shrink-0" />
+                      {triggered
+                        ? <XCircle size={12} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        : <CheckCircle size={12} className="text-green-500 mt-0.5 flex-shrink-0" />
                       }
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium leading-tight ${isFailed ? 'text-red-700' : 'text-gray-700'}`}>

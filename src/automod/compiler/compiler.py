@@ -45,11 +45,7 @@ _COMPILE_TOOL = {
                             "enum": ["deterministic", "structural", "subjective"],
                         },
                         "logic": {"type": "object"},
-                        "combine_mode": {
-                            "type": "string",
-                            "enum": ["all_must_pass", "any_must_pass"],
-                        },
-                        "fail_action": {
+                        "action": {
                             "type": "string",
                             "enum": ["remove", "flag", "continue"],
                         },
@@ -57,7 +53,7 @@ _COMPILE_TOOL = {
                     },
                     "required": [
                         "description", "item_type", "logic",
-                        "combine_mode", "fail_action", "children",
+                        "action", "children",
                     ],
                 },
             },
@@ -78,6 +74,43 @@ _COMPILE_TOOL = {
             },
         },
         "required": ["checklist_tree", "examples"],
+    },
+}
+
+_RECOMPILE_TOOL = {
+    "name": "submit_recompile_diff",
+    "description": "Submit diff operations to update an existing checklist tree",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "operations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "op": {
+                            "type": "string",
+                            "enum": ["keep", "update", "delete", "add"],
+                        },
+                        "existing_id": {"type": "string"},
+                        "description": {"type": "string"},
+                        "rule_text_anchor": {"type": ["string", "null"]},
+                        "item_type": {
+                            "type": "string",
+                            "enum": ["deterministic", "structural", "subjective"],
+                        },
+                        "logic": {"type": "object"},
+                        "action": {
+                            "type": "string",
+                            "enum": ["remove", "flag", "continue"],
+                        },
+                        "children": {"type": "array", "items": {"type": "object"}},
+                    },
+                    "required": ["op"],
+                },
+            },
+        },
+        "required": ["operations"],
     },
 }
 
@@ -201,8 +234,7 @@ class RuleCompiler:
             "rule_text_anchor": item.rule_text_anchor,
             "item_type": item.item_type,
             "logic": item.logic,
-            "combine_mode": item.combine_mode,
-            "fail_action": item.fail_action,
+            "action": item.action,
             "order": item.order,
         }
 
@@ -227,8 +259,7 @@ class RuleCompiler:
                 rule_text_anchor=item_data.get("rule_text_anchor"),
                 item_type=item_data.get("item_type", "subjective"),
                 logic=item_data.get("logic", {}),
-                combine_mode=item_data.get("combine_mode", "all_must_pass"),
-                fail_action=item_data.get("fail_action", "flag"),
+                action=item_data.get("action", "flag"),
             )
             result.append(item)
 
@@ -313,8 +344,7 @@ class RuleCompiler:
                 rule_text_anchor=item_data.get("rule_text_anchor"),
                 item_type=item_data.get("item_type", "subjective"),
                 logic=item_data.get("logic", {}),
-                combine_mode=item_data.get("combine_mode", "all_must_pass"),
-                fail_action=item_data.get("fail_action", "flag"),
+                action=item_data.get("action", "flag"),
             )
             result.append(item)
             order += 1
@@ -328,56 +358,36 @@ class RuleCompiler:
 
         return order
 
-    async def recompile_rule(
+    async def recompile_with_diff(
         self,
         rule: Rule,
         community: Community,
         other_rules: list[Rule],
         existing_items: list[ChecklistItem],
-        existing_examples: list[Example],
-    ) -> dict[str, Any]:
-        """Recompile with diff - returns suggested changes, not applied."""
+    ) -> list[dict]:
+        """Recompile an existing checklist using diff operations (keep/update/add/delete).
+
+        Returns a list of operation dicts to be applied by the caller.
+        """
         logger.info(f"Recompiling rule '{rule.title}' with diff")
 
-        new_items, new_examples = await self.compile_rule(
-            rule, community, other_rules, existing_items, existing_examples
+        other_rules_summary = self._make_other_rules_summary(
+            [r for r in other_rules if r.id != rule.id]
+        )
+        existing_dicts = [self._checklist_item_to_dict(i) for i in existing_items]
+
+        user_prompt = prompts.build_recompile_prompt(
+            rule_text=rule.text,
+            community_name=community.name,
+            platform=community.platform,
+            other_rules_summary=other_rules_summary,
+            existing_items=existing_dicts,
         )
 
-        # Build diff between existing and new
-        existing_descriptions = {item.description: item for item in existing_items}
-        new_descriptions = {item.description: item for item in new_items}
-
-        added = [
-            self._checklist_item_to_dict(item)
-            for desc, item in new_descriptions.items()
-            if desc not in existing_descriptions
-        ]
-        removed = [
-            self._checklist_item_to_dict(item)
-            for desc, item in existing_descriptions.items()
-            if desc not in new_descriptions
-        ]
-        modified = []
-        for desc in set(existing_descriptions) & set(new_descriptions):
-            old = existing_descriptions[desc]
-            new = new_descriptions[desc]
-            if (
-                old.logic != new.logic
-                or old.fail_action != new.fail_action
-                or old.combine_mode != new.combine_mode
-            ):
-                modified.append({
-                    "old": self._checklist_item_to_dict(old),
-                    "new": self._checklist_item_to_dict(new),
-                })
-
-        return {
-            "added": added,
-            "removed": removed,
-            "modified": modified,
-            "new_examples": new_examples,
-            "new_items_raw": [self._checklist_item_to_dict(i) for i in new_items],
-        }
+        result = await self._call_claude(
+            prompts.RECOMPILE_SYSTEM, user_prompt, tool=_RECOMPILE_TOOL
+        )
+        return result.get("operations", [])
 
     async def suggest_from_examples(
         self,

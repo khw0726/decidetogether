@@ -65,7 +65,7 @@ async def resolve_decision(
     body: DecisionResolve,
     db: AsyncSession = Depends(get_db),
 ) -> DecisionRead:
-    valid_verdicts = {"approve", "remove", "flag"}
+    valid_verdicts = {"approve", "remove", "review"}
     if body.verdict not in valid_verdicts:
         raise HTTPException(status_code=422, detail=f"verdict must be one of {valid_verdicts}")
 
@@ -85,35 +85,51 @@ async def resolve_decision(
 
     await db.flush()
 
-    # Auto-create example from this decision
-    post = decision.post_content
-    example_label = body.verdict  # approve→positive, remove/flag→negative
-    if body.verdict == "approve":
-        example_label = "positive"
-    elif body.verdict == "remove":
-        example_label = "negative"
-    else:
-        example_label = "borderline"
+    # Auto-create example from this decision based on the four cases:
+    #   agent=approve + mod=approve + no triggered rules → skip (no useful signal)
+    #   agent=approve + mod=remove/review               → negative/borderline, link to mod-specified rule_ids
+    #   agent=remove  + mod=approve                     → positive, link to agent's triggered_rules
+    #   agent=remove  + mod=remove/review               → negative/borderline, link to agent's triggered_rules
+    agent_approved = decision.agent_verdict == "approve"
+    mod_approved = body.verdict == "approve"
+    agent_triggered = decision.triggered_rules or []
 
-    example = Example(
-        content=post,
-        label=example_label,
-        source="moderator_decision",
-        moderator_reasoning=body.notes,
-    )
-    db.add(example)
-    await db.flush()
+    skip_example = agent_approved and mod_approved and not agent_triggered
 
-    # Link example to triggered rules
-    for rule_id in decision.triggered_rules or []:
-        rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-        if rule_result.scalar_one_or_none():
-            link = ExampleRuleLink(
-                example_id=example.id,
-                rule_id=rule_id,
-                relevance_note=f"Auto-created from moderator decision ({body.verdict})",
-            )
-            db.add(link)
+    if not skip_example:
+        if body.verdict == "approve":
+            example_label = "positive"
+        elif body.verdict == "remove":
+            example_label = "negative"
+        else:
+            example_label = "borderline"
+
+        example = Example(
+            content=decision.post_content,
+            label=example_label,
+            source="moderator_decision",
+            moderator_reasoning=body.notes,
+        )
+        db.add(example)
+        await db.flush()
+
+        # Determine which rules to link:
+        # - Agent missed the violation (approved but mod disagrees) → use moderator-specified rule_ids
+        # - Agent was correct or conservative → use agent's triggered_rules
+        if agent_approved and not mod_approved:
+            rule_ids_to_link = body.rule_ids or []
+        else:
+            rule_ids_to_link = agent_triggered
+
+        for rule_id in rule_ids_to_link:
+            rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+            if rule_result.scalar_one_or_none():
+                link = ExampleRuleLink(
+                    example_id=example.id,
+                    rule_id=rule_id,
+                    relevance_note=f"Auto-created from moderator decision ({body.verdict})",
+                )
+                db.add(link)
 
     await db.commit()
     await db.refresh(decision)
@@ -163,7 +179,7 @@ async def get_decision_stats(
     )
     all_decisions = list(all_decisions_result.scalars().all())
 
-    verdicts_breakdown: dict[str, int] = {"approve": 0, "remove": 0, "flag": 0}
+    verdicts_breakdown: dict[str, int] = {"approve": 0, "remove": 0, "review": 0}
     override_categories: dict[str, int] = {}
 
     for d in all_decisions:

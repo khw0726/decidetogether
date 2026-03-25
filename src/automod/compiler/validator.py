@@ -8,8 +8,7 @@ class ValidationError(Exception):
 
 
 VALID_ITEM_TYPES = {"deterministic", "structural", "subjective"}
-VALID_COMBINE_MODES = {"all_must_pass", "any_must_pass"}
-VALID_FAIL_ACTIONS = {"remove", "flag", "continue"}
+VALID_ACTIONS = {"remove", "flag", "continue"}
 VALID_RULE_TYPES = {"actionable", "procedural", "meta", "informational"}
 
 
@@ -24,13 +23,9 @@ def validate_checklist_item(item_data: dict[str, Any]) -> list[str]:
     if item_type not in VALID_ITEM_TYPES:
         errors.append(f"item_type must be one of {VALID_ITEM_TYPES}, got: {item_type!r}")
 
-    combine_mode = item_data.get("combine_mode", "all_must_pass")
-    if combine_mode not in VALID_COMBINE_MODES:
-        errors.append(f"combine_mode must be one of {VALID_COMBINE_MODES}")
-
-    fail_action = item_data.get("fail_action", "flag")
-    if fail_action not in VALID_FAIL_ACTIONS:
-        errors.append(f"fail_action must be one of {VALID_FAIL_ACTIONS}")
+    action = item_data.get("action", "flag")
+    if action not in VALID_ACTIONS:
+        errors.append(f"action must be one of {VALID_ACTIONS}")
 
     logic = item_data.get("logic", {})
     if item_type == "deterministic":

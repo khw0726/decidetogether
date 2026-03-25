@@ -128,7 +128,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [editedDescription, setEditedDescription] = useState(item.description)
   const [editedIntent, setEditedIntent] = useState(item.intent)
-  const [editedFailAction, setEditedFailAction] = useState(item.fail_action)
+  const [editedFailAction, setEditedFailAction] = useState(item.action)
 
   const queryClient = useQueryClient()
   const mutation = useMutation({
@@ -156,7 +156,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
     remove: <span className="badge badge-red">REMOVE</span>,
     flag: <span className="badge badge-yellow">FLAG</span>,
     continue: <span className="badge badge-gray">continue</span>,
-  }[item.fail_action] ?? null
+  }[item.action] ?? null
 
   const hasChildren = item.children && item.children.length > 0
   const indent = depth * 16
@@ -165,7 +165,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
     mutation.mutate({
       description: editedDescription,
       intent: editedIntent,
-      fail_action: editedFailAction as 'remove' | 'flag' | 'continue',
+      action: editedFailAction as 'remove' | 'flag' | 'continue',
     })
   }
 
@@ -248,9 +248,6 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
                     Anchor: &ldquo;{item.rule_text_anchor}&rdquo;
                   </p>
                 )}
-                <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
-                  <span>Combine: {item.combine_mode}</span>
-                </div>
                 {showLogic && <LogicInspector item={item} />}
               </>
             )}

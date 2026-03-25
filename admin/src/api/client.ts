@@ -36,12 +36,10 @@ export interface ChecklistItem {
   order: number
   parent_id: string | null
   description: string
-  intent: string
   rule_text_anchor: string | null
   item_type: 'deterministic' | 'structural' | 'subjective'
   logic: Record<string, unknown>
-  combine_mode: string
-  fail_action: string
+  action: string
   updated_at: string
   children: ChecklistItem[]
 }
@@ -220,7 +218,7 @@ export const dismissSuggestion = (suggestionId: string) =>
 export const listDecisions = (communityId: string, params?: { status?: string; verdict?: string; limit?: number; offset?: number }) =>
   api.get<Decision[]>(`/communities/${communityId}/decisions`, { params }).then(r => r.data)
 
-export const resolveDecision = (decisionId: string, data: { verdict: string; reasoning_category?: string; notes?: string }) =>
+export const resolveDecision = (decisionId: string, data: { verdict: string; reasoning_category?: string; notes?: string; rule_ids?: string[] }) =>
   api.put<Decision>(`/decisions/${decisionId}/resolve`, data).then(r => r.data)
 
 export const getDecisionStats = (communityId: string) =>

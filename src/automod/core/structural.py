@@ -8,8 +8,8 @@ from ..db.models import ChecklistItem
 def evaluate_structural(item: ChecklistItem, post: dict[str, Any]) -> tuple[bool, str]:
     """Evaluate structural checks against post metadata.
 
-    Returns (passes, reasoning) where passes=True means the criterion is met
-    (no structural violation for this item).
+    Returns (triggered, reasoning) where triggered=True means the item's question
+    is answered YES (violation detected).
     """
     logic = item.logic
     checks = logic.get("checks", [])
@@ -55,28 +55,15 @@ def evaluate_structural(item: ChecklistItem, post: dict[str, Any]) -> tuple[bool
         check_descriptions.append(f"{field}={actual!r} {operator} {value!r} → {'✓' if passed else '✗'}")
 
     if not check_results:
-        return True, "No structural checks defined."
+        return False, "No structural checks defined."
 
     if match_mode == "all":
-        passes = all(check_results)
+        triggered = all(check_results)
     else:  # any
-        passes = any(check_results)
-
-    # For structural items: failing the check = violation (passes=False)
-    # E.g. "account_age_days < 30" → young account → violation detected
-    # So if the check passes (condition is true), that means violation is detected → passes=False
-    # EXCEPT: this depends on whether the logic is framed as "detect violation" or "confirm OK"
-    # Convention: structural logic checks detect the violation condition (when True = bad)
-    # So we negate: passes = NOT check_passed
-    # Wait — need to be consistent with the spec examples:
-    # {"field": "account_age_days", "operator": "<", "value": 30} in a spam check
-    # means "account is new" → this IS a violation signal → check is True → item fails
-    # So: structural check True → violation → passes = False
-    violation_detected = passes  # checks fired = violation
-    passes = not violation_detected
+        triggered = any(check_results)
 
     reasoning = f"Structural checks ({match_mode}): {'; '.join(check_descriptions)}"
-    return passes, reasoning
+    return triggered, reasoning
 
 
 def _apply_operator(actual: Any, operator: str, value: Any) -> bool:

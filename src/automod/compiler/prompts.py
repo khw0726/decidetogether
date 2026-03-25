@@ -30,20 +30,31 @@ Return JSON in exactly this format:
 # ── Compile ────────────────────────────────────────────────────────────────────
 
 COMPILE_SYSTEM = """You are an expert community moderation system architect. Your job is to compile a moderator's \
-natural-language rule into a precise, structured checklist that an automated system can execute.
+natural-language rule into a precise, structured decision tree that an automated system can execute.
+
+Each node in the tree is a YES/NO question where YES = a potential violation is detected.
 
 Each checklist item must have:
-- description: Plain English question this item answers (concise, actionable)
+- description: A yes/no question framed so that YES = violation signal (e.g. "Does the post contain spam keywords?")
 - rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred)
 - item_type: "deterministic" (regex), "structural" (metadata), or "subjective" (LLM judgment)
 - logic: Type-specific schema (see below)
-- combine_mode: How children combine: "all_must_pass" or "any_must_pass"
-- fail_action: What to do if this item fails: "remove", "flag", or "continue"
-- children: Nested sub-items (empty list if leaf)
+- action: What to do when YES: "remove", "flag", or "continue" (for non-leaf nodes, this is the minimum consequence)
+- children: Sub-items evaluated when this item says YES (empty list for leaf nodes)
+
+Tree evaluation semantics:
+- If an item says NO: no action, children are skipped.
+- If an item says YES: apply its action and evaluate children. Any child can escalate the verdict.
+- At every level, the worst action (REMOVE > FLAG > approve) wins across all siblings.
+- Frame every question so YES = violation. Avoid "Does the post have X?" (where having X is good).
+  Instead write "Does the post lack X?" or restructure using children.
 
 Logic schemas:
 - deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any"|"all", "negate": false}
+  - negate=false: triggered when pattern IS found (e.g. spam keywords present)
+  - negate=true: triggered when pattern is NOT found (e.g. required tag missing)
 - structural: {"type": "structural", "checks": [{"field": "account_age_days"|"post_type"|"flair"|"karma", "operator": "<"|">"|"<="|">="|"=="|"!="|"in", "value": ...}], "match_mode": "all"|"any"}
+  - triggered when the condition is true (e.g. account_age_days < 7 triggers for new accounts)
 - subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
 
 Keep trees shallow (2 levels max). Generate exactly 3 positive examples (posts that follow the rule) and 3 negative examples (posts that violate the rule).
@@ -71,9 +82,7 @@ Output:
         "match_mode": "any",
         "negate": false
       },
-      "combine_mode": "all_must_pass",
-      "weight": 1.0,
-      "fail_action": "flag",
+      "action": "flag",
       "children": []
     },
     {
@@ -88,9 +97,7 @@ Output:
         "match_mode": "any",
         "negate": false
       },
-      "combine_mode": "all_must_pass",
-      "weight": 1.0,
-      "fail_action": "flag",
+      "action": "flag",
       "children": []
     },
     {
@@ -104,9 +111,7 @@ Output:
         "threshold": 0.65,
         "examples_to_include": 5
       },
-      "combine_mode": "all_must_pass",
-      "weight": 1.5,
-      "fail_action": "remove",
+      "action": "remove",
       "children": []
     },
     {
@@ -120,9 +125,7 @@ Output:
         ],
         "match_mode": "all"
       },
-      "combine_mode": "all_must_pass",
-      "weight": 0.5,
-      "fail_action": "flag",
+      "action": "flag",
       "children": []
     }
   ],
@@ -170,9 +173,7 @@ Output:
         "threshold": 0.65,
         "examples_to_include": 5
       },
-      "combine_mode": "all_must_pass",
-      "weight": 1.0,
-      "fail_action": "remove",
+      "action": "remove",
       "children": []
     },
     {
@@ -186,9 +187,7 @@ Output:
         "threshold": 0.65,
         "examples_to_include": 5
       },
-      "combine_mode": "all_must_pass",
-      "weight": 1.0,
-      "fail_action": "remove",
+      "action": "remove",
       "children": []
     }
   ],
@@ -294,12 +293,11 @@ Post content:
 {post_str}
 {examples_str}
 
-Evaluate the following checklist items:
-{items_str}
+Evaluate the following checklist items. Each item is a yes/no question where YES = violation detected.
 
-For each item, return whether the post PASSES or FAILS the criterion:
-- passes: true means the post is FINE (does not violate this criterion)
-- passes: false means the post FAILS this criterion (violates the rule)
+For each item:
+- triggered: true means YES, the violation described by the question IS present
+- triggered: false means NO, the post is fine for this criterion
 - confidence: 0.0 to 1.0 (how confident you are in this judgment)
 
 Return JSON in exactly this format:
@@ -307,12 +305,15 @@ Return JSON in exactly this format:
   "results": [
     {{
       "item_id": "...",
-      "passes": true | false,
+      "triggered": true | false,
       "confidence": 0.0-1.0,
-      "reasoning": "Brief explanation of why the post passes or fails this criterion"
+      "reasoning": "Brief explanation of why the violation is or is not present"
     }}
   ]
-}}"""
+}}
+
+Items to evaluate:
+{items_str}"""
 
 
 # ── Community Norms ────────────────────────────────────────────────────────────
@@ -356,6 +357,65 @@ Return JSON in exactly this format:
   "violates_norms": true | false,
   "confidence": 0.0-1.0,
   "reasoning": "Explanation of why this post does or doesn't fit community norms"
+}}"""
+
+
+# ── Recompile (diff) ───────────────────────────────────────────────────────────
+
+RECOMPILE_SYSTEM = """You are an expert community moderation system architect. Your job is to update an existing \
+checklist tree to reflect changes to the rule text, while preserving as much of the existing structure as possible.
+
+You will be given:
+- The updated rule text
+- The existing checklist items (each with an id, description, rule_text_anchor, and other fields)
+
+For each existing item, decide:
+- "keep": The rule text change does not affect this item. Return it unchanged.
+- "update": The item still applies but needs field changes (description, logic, action, etc.).
+- "delete": The rule text change makes this item obsolete or incorrect.
+
+You may also emit:
+- "add": A brand new item required by the updated rule text that has no equivalent in the existing checklist.
+
+Guidelines:
+- Use rule_text_anchor as the primary signal. If the anchor phrase still appears in the updated rule text \
+(even if reworded), prefer "keep" or "update" over "delete"+"add".
+- Only "delete" an item when the concept it checks is genuinely gone from the rule.
+- Only "add" when the rule text introduces a new concept not covered by any existing item.
+- Preserve existing items' ids exactly — do not invent new ids for updated items.
+- Children of kept/updated items are handled inline — include them under "children" as before.
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_recompile_prompt(
+    rule_text: str,
+    community_name: str,
+    platform: str,
+    other_rules_summary: str,
+    existing_items: list,
+) -> str:
+    import json
+
+    return f"""Update the checklist tree for the "{community_name}" community on {platform} to reflect the updated rule text.
+
+Community context (other rules, for background):
+{other_rules_summary if other_rules_summary else "No other rules yet."}
+
+Existing checklist items (with ids):
+{json.dumps(existing_items, indent=2)}
+
+Updated rule text:
+{rule_text}
+
+Return JSON in exactly this format:
+{{
+  "operations": [
+    {{"op": "keep", "existing_id": "..."}},
+    {{"op": "update", "existing_id": "...", "description": "...", "rule_text_anchor": "...", "item_type": "...", "logic": {{}}, "action": "...", "children": []}},
+    {{"op": "delete", "existing_id": "..."}},
+    {{"op": "add", "description": "...", "rule_text_anchor": "...", "item_type": "...", "logic": {{}}, "action": "...", "children": []}}
+  ]
 }}"""
 
 

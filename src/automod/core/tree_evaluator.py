@@ -1,12 +1,12 @@
 """Checklist tree walker: evaluates each node and combines results."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from ..db.models import ChecklistItem, Example, Rule
 from .deterministic import evaluate_deterministic
 from .structural import evaluate_structural
-from .actions import merge_item_results
+from .actions import VERDICT_PRECEDENCE
 
 logger = logging.getLogger(__name__)
 
@@ -17,15 +17,13 @@ class TreeEvaluator:
     def __init__(self, subjective_evaluator: Any):
         self.subjective_evaluator = subjective_evaluator
 
-    def _build_tree(self, items: list[ChecklistItem]) -> list[ChecklistItem]:
-        """Return root-level items; children are available via item.children relationship."""
-        return [item for item in items if item.parent_id is None]
-
     def _get_children(
         self, item: ChecklistItem, all_items: list[ChecklistItem]
     ) -> list[ChecklistItem]:
-        """Get direct children of an item from flat list."""
-        return [i for i in all_items if i.parent_id == item.id]
+        return sorted(
+            [i for i in all_items if i.parent_id == item.id],
+            key=lambda x: x.order,
+        )
 
     async def evaluate_rule(
         self,
@@ -39,9 +37,9 @@ class TreeEvaluator:
 
         Returns:
         {
-            "verdict": "approve" | "remove" | "flag",
+            "verdict": "approve" | "remove" | "review",
             "confidence": float,
-            "reasoning": {item_id: {passes, confidence, reasoning}},
+            "reasoning": {item_id: {triggered, confidence, reasoning}},
             "triggered_items": [item_id, ...]
         }
         """
@@ -53,7 +51,7 @@ class TreeEvaluator:
                 "triggered_items": [],
             }
 
-        # Collect all subjective items for batch evaluation
+        # Pre-evaluate all subjective items in a single batch for efficiency
         subjective_items = [i for i in checklist if i.item_type == "subjective"]
         subjective_results: dict[str, dict] = {}
 
@@ -67,145 +65,122 @@ class TreeEvaluator:
             for result in batch_results:
                 subjective_results[result["item_id"]] = result
 
-        # Evaluate all items
+        # Evaluate all items (deterministic + structural locally, subjective from batch)
         all_results: dict[str, dict] = {}
         for item in checklist:
             if item.item_type == "deterministic":
-                passes, reasoning = evaluate_deterministic(item, post)
-                confidence = 1.0  # deterministic is always certain
+                triggered, reasoning = evaluate_deterministic(item, post)
+                confidence = 1.0
             elif item.item_type == "structural":
-                passes, reasoning = evaluate_structural(item, post)
+                triggered, reasoning = evaluate_structural(item, post)
                 confidence = 1.0
             elif item.item_type == "subjective":
                 sub_result = subjective_results.get(item.id, {
-                    "passes": True,
+                    "triggered": False,
                     "confidence": 0.5,
                     "reasoning": "No result",
                 })
-                passes = sub_result.get("passes", True)
+                triggered = sub_result.get("triggered", False)
                 confidence = sub_result.get("confidence", 0.5)
                 reasoning = sub_result.get("reasoning", "")
             else:
-                passes = True
+                triggered = False
                 confidence = 0.5
                 reasoning = f"Unknown item type: {item.item_type}"
 
             all_results[item.id] = {
-                "passes": passes,
+                "triggered": triggered,
                 "confidence": confidence,
                 "reasoning": reasoning,
-                "fail_action": item.fail_action,
+                "action": item.action,
                 "item_type": item.item_type,
                 "description": item.description,
             }
 
-        # Walk tree to compute overall verdict
-        root_items = self._build_tree(checklist)
-        verdict, confidence, triggered = self._walk_tree(
+        # Walk root items and aggregate
+        root_items = sorted(
+            [i for i in checklist if i.parent_id is None], key=lambda x: x.order
+        )
+        verdict, confidence, triggered_ids, visited_ids = self._walk_roots(
             root_items, checklist, all_results
         )
+
+        # Only include items that were actually visited during the walk
+        visited_reasoning = {k: v for k, v in all_results.items() if k in visited_ids}
 
         return {
             "verdict": verdict,
             "confidence": confidence,
-            "reasoning": all_results,
-            "triggered_items": triggered,
+            "reasoning": visited_reasoning,
+            "triggered_items": triggered_ids,
         }
 
-    def _walk_tree(
+    def _walk_roots(
         self,
         root_items: list[ChecklistItem],
         all_items: list[ChecklistItem],
         all_results: dict[str, dict],
-    ) -> tuple[str, float, list[str]]:
-        """Walk the tree and determine final verdict for a rule.
-
-        Returns (verdict, confidence, triggered_item_ids).
-        """
-        triggered_items = []
+    ) -> tuple[str, float, list[str], set[str]]:
+        """Walk all root items and return worst verdict (OR logic across siblings)."""
         worst_verdict = "approve"
         worst_confidence = 1.0
+        all_triggered: list[str] = []
+        all_visited: set[str] = set()
 
-        for root_item in sorted(root_items, key=lambda x: x.order):
-            verdict, confidence, triggered = self._evaluate_subtree(
-                root_item, all_items, all_results
-            )
-            triggered_items.extend(triggered)
-
-            from .actions import VERDICT_PRECEDENCE
+        for item in root_items:
+            verdict, confidence, triggered, visited = self._evaluate_subtree(item, all_items, all_results)
+            all_triggered.extend(triggered)
+            all_visited.update(visited)
             if VERDICT_PRECEDENCE.get(verdict, 0) > VERDICT_PRECEDENCE.get(worst_verdict, 0):
                 worst_verdict = verdict
                 worst_confidence = confidence
             elif VERDICT_PRECEDENCE.get(verdict, 0) == VERDICT_PRECEDENCE.get(worst_verdict, 0):
-                # Same level — take lower confidence (more uncertain)
                 worst_confidence = min(worst_confidence, confidence)
 
-        return worst_verdict, worst_confidence, triggered_items
+        return worst_verdict, worst_confidence, all_triggered, all_visited
 
     def _evaluate_subtree(
         self,
         item: ChecklistItem,
         all_items: list[ChecklistItem],
         all_results: dict[str, dict],
-    ) -> tuple[str, float, list[str]]:
+    ) -> tuple[str, float, list[str], set[str]]:
         """Recursively evaluate an item and its children.
 
-        Returns (verdict, confidence, triggered_item_ids).
+        Returns (verdict, confidence, triggered_item_ids, visited_item_ids).
+
+        Semantics:
+        - If item is NOT triggered (answer=NO): return approve, skip children.
+        - If item IS triggered (answer=YES):
+            - Apply this item's own action as the minimum verdict.
+            - Evaluate children; any child can escalate the verdict (OR logic).
         """
+        result = all_results.get(item.id, {"triggered": False, "confidence": 0.5})
+        triggered = result.get("triggered", False)
+        confidence = result.get("confidence", 0.5)
+        visited: set[str] = {item.id}
+
+        if not triggered:
+            return "approve", confidence, [], visited
+
+        # Item says YES — translate action to verdict
+        # "flag" action → "review" verdict; "continue" is not a verdict on its own
+        _ACTION_TO_VERDICT = {"remove": "remove", "flag": "review", "continue": "approve"}
+        self_verdict = _ACTION_TO_VERDICT.get(item.action, "approve")
+        worst_verdict = self_verdict
+        worst_confidence = confidence
+        triggered_ids = [item.id]
+
+        # Evaluate children to potentially escalate
         children = self._get_children(item, all_items)
-        item_result = all_results.get(item.id, {"passes": True, "confidence": 0.5})
-
-        triggered = []
-
-        if not children:
-            # Leaf node
-            passes = item_result.get("passes", True)
-            confidence = item_result.get("confidence", 0.5)
-            if not passes:
-                triggered.append(item.id)
-                verdict = item.fail_action if item.fail_action != "continue" else "approve"
-            else:
-                verdict = "approve"
-            return verdict, confidence, triggered
-
-        # Non-leaf: evaluate children and combine
-        child_verdicts = []
-        child_results_for_combine = []
-
-        for child in sorted(children, key=lambda x: x.order):
-            child_verdict, child_confidence, child_triggered = self._evaluate_subtree(
+        for child in children:
+            child_verdict, child_confidence, child_triggered, child_visited = self._evaluate_subtree(
                 child, all_items, all_results
             )
-            triggered.extend(child_triggered)
+            triggered_ids.extend(child_triggered)
+            visited.update(child_visited)
+            if VERDICT_PRECEDENCE.get(child_verdict, 0) > VERDICT_PRECEDENCE.get(worst_verdict, 0):
+                worst_verdict = child_verdict
+                worst_confidence = child_confidence
 
-            from .actions import VERDICT_PRECEDENCE
-            child_passes = VERDICT_PRECEDENCE.get(child_verdict, 1) == VERDICT_PRECEDENCE.get("approve", 1)
-            child_results_for_combine.append({
-                "passes": child_passes,
-                "confidence": child_confidence,
-            })
-            child_verdicts.append(child_verdict)
-
-        # Apply this node's combine_mode to children
-        combined_passes, combined_confidence = merge_item_results(
-            child_results_for_combine, item.combine_mode
-        )
-
-        # Also consider this node's own evaluation
-        self_passes = item_result.get("passes", True)
-
-        # Final: node passes if it passes AND its children pass (for all_must_pass logic)
-        final_passes = combined_passes and self_passes
-
-        if not final_passes:
-            triggered.append(item.id)
-            verdict = item.fail_action if item.fail_action != "continue" else "approve"
-            # Escalate to worst child verdict if worse
-            from .actions import VERDICT_PRECEDENCE
-            for cv in child_verdicts:
-                if VERDICT_PRECEDENCE.get(cv, 0) > VERDICT_PRECEDENCE.get(verdict, 0):
-                    verdict = cv
-        else:
-            verdict = "approve"
-
-        return verdict, combined_confidence, triggered
+        return worst_verdict, worst_confidence, triggered_ids, visited

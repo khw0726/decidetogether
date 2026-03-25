@@ -71,8 +71,7 @@ class ChecklistItemRead(BaseModel):
     rule_text_anchor: Optional[str] = None
     item_type: str
     logic: dict[str, Any]
-    combine_mode: str
-    fail_action: str
+    action: str
     updated_at: datetime
     children: list["ChecklistItemRead"] = []
 
@@ -84,8 +83,7 @@ class ChecklistItemUpdate(BaseModel):
     rule_text_anchor: Optional[str] = None
     item_type: Optional[str] = None
     logic: Optional[dict[str, Any]] = None
-    combine_mode: Optional[str] = None
-    fail_action: Optional[str] = None
+    action: Optional[str] = None
     order: Optional[int] = None
 
 
@@ -139,10 +137,13 @@ class DecisionRead(BaseModel):
 
 
 class DecisionResolve(BaseModel):
-    verdict: str  # approve | remove | flag
+    verdict: str  # approve | remove | review
     reasoning_category: Optional[str] = None
     # rule_doesnt_apply | edge_case_allow | rule_needs_update | agent_wrong_interpretation | agree
     notes: Optional[str] = None
+    rule_ids: Optional[list[str]] = None
+    # Required when moderator overrides to remove/review on a post the agent approved
+    # (agent had no triggered_rules to link the example to)
 
 
 # ── PostContent ────────────────────────────────────────────────────────────────

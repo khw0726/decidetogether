@@ -23,11 +23,11 @@ _EVAL_TOOL = {
                     "type": "object",
                     "properties": {
                         "item_id": {"type": "string"},
-                        "passes": {"type": "boolean"},
+                        "triggered": {"type": "boolean"},
                         "confidence": {"type": "number"},
                         "reasoning": {"type": "string"},
                     },
-                    "required": ["item_id", "passes", "confidence", "reasoning"],
+                    "required": ["item_id", "triggered", "confidence", "reasoning"],
                 },
             },
         },
@@ -81,8 +81,9 @@ class SubjectiveEvaluator:
     ) -> list[dict[str, Any]]:
         """Batch evaluate multiple subjective items in a single LLM call.
 
-        Returns list of {item_id, passes, confidence, reasoning}.
+        Returns list of {item_id, triggered, confidence, reasoning}.
         Uses Haiku first; escalates low-confidence items to Sonnet.
+        triggered=True means the item's question is answered YES (violation detected).
         """
         if not items:
             return []
@@ -104,11 +105,10 @@ class SubjectiveEvaluator:
             haiku_results = haiku_response.get("results", [])
         except Exception as e:
             logger.error(f"Haiku evaluation failed: {e}")
-            # Return default uncertain results
             return [
                 {
                     "item_id": item.id,
-                    "passes": True,
+                    "triggered": False,
                     "confidence": 0.5,
                     "reasoning": f"Evaluation failed: {e}",
                 }
@@ -154,7 +154,7 @@ class SubjectiveEvaluator:
                 else:
                     final_results.append(haiku_by_id.get(item.id, {
                         "item_id": item.id,
-                        "passes": True,
+                        "triggered": False,
                         "confidence": 0.5,
                         "reasoning": "No result returned",
                     }))

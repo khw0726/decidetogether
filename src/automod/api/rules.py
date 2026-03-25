@@ -6,7 +6,7 @@ from typing import Optional
 
 import anthropic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -37,7 +37,12 @@ async def _compile_rule_background(
     rule_id: str,
     community_id: str,
 ) -> None:
-    """Background task to compile a rule after creation."""
+    """Background task to compile (or recompile) a rule.
+
+    First compile: runs compile_rule() and inserts all items fresh.
+    Recompile: runs recompile_with_diff() and applies keep/update/add/delete ops
+    against the existing checklist rows, preserving as much as possible.
+    """
     from ..db.database import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
@@ -63,61 +68,36 @@ async def _compile_rule_background(
             )
             other_rules = list(other_rules_result.scalars().all())
 
-            compiler = get_compiler()
-            checklist_items, example_dicts = await compiler.compile_rule(
-                rule=rule,
-                community=community,
-                other_rules=other_rules,
+            # Load existing top-level checklist items (parent_id IS NULL)
+            existing_result = await db.execute(
+                select(ChecklistItem).where(
+                    ChecklistItem.rule_id == rule_id,
+                    ChecklistItem.parent_id == None,  # noqa: E711
+                )
             )
+            existing_items = list(existing_result.scalars().all())
 
-            # Persist checklist items (handle parent_id linking)
-            added_items = []
-            for item in checklist_items:
-                db.add(item)
-                added_items.append(item)
+            compiler = get_compiler()
 
-            await db.flush()  # Get IDs
-
-            # Link children that were stored with _children_data
-            pending_with_children = [
-                item for item in added_items if getattr(item, "_children_data", [])
-            ]
-            for parent_item in pending_with_children:
-                children_data = getattr(parent_item, "_children_data", [])
-                for i, child_data in enumerate(children_data):
-                    child = ChecklistItem(
-                        rule_id=rule_id,
-                        order=i,
-                        parent_id=parent_item.id,
-                        description=child_data.get("description", ""),
-                        rule_text_anchor=child_data.get("rule_text_anchor"),
-                        item_type=child_data.get("item_type", "subjective"),
-                        logic=child_data.get("logic", {}),
-                        combine_mode=child_data.get("combine_mode", "all_must_pass"),
-                        fail_action=child_data.get("fail_action", "flag"),
-                    )
-                    db.add(child)
-
-            # Persist examples
-            for ex_dict in example_dicts:
-                content = ex_dict.get("content", {})
-                label = ex_dict.get("label", "positive")
-                relevance_note = ex_dict.get("relevance_note", "")
-
-                example = Example(
-                    content=content,
-                    label=label,
-                    source="generated",
+            if not existing_items:
+                # ── First compile ────────────────────────────────────────────
+                checklist_items, example_dicts = await compiler.compile_rule(
+                    rule=rule,
+                    community=community,
+                    other_rules=other_rules,
                 )
-                db.add(example)
-                await db.flush()
-
-                link = ExampleRuleLink(
-                    example_id=example.id,
-                    rule_id=rule_id,
-                    relevance_note=relevance_note,
+                await _persist_new_items(db, checklist_items, rule_id)
+                await _persist_new_examples(db, example_dicts, rule_id)
+            else:
+                # ── Recompile with diff ──────────────────────────────────────
+                operations = await compiler.recompile_with_diff(
+                    rule=rule,
+                    community=community,
+                    other_rules=other_rules,
+                    existing_items=existing_items,
                 )
-                db.add(link)
+                existing_by_id = {item.id: item for item in existing_items}
+                await _apply_diff_operations(db, operations, existing_by_id, rule_id)
 
             await db.commit()
             logger.info(f"Compilation complete for rule {rule_id}")
@@ -125,6 +105,135 @@ async def _compile_rule_background(
         except Exception as e:
             logger.error(f"Compilation failed for rule {rule_id}: {e}")
             await db.rollback()
+
+
+async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
+    """Insert a fresh set of checklist items, handling parent_id linking for children."""
+    added_items = []
+    for item in checklist_items:
+        db.add(item)
+        added_items.append(item)
+
+    await db.flush()
+
+    for parent_item in added_items:
+        children_data = getattr(parent_item, "_children_data", [])
+        for i, child_data in enumerate(children_data):
+            child = ChecklistItem(
+                rule_id=rule_id,
+                order=i,
+                parent_id=parent_item.id,
+                description=child_data.get("description", ""),
+                rule_text_anchor=child_data.get("rule_text_anchor"),
+                item_type=child_data.get("item_type", "subjective"),
+                logic=child_data.get("logic", {}),
+                action=child_data.get("action", "flag"),
+            )
+            db.add(child)
+
+
+async def _persist_new_examples(db, example_dicts: list, rule_id: str) -> None:
+    """Insert generated examples and link them to the rule."""
+    for ex_dict in example_dicts:
+        example = Example(
+            content=ex_dict.get("content", {}),
+            label=ex_dict.get("label", "positive"),
+            source="generated",
+        )
+        db.add(example)
+        await db.flush()
+        db.add(ExampleRuleLink(
+            example_id=example.id,
+            rule_id=rule_id,
+            relevance_note=ex_dict.get("relevance_note", ""),
+        ))
+
+
+async def _apply_diff_operations(
+    db,
+    operations: list[dict],
+    existing_by_id: dict,
+    rule_id: str,
+) -> None:
+    """Apply keep/update/add/delete operations from recompile_with_diff()."""
+    for op in operations:
+        kind = op.get("op")
+
+        if kind == "keep":
+            # Nothing to do — row stays as-is
+            pass
+
+        elif kind == "update":
+            item = existing_by_id.get(op.get("existing_id"))
+            if item is None:
+                logger.warning(f"recompile update: unknown id {op.get('existing_id')!r}")
+                continue
+            if "description" in op:
+                item.description = op["description"]
+            if "rule_text_anchor" in op:
+                item.rule_text_anchor = op["rule_text_anchor"]
+            if "item_type" in op:
+                item.item_type = op["item_type"]
+            if "logic" in op:
+                item.logic = op["logic"]
+            if "action" in op:
+                item.action = op["action"]
+            # Replace children: delete old child rows, insert new ones
+            if "children" in op:
+                await db.execute(
+                    sa_delete(ChecklistItem).where(ChecklistItem.parent_id == item.id)
+                )
+                await db.flush()
+                for i, child_data in enumerate(op["children"]):
+                    db.add(ChecklistItem(
+                        rule_id=rule_id,
+                        order=i,
+                        parent_id=item.id,
+                        description=child_data.get("description", ""),
+                        rule_text_anchor=child_data.get("rule_text_anchor"),
+                        item_type=child_data.get("item_type", "subjective"),
+                        logic=child_data.get("logic", {}),
+                        action=child_data.get("action", "flag"),
+                    ))
+
+        elif kind == "delete":
+            item = existing_by_id.get(op.get("existing_id"))
+            if item is None:
+                logger.warning(f"recompile delete: unknown id {op.get('existing_id')!r}")
+                continue
+            # Explicitly delete children first (async ORM cascade requires loaded relationships)
+            await db.execute(
+                sa_delete(ChecklistItem).where(ChecklistItem.parent_id == item.id)
+            )
+            await db.delete(item)
+
+        elif kind == "add":
+            new_item = ChecklistItem(
+                rule_id=rule_id,
+                order=op.get("order", 0),
+                parent_id=None,
+                description=op.get("description", ""),
+                rule_text_anchor=op.get("rule_text_anchor"),
+                item_type=op.get("item_type", "subjective"),
+                logic=op.get("logic", {}),
+                action=op.get("action", "flag"),
+            )
+            db.add(new_item)
+            await db.flush()
+            for i, child_data in enumerate(op.get("children", [])):
+                db.add(ChecklistItem(
+                    rule_id=rule_id,
+                    order=i,
+                    parent_id=new_item.id,
+                    description=child_data.get("description", ""),
+                    rule_text_anchor=child_data.get("rule_text_anchor"),
+                    item_type=child_data.get("item_type", "subjective"),
+                    logic=child_data.get("logic", {}),
+                    action=child_data.get("action", "flag"),
+                ))
+
+        else:
+            logger.warning(f"recompile: unknown op {kind!r}, skipping")
 
 
 @router.post("/communities/{community_id}/rules", response_model=RuleRead, status_code=201)

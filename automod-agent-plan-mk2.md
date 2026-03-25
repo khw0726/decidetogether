@@ -95,22 +95,28 @@ ChecklistItem
 ├── rule_id: FK → Rule
 ├── order: integer (position in evaluation tree)
 ├── parent_id: FK → ChecklistItem (nullable, for tree structure)
-├── description: string (what this item checks)
-├── intent: string (explains how this item implements the rule's intent;
-│   references the specific clause or phrase in the rule text that
-│   this item operationalizes, e.g., "Implements 'no advertising' by
-│   detecting commercial language patterns in post text")
+├── description: string (yes/no question where YES = potential violation;
+│   always framed so YES = problem detected, e.g., "Does the post advertise
+│   a product or service?" not "Is the post non-promotional?")
 ├── rule_text_anchor: string (nullable; the exact phrase or sentence from
 │   the rule text that this item derives from, e.g., "not advertise
 │   products or services")
 ├── item_type: enum (deterministic | structural | subjective)
 ├── logic: JSON (see 3.2 for type-specific schemas)
-├── combine_mode: enum (all_must_pass | any_must_pass | weighted)
-│   (how child items combine; only relevant for non-leaf nodes)
-├── weight: float (for weighted combining at parent level)
-├── fail_action: enum (remove | flag | continue)
-│   (what happens if this item triggers; leaf nodes only)
+├── action: enum (remove | flag | continue)
+│   - What to do when this item says YES (triggered = True = violation detected)
+│   - For leaf nodes: the final consequence
+│   - For non-leaf nodes: the minimum consequence; children can only escalate
+│   - `continue` with no triggered children resolves to `approve`
 └── updated_at: timestamp
+
+**Decision tree semantics:**
+- `triggered = True` means the item's question is answered YES (violation signal detected)
+- `triggered = False` means NO — item passes, children are skipped entirely
+- OR logic is always used: if any item at any level is triggered, the worst action wins
+- No `combine_mode` — the tree structure itself encodes specificity, not combining logic
+- "No leads to further inspection" cases are rephrased as YES-violation questions with children
+  (e.g., "Post discusses political topics?" YES → child: "Is political flair missing?" YES → FLAG)
 
 Example
 ├── id: UUID
@@ -249,9 +255,9 @@ Before attempting compilation, the system classifies whether the rule is actiona
 1. User pastes or writes a rule (e.g., "No self-promotion or spam. Posts should contribute to the community, not advertise products or services.")
 2. System sends the rule text + community context + platform type to Claude API. Non-actionable rules from the same community are included as background context (so the compiler understands the community's tone and scope) but are not themselves compiled.
 3. Claude returns a structured checklist tree. Prompt should instruct Claude to:
-   - Break the rule into atomic checkable items.
-   - For each item, write an `intent` field that explains in plain language how this item connects to the rule's purpose and which aspect of the rule it operationalizes.
-   - For each item, extract a `rule_text_anchor` — the specific phrase or sentence from the original rule text that this item derives from. If the item addresses an implicit concern not directly stated in the rule text (e.g., checking account age for a "no spam" rule), the anchor should be null and the intent should explain the inference.
+   - Break the rule into atomic yes/no questions where YES = violation detected.
+   - Frame each question so that YES = problem exists (e.g., "Does this post advertise a product?" not "Is this post non-promotional?").
+   - For each item, extract a `rule_text_anchor` — the specific phrase from the original rule text this item derives from (null if inferred rather than explicit).
    - Classify each as deterministic, structural, or subjective.
    - Provide regex patterns for deterministic items.
    - Specify structural field checks.
@@ -281,11 +287,14 @@ Rule to compile: {rule_text}
 **Process:**
 1. Receive a post (from platform adapter or manual input).
 2. Iterate **actionable** rules in priority order (non-actionable rules are skipped for evaluation but included as community context for subjective LLM calls).
-3. For each rule, walk the checklist tree:
-   - **Deterministic items:** Execute regex/pattern matching locally. No LLM call needed.
-   - **Structural items:** Check against post metadata fields. No LLM call needed.
-   - **Subjective items:** Call Claude API with the post content, the item's prompt/rubric, and relevant examples. Parse the response for a judgment + reasoning.
-4. Combine item results per the tree structure (all_must_pass / any_must_pass / weighted).
+3. For each rule, evaluate all checklist items (pre-evaluated in a single batch for subjective items), then walk the decision tree:
+   - **Deterministic items:** Execute regex/pattern matching locally. `triggered=True` when a pattern matches (violation found). No LLM call.
+   - **Structural items:** Check post metadata fields. `triggered=True` when condition is met (e.g., account too new). No LLM call.
+   - **Subjective items:** Pre-evaluated in a single batched Claude API call (Haiku first, escalate low-confidence items to Sonnet). LLM returns `triggered: bool` (True = violation detected).
+4. Walk the tree with OR logic:
+   - If an item is NOT triggered (answer = NO): return approve, skip children entirely.
+   - If an item IS triggered (answer = YES): apply its `action` as the minimum verdict, then evaluate children — any child can escalate but not lower the verdict.
+   - Only items actually visited during the walk appear in the reasoning output.
 5. Aggregate across rules to produce a final verdict:
    - If any rule's tree results in REMOVE → agent verdict = REMOVE.
    - If any rule's tree results in FLAG → agent verdict = FLAG (unless overridden by REMOVE).
@@ -529,14 +538,13 @@ class PlatformAdapter(ABC):
 ### Decision: Suggestions, Not Auto-Updates
 All bidirectional alignment propagation is surfaced as suggestions. This avoids the "afraid to touch anything" problem and keeps moderators in control. The tradeoff is more clicks, but trust is worth more than convenience in v1.
 
-### Decision: Intent and Rule Text Anchor on Checklist Items
-Every checklist item carries an `intent` (why it exists) and a `rule_text_anchor` (which phrase in the rule it derives from). This serves three purposes:
-1. **Transparency:** Moderators can understand why the agent checks what it checks, without needing to reverse-engineer the logic.
-2. **Alignment diagnostics:** When a moderator overrides a decision, the intent field helps the system (and the moderator) pinpoint whether the problem is the rule text, the interpretation, or the logic. An override on an item whose intent says "Implements 'no advertising' by detecting commercial language" tells you something different than one whose intent says "Inferred: checks account age as spam signal."
-3. **Recompile stability:** When rule text is edited and recompiled, the compiler can use existing anchors to match old checklist items to their new counterparts, preserving user customizations on items whose anchoring text hasn't changed. Items whose anchor text was deleted or substantially rewritten get flagged for review.
+### Decision: Rule Text Anchor on Checklist Items
+Every checklist item carries a `rule_text_anchor` (which phrase in the rule it derives from, or null if inferred). This serves two purposes:
+1. **Transparency:** Moderators can understand why the agent checks what it checks.
+2. **Recompile stability:** When rule text is edited and recompiled, the compiler uses existing anchors to match old checklist items to their new counterparts, preserving user customizations on items whose anchoring text hasn't changed. Items whose anchor text was deleted or substantially rewritten get flagged for review.
 
-### Decision: Tree Structure for Checklist Evaluation
-Checklist items form a tree with combining logic at each non-leaf node. This is more expressive than a flat list but harder to edit. Default trees should be shallow (2 levels max) to keep the UI manageable.
+### Decision: Decision Tree with OR Logic and YES=Violation Framing
+Checklist items form a decision tree where every item is a yes/no question framed so YES = violation signal. OR logic is always used — if any triggered item leads to REMOVE/FLAG, that wins. There is no `combine_mode`; the tree structure itself encodes specificity. Children are only evaluated when their parent is triggered, so a NO answer prunes the entire subtree. This keeps the model simple and consistent: the compiler always frames questions as "does this violation exist?" Default trees should be shallow (2 levels max) to keep the UI manageable.
 
 ### Decision: Community Norms Layer Separate from Rules
 The FLAG-without-rule-violation case uses a separate evaluation path. This keeps the rule-based system clean and deterministic while still catching emerging issues.

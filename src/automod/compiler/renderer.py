@@ -37,12 +37,11 @@ def _render_items(
             "remove": "→REMOVE",
             "flag": "→FLAG",
             "continue": "→continue",
-        }.get(item.fail_action, "")
+        }.get(item.action, "")
 
         lines.append(f"{prefix}{type_badge} {item.description} {action_badge}")
         if item.rule_text_anchor:
             lines.append(f"{prefix}    Anchor: \"{item.rule_text_anchor}\"")
-        lines.append(f"{prefix}    Combine: {item.combine_mode}")
 
         children = children_map.get(item.id, [])
         if children:

@@ -92,7 +92,7 @@ export default function Dashboard({ communityId }: DashboardProps) {
               const colors: Record<string, string> = {
                 approve: 'bg-green-500',
                 remove: 'bg-red-500',
-                flag: 'bg-amber-500',
+                review: 'bg-amber-500',
               }
               return (
                 <div key={verdict}>
