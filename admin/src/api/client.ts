@@ -170,6 +170,14 @@ export const batchImportRules = (communityId: string, rules: BatchImportRuleItem
 export const getChecklist = (ruleId: string) =>
   api.get<ChecklistItem[]>(`/rules/${ruleId}/checklist`).then(r => r.data)
 
+export const createChecklistItem = (ruleId: string, data: {
+  description: string
+  item_type?: string
+  action?: string
+  parent_id?: string | null
+  rule_text_anchor?: string | null
+}) => api.post<ChecklistItem>(`/rules/${ruleId}/checklist-items`, data).then(r => r.data)
+
 export const updateChecklistItem = (itemId: string, data: Partial<ChecklistItem>) =>
   api.put<ChecklistItem>(`/checklist-items/${itemId}`, data).then(r => r.data)
 

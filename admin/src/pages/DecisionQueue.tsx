@@ -146,6 +146,46 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
   )
 }
 
+function ItemReasoningTree({
+  itemReasoning,
+  parentId,
+  depth,
+}: {
+  itemReasoning: Record<string, unknown>
+  parentId: string | null
+  depth: number
+}) {
+  const items = Object.entries(itemReasoning).filter(([, itemR]) => {
+    const ir = itemR as Record<string, unknown>
+    return (ir.parent_id ?? null) === parentId
+  })
+
+  if (items.length === 0) return null
+
+  return (
+    <>
+      {items.map(([itemId, itemR]) => {
+        const ir = itemR as Record<string, unknown>
+        return (
+          <div key={itemId} style={{ marginLeft: depth * 12 }}>
+            <div className={`pl-3 border-l-2 ${ir.triggered ? 'border-red-300' : 'border-green-300'}`}>
+              <span className="text-gray-500">{ir.description as string}: </span>
+              <span className={ir.triggered ? 'text-red-700' : 'text-green-700'}>
+                {ir.reasoning as string}
+              </span>
+            </div>
+            <ItemReasoningTree
+              itemReasoning={itemReasoning}
+              parentId={itemId}
+              depth={depth + 1}
+            />
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
 function DecisionCard({
   decision,
   rulesMap,
@@ -345,17 +385,11 @@ function DecisionCard({
                   </div>
                   {!!r.item_reasoning && (
                     <div className="space-y-1 mt-2">
-                      {Object.entries(r.item_reasoning as Record<string, unknown>).map(([itemId, itemR]) => {
-                        const ir = itemR as Record<string, unknown>
-                        return (
-                          <div key={itemId} className={`pl-3 border-l-2 ${ir.triggered ? 'border-red-300' : 'border-green-300'}`}>
-                            <span className="text-gray-500">{ir.description as string}: </span>
-                            <span className={ir.triggered ? 'text-red-700' : 'text-green-700'}>
-                              {ir.reasoning as string}
-                            </span>
-                          </div>
-                        )
-                      })}
+                      <ItemReasoningTree
+                        itemReasoning={r.item_reasoning as Record<string, unknown>}
+                        parentId={null}
+                        depth={0}
+                      />
                     </div>
                   )}
                 </div>

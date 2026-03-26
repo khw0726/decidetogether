@@ -12,7 +12,7 @@ from ..config import settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
 from ..db.models import ChecklistItem, Community, Example, ExampleRuleLink, Rule, Suggestion
-from ..models.schemas import ChecklistItemRead, ChecklistItemUpdate, SuggestionRead
+from ..models.schemas import ChecklistItemCreate, ChecklistItemRead, ChecklistItemUpdate, SuggestionRead
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["checklist"])
@@ -76,6 +76,71 @@ async def get_checklist(
     return _build_tree(items)
 
 
+@router.post("/rules/{rule_id}/checklist-items", response_model=ChecklistItemRead, status_code=201)
+async def create_checklist_item(
+    rule_id: str, body: ChecklistItemCreate, db: AsyncSession = Depends(get_db)
+) -> ChecklistItemRead:
+    rule_result = await db.execute(
+        select(Rule).where(Rule.id == rule_id)
+    )
+    rule = rule_result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    community_result = await db.execute(
+        select(Community).where(Community.id == rule.community_id)
+    )
+    community = community_result.scalar_one_or_none()
+
+    # Validate parent belongs to same rule; enforce parent action = continue
+    if body.parent_id:
+        parent_result = await db.execute(
+            select(ChecklistItem).where(
+                ChecklistItem.id == body.parent_id,
+                ChecklistItem.rule_id == rule_id,
+            )
+        )
+        parent_item = parent_result.scalar_one_or_none()
+        if not parent_item:
+            raise HTTPException(status_code=400, detail="Parent item not found in this rule")
+        if parent_item.action != "continue":
+            parent_item.action = "continue"
+
+    # Fetch all existing items for this rule (context for inference)
+    existing_result = await db.execute(
+        select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+    )
+    existing_items = list(existing_result.scalars().all())
+
+    # Place at end of siblings
+    siblings = [i for i in existing_items if i.parent_id == body.parent_id]
+    next_order = max((s.order for s in siblings), default=-1) + 1
+
+    # Infer item_type and logic via Claude
+    compiler = get_compiler()
+    inferred = await compiler.compile_single_item(
+        description=body.description,
+        rule=rule,
+        community=community,
+        existing_items=existing_items,
+    )
+
+    item = ChecklistItem(
+        rule_id=rule_id,
+        parent_id=body.parent_id,
+        order=next_order,
+        description=body.description,
+        rule_text_anchor=body.rule_text_anchor,
+        item_type=inferred["item_type"],
+        logic=inferred["logic"],
+        action=body.action,
+    )
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    return _item_to_read(item)
+
+
 @router.put("/checklist-items/{item_id}", response_model=ChecklistItemRead)
 async def update_checklist_item(
     item_id: str,
@@ -96,7 +161,12 @@ async def update_checklist_item(
     if body.logic is not None:
         item.logic = body.logic
     if body.action is not None:
-        item.action = body.action
+        # Non-leaf nodes must always use "continue"
+        has_children_result = await db.execute(
+            select(ChecklistItem).where(ChecklistItem.parent_id == item_id).limit(1)
+        )
+        is_non_leaf = has_children_result.scalar_one_or_none() is not None
+        item.action = "continue" if is_non_leaf else body.action
     if body.order is not None:
         item.order = body.order
 

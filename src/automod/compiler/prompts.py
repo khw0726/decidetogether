@@ -39,15 +39,20 @@ Each checklist item must have:
 - rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred)
 - item_type: "deterministic" (regex), "structural" (metadata), or "subjective" (LLM judgment)
 - logic: Type-specific schema (see below)
-- action: What to do when YES: "remove", "flag", or "continue" (for non-leaf nodes, this is the minimum consequence)
+- action: "remove", "flag", or "continue"
+  - Leaf nodes (no children): use "remove" or "flag" to set the consequence.
+  - Non-leaf nodes (has children): MUST always be "continue". The verdict comes entirely from the children.
 - children: Sub-items evaluated when this item says YES (empty list for leaf nodes)
 
 Tree evaluation semantics:
 - If an item says NO: no action, children are skipped.
-- If an item says YES: apply its action and evaluate children. Any child can escalate the verdict.
+- If an item says YES: apply its action, then evaluate children. Children can only escalate the verdict.
+- Non-leaf action is always "continue" — children are the sole decision-makers.
 - At every level, the worst action (REMOVE > FLAG > approve) wins across all siblings.
 - Frame every question so YES = violation. Avoid "Does the post have X?" (where having X is good).
   Instead write "Does the post lack X?" or restructure using children.
+- Use children to refine broad checks: e.g. a deterministic parent (fast gate) with a subjective child
+  (confirms it's a real violation, not a false positive). Parent action = "continue" always.
 
 Logic schemas:
 - deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any"|"all", "negate": false}
@@ -314,6 +319,47 @@ Return JSON in exactly this format:
 
 Items to evaluate:
 {items_str}"""
+
+
+# ── Single Item Inference ──────────────────────────────────────────────────────
+
+INFER_ITEM_SYSTEM = """You are a moderation rule compiler. Given a checklist item description (a yes/no question where YES = violation), classify it and generate the appropriate logic JSON.
+
+Item types:
+- **deterministic**: Can be evaluated with regex pattern matching against post text. Use when the violation is detectable by specific words, phrases, URLs, or formatting patterns.
+- **structural**: Can be evaluated against post metadata fields (account_age_days, karma, post_type, flair, etc.). Use when the violation depends on who posted or how, not what they wrote.
+- **subjective**: Requires LLM judgment. Use when detecting the violation requires understanding context, intent, or nuance that patterns can't capture.
+
+Logic schemas:
+- deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any", "negate": false}
+- structural: {"type": "structural", "checks": [{"field": "...", "operator": "<|>|==|!=|<=|>=", "value": ...}], "match_mode": "all"}
+- subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
+
+Note: the `action` field is NOT part of this inference — it is provided separately by the user.
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_infer_item_prompt(
+    description: str,
+    rule_text: Optional[str] = None,
+    community_name: str = "",
+    existing_items: Optional[list[dict]] = None,
+) -> str:
+    parts = []
+    if community_name:
+        parts.append(f"Community: {community_name}")
+    if rule_text:
+        parts.append(f"Rule this item belongs to:\n{rule_text}")
+    if existing_items:
+        items_str = "\n".join(
+            f"- [{item['item_type']}] {item['description']}"
+            for item in existing_items
+        )
+        parts.append(f"Existing checklist items for this rule (for context, avoid duplication):\n{items_str}")
+    parts.append(f"New item description: {description}")
+    parts.append("Classify this item and generate the logic JSON.")
+    return "\n\n".join(parts)
 
 
 # ── Community Norms ────────────────────────────────────────────────────────────

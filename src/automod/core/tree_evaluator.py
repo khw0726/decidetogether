@@ -95,6 +95,7 @@ class TreeEvaluator:
                 "action": item.action,
                 "item_type": item.item_type,
                 "description": item.description,
+                "parent_id": item.parent_id,
             }
 
         # Walk root items and aggregate

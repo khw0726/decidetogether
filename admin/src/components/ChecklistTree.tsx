@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2 } from 'lucide-react'
-import { ChecklistItem, updateChecklistItem, deleteChecklistItem } from '../api/client'
+import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus } from 'lucide-react'
+import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem } from '../api/client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 interface ChecklistTreeProps {
@@ -10,18 +10,28 @@ interface ChecklistTreeProps {
 }
 
 export default function ChecklistTree({ items, ruleId, onAnchorHover }: ChecklistTreeProps) {
-  if (items.length === 0) {
-    return (
-      <div className="text-sm text-gray-400 italic py-4 text-center">
-        No checklist items yet. Compile the rule to generate them.
-      </div>
-    )
-  }
+  const [adding, setAdding] = useState(false)
   return (
     <div className="space-y-1">
+      {items.length === 0 && !adding && (
+        <div className="text-sm text-gray-400 italic py-4 text-center">
+          No checklist items yet. Compile the rule to generate them, or add one manually.
+        </div>
+      )}
       {items.map(item => (
         <ChecklistNode key={item.id} item={item} ruleId={ruleId} depth={0} onAnchorHover={onAnchorHover} />
       ))}
+      {adding
+        ? <AddItemForm ruleId={ruleId} parentId={null} onDone={() => setAdding(false)} />
+        : (
+          <button
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-indigo-600 px-1 py-1 mt-1"
+            onClick={() => setAdding(true)}
+          >
+            <Plus size={13} /> Add root item
+          </button>
+        )
+      }
     </div>
   )
 }
@@ -119,6 +129,59 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
   )
 }
 
+// ── AddItemForm ───────────────────────────────────────────────────────────────
+
+function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: string | null; onDone: () => void }) {
+  const [description, setDescription] = useState('')
+  const [action, setAction] = useState('flag')
+  const queryClient = useQueryClient()
+
+  const mutation = useMutation({
+    mutationFn: () => createChecklistItem(ruleId, { description, action, parent_id: parentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklist', ruleId] })
+      onDone()
+    },
+  })
+
+  return (
+    <div className="border border-indigo-200 rounded-lg p-3 bg-indigo-50 space-y-2 text-xs">
+      <input
+        autoFocus
+        className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+        placeholder="Yes/no question (YES = violation)..."
+        value={description}
+        onChange={e => setDescription(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && description.trim()) mutation.mutate(); if (e.key === 'Escape') onDone() }}
+      />
+      <div className="flex items-center gap-2">
+        <span className="text-gray-400 italic">Type inferred automatically</span>
+        <select
+          className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none ml-auto"
+          value={action}
+          onChange={e => setAction(e.target.value)}
+        >
+          <option value="flag">Flag</option>
+          <option value="remove">Remove</option>
+          <option value="continue">Continue</option>
+        </select>
+        <button
+          className="btn-primary text-xs py-1"
+          onClick={() => mutation.mutate()}
+          disabled={!description.trim() || mutation.isPending}
+        >
+          <Check size={12} />
+          {mutation.isPending ? 'Inferring...' : 'Add'}
+        </button>
+        <button className="btn-secondary text-xs py-1" onClick={onDone}>
+          <X size={12} />
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── ChecklistNode ─────────────────────────────────────────────────────────────
 
 function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void }) {
@@ -126,8 +189,8 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
   const [editing, setEditing] = useState(false)
   const [showLogic, setShowLogic] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [addingChild, setAddingChild] = useState(false)
   const [editedDescription, setEditedDescription] = useState(item.description)
-  const [editedIntent, setEditedIntent] = useState(item.intent)
   const [editedFailAction, setEditedFailAction] = useState(item.action)
 
   const queryClient = useQueryClient()
@@ -164,7 +227,6 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
   const handleSave = () => {
     mutation.mutate({
       description: editedDescription,
-      intent: editedIntent,
       action: editedFailAction as 'remove' | 'flag' | 'continue',
     })
   }
@@ -192,7 +254,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {typeBadge}
-              {actionBadge}
+              {!hasChildren && actionBadge}
               {!editing && (
                 <span className="text-sm font-medium text-gray-800">{item.description}</span>
               )}
@@ -208,27 +270,20 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
                     onChange={e => setEditedDescription(e.target.value)}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Intent</label>
-                  <textarea
-                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    rows={2}
-                    value={editedIntent}
-                    onChange={e => setEditedIntent(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Fail Action</label>
-                  <select
-                    className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    value={editedFailAction}
-                    onChange={e => setEditedFailAction(e.target.value)}
-                  >
-                    <option value="remove">remove</option>
-                    <option value="flag">flag</option>
-                    <option value="continue">continue</option>
-                  </select>
-                </div>
+                {!hasChildren && (
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Action</label>
+                    <select
+                      className="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={editedFailAction}
+                      onChange={e => setEditedFailAction(e.target.value)}
+                    >
+                      <option value="remove">remove</option>
+                      <option value="flag">flag</option>
+                      <option value="continue">continue</option>
+                    </select>
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <button className="btn-primary text-xs py-1" onClick={handleSave} disabled={mutation.isPending}>
                     <Check size={12} />
@@ -242,7 +297,6 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
               </div>
             ) : (
               <>
-                <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.intent}</p>
                 {item.rule_text_anchor && (
                   <p className="text-xs text-indigo-600 mt-1">
                     Anchor: &ldquo;{item.rule_text_anchor}&rdquo;
@@ -268,6 +322,13 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
                 title="Edit item"
               >
                 <Edit2 size={14} />
+              </button>
+              <button
+                className="p-1 text-gray-400 hover:text-indigo-600 rounded"
+                onClick={() => { setExpanded(true); setAddingChild(true) }}
+                title="Add child item"
+              >
+                <Plus size={14} />
               </button>
               {confirmDelete ? (
                 <>
@@ -302,11 +363,14 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
       </div>
 
       {/* Children */}
-      {hasChildren && expanded && (
+      {expanded && (item.children.length > 0 || addingChild) && (
         <div className="mt-1 space-y-1">
           {item.children.map(child => (
             <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} />
           ))}
+          {addingChild && (
+            <AddItemForm ruleId={ruleId} parentId={item.id} onDone={() => setAddingChild(false)} />
+          )}
         </div>
       )}
     </div>

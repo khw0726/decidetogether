@@ -145,6 +145,22 @@ _SUGGEST_FROM_EXAMPLES_TOOL = {
     },
 }
 
+_INFER_ITEM_TOOL = {
+    "name": "submit_inferred_item",
+    "description": "Submit the inferred item type and logic for a checklist item description",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "item_type": {
+                "type": "string",
+                "enum": ["deterministic", "structural", "subjective"],
+            },
+            "logic": {"type": "object"},
+        },
+        "required": ["item_type", "logic"],
+    },
+}
+
 _SUGGEST_FROM_CHECKLIST_TOOL = {
     "name": "submit_checklist_suggestions",
     "description": "Submit suggested examples and optional rule text updates",
@@ -388,6 +404,30 @@ class RuleCompiler:
             prompts.RECOMPILE_SYSTEM, user_prompt, tool=_RECOMPILE_TOOL
         )
         return result.get("operations", [])
+
+    async def compile_single_item(
+        self,
+        description: str,
+        rule: Rule,
+        community: Community,
+        existing_items: list[ChecklistItem],
+    ) -> dict:
+        """Infer item_type and logic for a manually-added checklist item description."""
+        logger.info(f"Inferring item type/logic for: {description!r}")
+        existing_dicts = [self._checklist_item_to_dict(i) for i in existing_items]
+        user_prompt = prompts.build_infer_item_prompt(
+            description=description,
+            rule_text=rule.text,
+            community_name=community.name,
+            existing_items=existing_dicts,
+        )
+        result = await self._call_claude(
+            prompts.INFER_ITEM_SYSTEM, user_prompt, tool=_INFER_ITEM_TOOL
+        )
+        return {
+            "item_type": result.get("item_type", "subjective"),
+            "logic": result.get("logic", {}),
+        }
 
     async def suggest_from_examples(
         self,

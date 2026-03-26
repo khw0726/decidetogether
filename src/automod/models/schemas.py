@@ -78,6 +78,15 @@ class ChecklistItemRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ChecklistItemCreate(BaseModel):
+    description: str
+    item_type: str = "subjective"  # deterministic | structural | subjective
+    action: str = "flag"           # remove | flag | continue
+    parent_id: Optional[str] = None
+    rule_text_anchor: Optional[str] = None
+    logic: dict[str, Any] = {}
+
+
 class ChecklistItemUpdate(BaseModel):
     description: Optional[str] = None
     rule_text_anchor: Optional[str] = None
