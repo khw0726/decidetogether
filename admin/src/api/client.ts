@@ -47,9 +47,11 @@ export interface ChecklistItem {
 export interface Example {
   id: string
   content: Record<string, unknown>
-  label: 'positive' | 'negative' | 'borderline'
+  label: 'compliant' | 'violating' | 'borderline'
   source: string
   moderator_reasoning: string | null
+  checklist_item_id: string | null
+  checklist_item_description: string | null
   created_at: string
   updated_at: string
 }
@@ -88,6 +90,11 @@ export interface Suggestion {
   content: Record<string, unknown>
   status: string
   created_at: string
+}
+
+export interface NewRuleSuggestion {
+  warning?: string
+  suggestion: Suggestion
 }
 
 export interface PostContent {
@@ -220,6 +227,21 @@ export const acceptSuggestion = (suggestionId: string) =>
 
 export const dismissSuggestion = (suggestionId: string) =>
   api.post<Suggestion>(`/suggestions/${suggestionId}/dismiss`).then(r => r.data)
+
+export const listUnlinkedOverrides = (communityId: string) =>
+  api.get<Example[]>(`/communities/${communityId}/unlinked-overrides`).then(r => r.data)
+
+export const suggestRuleFromOverrides = (communityId: string, exampleIds: string[]) =>
+  api.post<NewRuleSuggestion>(
+    `/communities/${communityId}/suggest-rule-from-overrides`,
+    { example_ids: exampleIds },
+  ).then(r => r.data)
+
+export const suggestRuleFromDecisions = (communityId: string, decisionIds: string[]) =>
+  api.post<NewRuleSuggestion>(
+    `/communities/${communityId}/suggest-rule-from-decisions`,
+    { decision_ids: decisionIds },
+  ).then(r => r.data)
 
 // ── Decisions ──────────────────────────────────────────────────────────────────
 

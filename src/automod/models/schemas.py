@@ -100,7 +100,7 @@ class ChecklistItemUpdate(BaseModel):
 
 class ExampleCreate(BaseModel):
     content: dict[str, Any]
-    label: str  # positive | negative | borderline
+    label: str  # compliant | violating | borderline
     source: str = "manual"
     moderator_reasoning: Optional[str] = None
     relevance_note: Optional[str] = None
@@ -112,6 +112,8 @@ class ExampleRead(BaseModel):
     label: str
     source: str
     moderator_reasoning: Optional[str] = None
+    checklist_item_id: Optional[str] = None
+    checklist_item_description: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -242,6 +244,14 @@ class RuleBatchImportResponse(BaseModel):
     total: int
     actionable_count: int
     skipped_count: int  # non-actionable (procedural/meta/informational)
+
+
+class SuggestRuleFromOverridesRequest(BaseModel):
+    example_ids: list[str]
+
+
+class SuggestRuleFromDecisionsRequest(BaseModel):
+    decision_ids: list[str]
 
 
 # ── Alignment ──────────────────────────────────────────────────────────────────

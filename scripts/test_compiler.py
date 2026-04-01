@@ -34,7 +34,7 @@ CSV_PATH = Path("/hdd/khw/home/reddit_data/moderator_perceptions_public/data/rul
 OUTPUT_PATH = Path(__file__).parent / "compiler_test_output.json"
 
 SAMPLE_SIZE = 20
-RANDOM_SEED = 42
+RANDOM_SEED = 43
 MIN_RULES = 2
 MAX_RULES = 12
 LATEST_WINDOW_DAYS = 30

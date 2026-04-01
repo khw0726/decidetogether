@@ -104,7 +104,7 @@ def validate_compiled_output(compiled: dict) -> list[str]:
             errors.append(f"checklist_tree[{i}]: {err}")
 
     examples = compiled.get("examples", [])
-    valid_labels = {"positive", "negative", "borderline"}
+    valid_labels = {"compliant", "violating", "borderline"}
     for i, ex in enumerate(examples):
         if ex.get("label") not in valid_labels:
             errors.append(f"examples[{i}]: label must be one of {valid_labels}")

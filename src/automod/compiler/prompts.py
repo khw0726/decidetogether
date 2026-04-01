@@ -62,7 +62,9 @@ Logic schemas:
   - triggered when the condition is true (e.g. account_age_days < 7 triggers for new accounts)
 - subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
 
-Keep trees shallow (2 levels max). Generate exactly 3 positive examples (posts that follow the rule) and 3 negative examples (posts that violate the rule).
+Keep trees shallow (2 levels max). Generate exactly 3 compliant examples (posts that follow the rule) and one violating example per top-level checklist item (so if you generate 3 checklist items, generate 3 violating examples — one clearly triggering each item).
+
+For each example, include `related_checklist_item_description`: the exact description string of the checklist item this example is designed to trigger (for violating/borderline examples), or null for compliant examples.
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -136,7 +138,7 @@ Output:
   ],
   "examples": [
     {
-      "label": "negative",
+      "label": "violating",
       "content": {
         "id": "example-1",
         "platform": "reddit",
@@ -145,10 +147,11 @@ Output:
         "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
         "timestamp": "2026-01-01T00:00:00Z"
       },
-      "relevance_note": "Clear self-promotion with discount code and external shop link"
+      "relevance_note": "Clear self-promotion with discount code and external shop link",
+      "related_checklist_item_description": "Does the content contain explicit promotional language or calls to action?"
     },
     {
-      "label": "positive",
+      "label": "compliant",
       "content": {
         "id": "example-2",
         "platform": "reddit",
@@ -157,7 +160,8 @@ Output:
         "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
         "timestamp": "2026-01-01T00:00:00Z"
       },
-      "relevance_note": "Genuine knowledge sharing, no commercial intent"
+      "relevance_note": "Genuine knowledge sharing, no commercial intent",
+      "related_checklist_item_description": null
     }
   ]
 }
@@ -198,7 +202,7 @@ Output:
   ],
   "examples": [
     {
-      "label": "negative",
+      "label": "violating",
       "content": {
         "id": "example-3",
         "platform": "reddit",
@@ -207,10 +211,11 @@ Output:
         "context": {"channel": "r/PikminBloomApp", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
         "timestamp": "2026-01-01T00:00:00Z"
       },
-      "relevance_note": "Political post"
+      "relevance_note": "Political post",
+      "related_checklist_item_description": "Does the post or the comment contain political, religious, or soap-boxing content?"
     },
     {
-      "label": "positive",
+      "label": "compliant",
       "content": {
         "id": "example-4",
         "platform": "reddit",
@@ -219,7 +224,8 @@ Output:
         "context": {"channel": "r/PikminBloomApp", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": "Showcase", "platform_metadata": {}},
         "timestamp": "2026-01-01T00:00:00Z"
       },
-      "relevance_note": "Although it mentions the White House, the post does not discuss any political agenda."
+      "relevance_note": "Although it mentions the White House, the post does not discuss any political agenda.",
+      "related_checklist_item_description": null
     }
   ]
 }
@@ -253,16 +259,17 @@ Community context (other rules, for background):
 Rule to compile:
 {rule_text}
 
-Generate a checklist tree with 2-3 items (can have children), plus exactly 3 positive and 3 negative examples.
+Generate a checklist tree with 2-3 items (can have children), plus 3 compliant examples and one violating example per top-level checklist item.
 
 Return JSON in exactly this format:
 {{
   "checklist_tree": [...],
   "examples": [
     {{
-      "label": "positive" | "negative" | "borderline",
+      "label": "compliant" | "violating" | "borderline",
       "content": {{...post content object...}},
-      "relevance_note": "Why this example relates to the rule"
+      "relevance_note": "Why this example relates to the rule",
+      "related_checklist_item_description": "Exact description of the checklist item this example primarily tests, or null for compliant examples"
     }}
   ]
 }}"""
@@ -492,8 +499,8 @@ Labeled examples:
 {json.dumps(examples, indent=2)}
 
 Identify patterns where the checklist might be:
-1. Missing criteria that distinguish positive from negative examples
-2. Over-triggering (flagging positives as violations)
+1. Missing criteria that distinguish compliant from violating examples
+2. Over-triggering (flagging compliant posts as violations)
 3. Under-triggering (missing clear violations)
 4. Using thresholds or patterns that need adjustment
 
@@ -540,13 +547,13 @@ Existing examples (do not duplicate these):
 Generate examples that:
 1. Test boundary cases near the new thresholds or patterns
 2. Cover scenarios the existing examples don't address
-3. Include both positive (rule-following) and negative (rule-violating) cases
+3. Include both compliant (rule-following) and violating (triggering checklist) cases
 
 Return JSON in exactly this format:
 {{
   "suggested_examples": [
     {{
-      "label": "positive" | "negative" | "borderline",
+      "label": "compliant" | "violating" | "borderline",
       "content": {{...normalized post content...}},
       "relevance_note": "What aspect of the updated checklist this example tests"
     }}
@@ -558,4 +565,80 @@ Return JSON in exactly this format:
       "reasoning": "..."
     }}
   ]
+}}"""
+
+
+# ── Fill Missing Examples ──────────────────────────────────────────────────────
+
+FILL_EXAMPLES_SYSTEM = """You are a content moderation testing specialist. Generate realistic post examples that clearly trigger specific moderation checklist items.
+
+For each checklist item provided, generate exactly one violating example — a post that clearly and unambiguously triggers that specific item. Make examples realistic and specific enough to be useful test cases.
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_fill_examples_prompt(
+    rule_text: str,
+    community_name: str,
+    platform: str,
+    items_needing_examples: list[dict],
+    existing_examples: Optional[list[dict]] = None,
+) -> str:
+    import json
+
+    existing_str = ""
+    if existing_examples:
+        existing_str = f"\n\nExisting examples (do not duplicate these):\n{json.dumps(existing_examples, indent=2)}"
+
+    return f"""Generate one violating example for each of the following checklist items from the "{community_name}" community on {platform}.
+
+Rule text:
+{rule_text}
+
+Checklist items that need a violating example:
+{json.dumps(items_needing_examples, indent=2)}
+{existing_str}
+
+Generate exactly one violating post per item. Set related_checklist_item_description to the exact description of the item it triggers.
+
+Return JSON in exactly this format:
+{{
+  "examples": [
+    {{
+      "label": "violating",
+      "content": {{...post content object...}},
+      "relevance_note": "Why this example triggers the checklist item",
+      "related_checklist_item_description": "Exact description of the checklist item this triggers"
+    }}
+  ]
+}}"""
+
+
+# ── Synthesize Rule from Overrides ─────────────────────────────────────────────
+
+SYNTHESIZE_RULE_SYSTEM = """You are a community moderation rule author. You will be given posts that moderators removed or flagged even though no existing rule covered them. Your job is to infer the underlying community norm and articulate it as a clear, enforceable rule.
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_synthesize_rule_prompt(
+    examples: list[dict],
+    community_name: str,
+    platform: str,
+) -> str:
+    import json
+
+    return f"""These posts were manually removed or flagged by moderators of the "{community_name}" community on {platform}, but no existing rule matched them. Identify the common pattern and write a new rule that would cover it.
+
+Moderator override examples (posts removed without a matching rule):
+{json.dumps(examples, indent=2)}
+
+Identify what these posts have in common that warranted moderation. If the examples are too varied or the pattern is unclear, still provide a best-guess rule but set confidence to "low".
+
+Return JSON in exactly this format:
+{{
+  "title": "Short rule title (≤ 10 words)",
+  "text": "Full rule text as it would appear in the community rules",
+  "confidence": "low" | "medium" | "high",
+  "reasoning": "Brief explanation of the inferred pattern and what the examples have in common"
 }}"""

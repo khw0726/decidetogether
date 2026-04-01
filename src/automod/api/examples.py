@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Example, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import ExampleCreate, ExampleRead, ExampleUpdate
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ async def add_example(
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
-    valid_labels = {"positive", "negative", "borderline"}
+    valid_labels = {"compliant", "violating", "borderline"}
     if body.label not in valid_labels:
         raise HTTPException(status_code=422, detail=f"label must be one of {valid_labels}")
 
@@ -133,8 +133,35 @@ async def list_examples(
         query = query.where(Example.label == label)
 
     result = await db.execute(query)
-    examples = result.scalars().all()
-    return [ExampleRead.model_validate(e) for e in examples]
+    examples = list(result.scalars().all())
+
+    # Fetch checklist item links for all examples in one query.
+    # checklist_item_id may be NULL for links that survived a recompile delete;
+    # checklist_item_description is always populated and used as the stable display value.
+    example_ids = [e.id for e in examples]
+    item_link_result = await db.execute(
+        select(ExampleChecklistItemLink)
+        .where(ExampleChecklistItemLink.example_id.in_(example_ids))
+    )
+    item_by_example: dict[str, tuple[str | None, str | None]] = {}
+    for link in item_link_result.scalars():
+        item_by_example[link.example_id] = (link.checklist_item_id, link.checklist_item_description or None)
+
+    reads = []
+    for e in examples:
+        item_id, item_desc = item_by_example.get(e.id, (None, None))
+        reads.append(ExampleRead(
+            id=e.id,
+            content=e.content,
+            label=e.label,
+            source=e.source,
+            moderator_reasoning=e.moderator_reasoning,
+            checklist_item_id=item_id,
+            checklist_item_description=item_desc,
+            created_at=e.created_at,
+            updated_at=e.updated_at,
+        ))
+    return reads
 
 
 @router.put("/examples/{example_id}", response_model=ExampleRead)
@@ -151,7 +178,7 @@ async def update_example(
     if body.content is not None:
         example.content = body.content
     if body.label is not None:
-        valid_labels = {"positive", "negative", "borderline"}
+        valid_labels = {"compliant", "violating", "borderline"}
         if body.label not in valid_labels:
             raise HTTPException(status_code=422, detail=f"label must be one of {valid_labels}")
         example.label = body.label

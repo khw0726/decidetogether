@@ -6,13 +6,13 @@ from typing import Optional
 
 import anthropic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy import delete as sa_delete, select
+from sqlalchemy import delete as sa_delete, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Example, ExampleRuleLink, Rule
+from ..db.models import ChecklistItem, Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule
 from ..models.schemas import (
     RuleBatchImportRequest,
     RuleBatchImportResponse,
@@ -31,6 +31,42 @@ router = APIRouter(tags=["rules"])
 def get_compiler() -> RuleCompiler:
     client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
     return RuleCompiler(client, settings)
+
+
+async def _re_resolve_checklist_links(db, rule_id: str) -> None:
+    """After recompile, re-link dangling ExampleChecklistItemLink rows back to items by description.
+
+    Links become dangling (checklist_item_id=NULL) when an item is deleted during a diff-recompile.
+    We match them against current items by exact description to restore the link.
+    """
+    items_result = await db.execute(
+        select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+    )
+    desc_to_id = {item.description: item.id for item in items_result.scalars()}
+    if not desc_to_id:
+        return
+
+    example_ids_result = await db.execute(
+        select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
+    )
+    example_ids = [r[0] for r in example_ids_result]
+    if not example_ids:
+        return
+
+    dangling_result = await db.execute(
+        select(ExampleChecklistItemLink)
+        .where(ExampleChecklistItemLink.example_id.in_(example_ids))
+        .where(ExampleChecklistItemLink.checklist_item_id == None)  # noqa: E711
+        .where(ExampleChecklistItemLink.checklist_item_description != "")
+    )
+    resolved = 0
+    for link in dangling_result.scalars():
+        new_id = desc_to_id.get(link.checklist_item_description)
+        if new_id:
+            link.checklist_item_id = new_id
+            resolved += 1
+    if resolved:
+        logger.info(f"Re-resolved {resolved} checklist item link(s) for rule {rule_id}")
 
 
 async def _compile_rule_background(
@@ -87,7 +123,14 @@ async def _compile_rule_background(
                     other_rules=other_rules,
                 )
                 await _persist_new_items(db, checklist_items, rule_id)
-                await _persist_new_examples(db, example_dicts, rule_id)
+                await db.flush()
+                items_result = await db.execute(
+                    select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+                )
+                item_desc_map = {i.description: i.id for i in items_result.scalars()}
+                await _persist_new_examples(db, example_dicts, rule_id, item_description_map=item_desc_map)
+                await db.flush()
+                await _fill_missing_examples(db, rule_id, compiler, rule, community)
             else:
                 # ── Recompile with diff ──────────────────────────────────────
                 operations = await compiler.recompile_with_diff(
@@ -98,6 +141,9 @@ async def _compile_rule_background(
                 )
                 existing_by_id = {item.id: item for item in existing_items}
                 await _apply_diff_operations(db, operations, existing_by_id, rule_id)
+                await db.flush()
+                await _re_resolve_checklist_links(db, rule_id)
+                await _fill_missing_examples(db, rule_id, compiler, rule, community)
 
             await db.commit()
             logger.info(f"Compilation complete for rule {rule_id}")
@@ -132,12 +178,22 @@ async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
             db.add(child)
 
 
-async def _persist_new_examples(db, example_dicts: list, rule_id: str) -> None:
-    """Insert generated examples and link them to the rule."""
+async def _persist_new_examples(
+    db,
+    example_dicts: list,
+    rule_id: str,
+    item_description_map: dict[str, str] | None = None,
+) -> None:
+    """Insert generated examples and link them to the rule.
+
+    item_description_map maps checklist item description → item ID, used to
+    create ExampleChecklistItemLink records when the compiler provides
+    related_checklist_item_description on an example.
+    """
     for ex_dict in example_dicts:
         example = Example(
             content=ex_dict.get("content", {}),
-            label=ex_dict.get("label", "positive"),
+            label=ex_dict.get("label", "compliant"),
             source="generated",
         )
         db.add(example)
@@ -147,6 +203,65 @@ async def _persist_new_examples(db, example_dicts: list, rule_id: str) -> None:
             rule_id=rule_id,
             relevance_note=ex_dict.get("relevance_note", ""),
         ))
+        related_desc = ex_dict.get("related_checklist_item_description")
+        if related_desc and item_description_map:
+            item_id = item_description_map.get(related_desc)
+            if item_id:
+                db.add(ExampleChecklistItemLink(
+                    example_id=example.id,
+                    checklist_item_id=item_id,
+                    checklist_item_description=related_desc,
+                ))
+
+
+async def _fill_missing_examples(db, rule_id: str, compiler, rule, community) -> None:
+    """Generate one violating example for each top-level checklist item that doesn't have one."""
+    items_result = await db.execute(
+        select(ChecklistItem).where(
+            ChecklistItem.rule_id == rule_id,
+            ChecklistItem.parent_id == None,  # noqa: E711
+        )
+    )
+    all_items = list(items_result.scalars())
+    if not all_items:
+        return
+
+    covered_result = await db.execute(
+        select(ExampleChecklistItemLink.checklist_item_id)
+        .join(Example, Example.id == ExampleChecklistItemLink.example_id)
+        .where(
+            ExampleChecklistItemLink.checklist_item_id.in_([i.id for i in all_items]),
+            Example.label.in_(["violating", "borderline"]),
+        )
+        .distinct()
+    )
+    covered_ids = {r[0] for r in covered_result}
+
+    items_needing = [i for i in all_items if i.id not in covered_ids]
+    if not items_needing:
+        return
+
+    example_ids_result = await db.execute(
+        select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
+    )
+    example_ids = [r[0] for r in example_ids_result]
+    existing_examples = []
+    if example_ids:
+        examples_result = await db.execute(
+            select(Example).where(Example.id.in_(example_ids))
+        )
+        existing_examples = list(examples_result.scalars())
+
+    new_examples = await compiler.generate_examples_for_items(
+        rule=rule,
+        community=community,
+        items=items_needing,
+        existing_examples=existing_examples or None,
+    )
+
+    item_desc_map = {i.description: i.id for i in all_items}
+    await _persist_new_examples(db, new_examples, rule_id, item_description_map=item_desc_map)
+    logger.info(f"Filled {len(new_examples)} missing example(s) for rule {rule_id}")
 
 
 async def _apply_diff_operations(
@@ -178,8 +293,18 @@ async def _apply_diff_operations(
                 item.logic = op["logic"]
             if "action" in op:
                 item.action = op["action"]
-            # Replace children: delete old child rows, insert new ones
+            # Replace children: null out links, delete old child rows, insert new ones
             if "children" in op:
+                old_child_ids_result = await db.execute(
+                    select(ChecklistItem.id).where(ChecklistItem.parent_id == item.id)
+                )
+                old_child_ids = [r[0] for r in old_child_ids_result]
+                if old_child_ids:
+                    await db.execute(
+                        sa_update(ExampleChecklistItemLink)
+                        .where(ExampleChecklistItemLink.checklist_item_id.in_(old_child_ids))
+                        .values(checklist_item_id=None)
+                    )
                 await db.execute(
                     sa_delete(ChecklistItem).where(ChecklistItem.parent_id == item.id)
                 )
@@ -201,7 +326,17 @@ async def _apply_diff_operations(
             if item is None:
                 logger.warning(f"recompile delete: unknown id {op.get('existing_id')!r}")
                 continue
-            # Explicitly delete children first (async ORM cascade requires loaded relationships)
+            # Collect child IDs, null out all links before deletion to preserve description
+            child_ids_result = await db.execute(
+                select(ChecklistItem.id).where(ChecklistItem.parent_id == item.id)
+            )
+            child_ids = [r[0] for r in child_ids_result]
+            ids_to_null = child_ids + [item.id]
+            await db.execute(
+                sa_update(ExampleChecklistItemLink)
+                .where(ExampleChecklistItemLink.checklist_item_id.in_(ids_to_null))
+                .values(checklist_item_id=None)
+            )
             await db.execute(
                 sa_delete(ChecklistItem).where(ChecklistItem.parent_id == item.id)
             )

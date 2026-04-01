@@ -7,9 +7,12 @@ interface ChecklistTreeProps {
   items: ChecklistItem[]
   ruleId: string
   onAnchorHover?: (anchor: string | null) => void
+  selectedItemId?: string | null
+  onItemSelect?: (itemId: string | null) => void
+  highlightedItemId?: string | null
 }
 
-export default function ChecklistTree({ items, ruleId, onAnchorHover }: ChecklistTreeProps) {
+export default function ChecklistTree({ items, ruleId, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId }: ChecklistTreeProps) {
   const [adding, setAdding] = useState(false)
   return (
     <div className="space-y-1">
@@ -19,7 +22,7 @@ export default function ChecklistTree({ items, ruleId, onAnchorHover }: Checklis
         </div>
       )}
       {items.map(item => (
-        <ChecklistNode key={item.id} item={item} ruleId={ruleId} depth={0} onAnchorHover={onAnchorHover} />
+        <ChecklistNode key={item.id} item={item} ruleId={ruleId} depth={0} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} />
       ))}
       {adding
         ? <AddItemForm ruleId={ruleId} parentId={null} onDone={() => setAdding(false)} />
@@ -184,7 +187,7 @@ function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: s
 
 // ── ChecklistNode ─────────────────────────────────────────────────────────────
 
-function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void }) {
+function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void; selectedItemId?: string | null; onItemSelect?: (itemId: string | null) => void; highlightedItemId?: string | null }) {
   const [expanded, setExpanded] = useState(true)
   const [editing, setEditing] = useState(false)
   const [showLogic, setShowLogic] = useState(false)
@@ -210,9 +213,9 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
   })
 
   const typeBadge = {
-    deterministic: <span className="badge badge-blue">DET</span>,
-    structural: <span className="badge badge-yellow">STR</span>,
-    subjective: <span className="badge badge-purple">SUB</span>,
+    deterministic: <span className="badge badge-blue">DETERMINISTIC</span>,
+    structural: <span className="badge badge-yellow">STRUCTURAL</span>,
+    subjective: <span className="badge badge-purple">SUBJECTIVE</span>,
   }[item.item_type] ?? <span className="badge badge-gray">{item.item_type}</span>
 
   const actionBadge = {
@@ -231,30 +234,40 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
     })
   }
 
+  const isSelected = selectedItemId === item.id
+  const isHighlighted = highlightedItemId === item.id
+
   return (
     <div style={{ marginLeft: indent }}>
       <div
-        className="border border-gray-200 rounded-lg p-3 bg-white hover:border-gray-300 transition-colors"
+        className={`border rounded-lg p-3 transition-colors cursor-pointer ${
+          isSelected ? 'bg-white border-indigo-400 ring-1 ring-indigo-300' :
+          isHighlighted ? 'bg-amber-50 border-amber-400 ring-1 ring-amber-300' :
+          'bg-white border-gray-200 hover:border-gray-300'
+        }`}
         onMouseEnter={() => onAnchorHover?.(item.rule_text_anchor || null)}
         onMouseLeave={() => onAnchorHover?.(null)}
+        onClick={e => { if (!(e.target as HTMLElement).closest('button, input, textarea, select')) onItemSelect?.(isSelected ? null : item.id) }}
       >
-        <div className="flex items-start gap-2">
+        <div className="flex items-stretch gap-2">
           {/* Expand toggle */}
-          {hasChildren ? (
-            <button
-              className="flex-shrink-0 mt-0.5 text-gray-400 hover:text-gray-600"
-              onClick={() => setExpanded(!expanded)}
-            >
-              {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            </button>
-          ) : (
-            <div className="w-4 flex-shrink-0" />
-          )}
+          <div className="flex grow-0 items-start">
+            {hasChildren ? (
+              <button
+                className="flex-shrink-0 mt-0.5 text-gray-400 hover:text-gray-600"
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
+            ) : (
+              <div className="w-4 flex-shrink-0" />
+            )}
+          </div>
+
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {typeBadge}
-              {!hasChildren && actionBadge}
               {!editing && (
                 <span className="text-sm font-medium text-gray-800">{item.description}</span>
               )}
@@ -264,7 +277,8 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
               <div className="mt-2 space-y-2">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Description</label>
-                  <input
+                  <textarea
+                    rows={4}
                     className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     value={editedDescription}
                     onChange={e => setEditedDescription(e.target.value)}
@@ -307,66 +321,76 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover }: { item: Checklist
             )}
           </div>
 
+
           {!editing && (
-            <div className="flex gap-1 flex-shrink-0">
-              <button
-                className={`p-1 rounded transition-colors ${showLogic ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-gray-700'}`}
-                onClick={() => setShowLogic(v => !v)}
-                title="Inspect logic"
-              >
-                <Code size={14} />
-              </button>
-              <button
-                className="p-1 text-gray-400 hover:text-gray-700 rounded"
-                onClick={() => setEditing(true)}
-                title="Edit item"
-              >
-                <Edit2 size={14} />
-              </button>
-              <button
-                className="p-1 text-gray-400 hover:text-indigo-600 rounded"
-                onClick={() => { setExpanded(true); setAddingChild(true) }}
-                title="Add child item"
-              >
-                <Plus size={14} />
-              </button>
-              {confirmDelete ? (
-                <>
-                  <button
-                    className="p-1 text-red-600 hover:text-red-800 rounded"
-                    onClick={() => deleteMutation.mutate()}
-                    disabled={deleteMutation.isPending}
-                    title="Confirm delete"
-                  >
-                    <Check size={14} />
-                  </button>
-                  <button
-                    className="p-1 text-gray-400 hover:text-gray-700 rounded"
-                    onClick={() => setConfirmDelete(false)}
-                    title="Cancel"
-                  >
-                    <X size={14} />
-                  </button>
-                </>
-              ) : (
+            <div className="flex flex-col items-end gap-1 w-24 flex-shrink-0 justify-between">
+              <div className="flex gap-1">
                 <button
-                  className="p-1 text-gray-400 hover:text-red-600 rounded"
-                  onClick={() => setConfirmDelete(true)}
-                  title="Delete item"
+                  className={`p-1 rounded transition-colors ${showLogic ? 'text-indigo-600 bg-indigo-50' : 'text-gray-400 hover:text-gray-700'}`}
+                  onClick={() => setShowLogic(v => !v)}
+                  title="Inspect logic"
                 >
-                  <Trash2 size={14} />
+                  <Code size={14} />
                 </button>
-              )}
+                <button
+                  className="p-1 text-gray-400 hover:text-gray-700 rounded"
+                  onClick={() => setEditing(true)}
+                  title="Edit item"
+                >
+                  <Edit2 size={14} />
+                </button>
+                <button
+                  className="p-1 text-gray-400 hover:text-indigo-600 rounded"
+                  onClick={() => { setExpanded(true); setAddingChild(true) }}
+                  title="Add child item"
+                >
+                  <Plus size={14} />
+                </button>
+                {confirmDelete ? (
+                  <>
+                    <button
+                      className="p-1 text-red-600 hover:text-red-800 rounded"
+                      onClick={() => deleteMutation.mutate()}
+                      disabled={deleteMutation.isPending}
+                      title="Confirm delete"
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      className="p-1 text-gray-400 hover:text-gray-700 rounded"
+                      onClick={() => setConfirmDelete(false)}
+                      title="Cancel"
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="p-1 text-gray-400 hover:text-red-600 rounded"
+                    onClick={() => setConfirmDelete(true)}
+                    title="Delete item"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-col items-end text-xs text-gray-400">
+                <span>if yes →</span>
+                {actionBadge}
+              </div>
             </div>
           )}
+
+
         </div>
+
       </div>
 
       {/* Children */}
       {expanded && (item.children.length > 0 || addingChild) && (
         <div className="mt-1 space-y-1">
           {item.children.map(child => (
-            <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} />
+            <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} />
           ))}
           {addingChild && (
             <AddItemForm ruleId={ruleId} parentId={item.id} onDone={() => setAddingChild(false)} />

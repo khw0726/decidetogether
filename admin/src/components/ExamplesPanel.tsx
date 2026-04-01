@@ -5,18 +5,20 @@ import { listExamples, addExample, deleteExample, Example } from '../api/client'
 
 interface ExamplesPanelProps {
   ruleId: string
+  filterItemId?: string | null
+  onItemHighlight?: (itemId: string | null) => void
 }
 
-const LABELS = ['positive', 'negative', 'borderline'] as const
+const LABELS = ['compliant', 'violating', 'borderline'] as const
 type Label = typeof LABELS[number]
 
 const labelConfig: Record<Label, { badge: string; icon: React.ReactNode; color: string }> = {
-  positive: {
+  compliant: {
     badge: 'badge-green',
     icon: <ThumbsUp size={12} />,
     color: 'text-green-700',
   },
-  negative: {
+  violating: {
     badge: 'badge-red',
     icon: <ThumbsDown size={12} />,
     color: 'text-red-700',
@@ -28,8 +30,8 @@ const labelConfig: Record<Label, { badge: string; icon: React.ReactNode; color: 
   },
 }
 
-export default function ExamplesPanel({ ruleId }: ExamplesPanelProps) {
-  const [activeTab, setActiveTab] = useState<Label>('positive')
+export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight }: ExamplesPanelProps) {
+  const [activeTab, setActiveTab] = useState<Label>('compliant')
   const [showAdd, setShowAdd] = useState(false)
 
   const queryClient = useQueryClient()
@@ -45,14 +47,17 @@ export default function ExamplesPanel({ ruleId }: ExamplesPanelProps) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['examples', ruleId] }),
   })
 
-  const filtered = examples.filter((e: Example) => e.label === activeTab)
+  const byLabel = examples.filter((e: Example) => e.label === activeTab)
+  const filtered = filterItemId
+    ? byLabel.filter((e: Example) => e.checklist_item_id === filterItemId)
+    : byLabel
 
   return (
     <div className="flex flex-col h-full">
       {/* Tabs */}
       <div className="flex items-center gap-0.5 mb-3">
         {LABELS.map(label => {
-          const count = examples.filter((e: Example) => e.label === label).length
+          const count = examples.filter((e: Example) => e.label === label && (!filterItemId || e.checklist_item_id === filterItemId)).length
           const cfg = labelConfig[label]
           return (
             <button
@@ -79,6 +84,16 @@ export default function ExamplesPanel({ ruleId }: ExamplesPanelProps) {
         </button>
       </div>
 
+      {/* Active checklist item filter */}
+      {filterItemId && (
+        <div className="mb-2 px-1 flex items-center gap-1.5 text-xs text-indigo-700">
+          <span className="bg-indigo-50 border border-indigo-200 rounded px-2 py-0.5 truncate max-w-[220px]">
+            Filtered by checklist item
+          </span>
+          <span className="text-gray-400">(click item again to clear)</span>
+        </div>
+      )}
+
       {/* Examples list */}
       <div className="flex-1 overflow-auto space-y-2">
         {isLoading && <div className="text-sm text-gray-400 text-center py-4">Loading...</div>}
@@ -93,7 +108,12 @@ export default function ExamplesPanel({ ruleId }: ExamplesPanelProps) {
           const title = (postContent.title as string) || ''
           const body = (postContent.body as string) || ''
           return (
-            <div key={ex.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+            <div
+              key={ex.id}
+              className="border border-gray-200 rounded-lg p-3 bg-white"
+              onMouseEnter={() => ex.checklist_item_id && onItemHighlight?.(ex.checklist_item_id)}
+              onMouseLeave={() => onItemHighlight?.(null)}
+            >
               <div className="flex items-start gap-2">
                 <span className={`badge ${labelConfig[ex.label].badge} flex-shrink-0`}>
                   {ex.label}
@@ -104,6 +124,11 @@ export default function ExamplesPanel({ ruleId }: ExamplesPanelProps) {
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs text-gray-400">Source: {ex.source}</span>
                   </div>
+                  {ex.checklist_item_description && (
+                    <span className="text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded mt-1 inline-block">
+                      {ex.checklist_item_description}
+                    </span>
+                  )}
                   {ex.moderator_reasoning && (
                     <p className="text-xs text-gray-600 mt-1 italic">{ex.moderator_reasoning}</p>
                   )}
@@ -204,8 +229,8 @@ function AddExampleModal({
               value={label}
               onChange={e => setLabel(e.target.value as Label)}
             >
-              <option value="positive">Positive (follows rule)</option>
-              <option value="negative">Negative (violates rule)</option>
+              <option value="compliant">Compliant (follows rule)</option>
+              <option value="violating">Violating (violates rule)</option>
               <option value="borderline">Borderline</option>
             </select>
           </div>

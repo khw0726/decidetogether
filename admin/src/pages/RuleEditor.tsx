@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Lightbulb, BookOpen, AlertCircle, Loader2, Upload,
@@ -67,6 +67,8 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
   const [isSaving, setIsSaving] = useState(false)
   const [isEditingRuleText, setIsEditingRuleText] = useState(false)
   const [hoveredAnchor, setHoveredAnchor] = useState<string | null>(null)
+  const [selectedChecklistItemId, setSelectedChecklistItemId] = useState<string | null>(null)
+  const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
   const [ruleListOpen, setRuleListOpen] = useState(true)
 
   const queryClient = useQueryClient()
@@ -134,6 +136,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     setEditingTitle(rule.title)
     setIsEditingRuleText(false)
     setHoveredAnchor(null)
+    setSelectedChecklistItemId(null)
   }
 
   const handleSaveRule = async () => {
@@ -411,7 +414,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
             <div className="flex-1 overflow-auto p-3">
               {selectedRuleId ? (
                 selectedRule?.rule_type === 'actionable' ? (
-                  <ChecklistTree items={checklist} ruleId={selectedRuleId} onAnchorHover={setHoveredAnchor} />
+                  <ChecklistTree items={checklist} ruleId={selectedRuleId} onAnchorHover={setHoveredAnchor} selectedItemId={selectedChecklistItemId} onItemSelect={setSelectedChecklistItemId} highlightedItemId={highlightedItemId} />
                 ) : (
                   <div className="text-xs text-gray-400 italic">Only actionable rules have checklists.</div>
                 )
@@ -428,7 +431,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
             </div>
             <div className="flex-1 overflow-hidden">
               {selectedRuleId ? (
-                <ExamplesPanel ruleId={selectedRuleId} />
+                <ExamplesPanel ruleId={selectedRuleId} filterItemId={selectedChecklistItemId} onItemHighlight={setHighlightedItemId} />
               ) : (
                 <div className="p-3 text-xs text-gray-400 italic">Select a rule to view examples.</div>
               )}
@@ -468,6 +471,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
         <SuggestionDiff
           suggestions={suggestions}
           ruleId={selectedRuleId}
+          currentRuleText={selectedRule?.text}
           onClose={() => setShowSuggestions(false)}
         />
       )}
@@ -669,11 +673,56 @@ function TestResults({
         const verdict = String(ruleData.verdict || 'approve')
         const confidence = Number(ruleData.confidence ?? 0)
         const itemReasoning = (ruleData.item_reasoning ?? {}) as Record<string, Record<string, unknown>>
-        const triggeredItems = (ruleData.triggered_items ?? []) as string[]
 
-        // Only show items that failed, or all if nothing triggered (for approve cases)
-        const itemEntries = Object.entries(itemReasoning)
-        const hasViolations = triggeredItems.length > 0
+        // Only hide non-triggered items when the rule actually produced a violation verdict.
+        // If verdict=approve (e.g. parent action=continue + child not triggered), show all
+        // visited items so the user can see the full chain and understand why it passed.
+        const hasViolations = verdict !== 'approve'
+
+        // Recursive renderer — hierarchy derived from parent_id in item data,
+        // so it works for all rules, not just the currently selected one.
+        // checklistMap is used only for description fallback and ordering.
+        const renderNode = (itemId: string, depth: number): React.ReactNode => {
+          const data = itemReasoning[itemId]
+          if (!data) return null
+          const triggered = Boolean(data.triggered)
+          if (!triggered && hasViolations) return null
+          const desc = String(checklistMap[itemId]?.description || data.description || itemId)
+          const reasoningText = data.reasoning ? String(data.reasoning) : null
+          const conf = Number(data.confidence ?? 0)
+          const childEntries = Object.entries(itemReasoning)
+            .filter(([_, d]) => d.parent_id === itemId)
+            .sort(([idA], [idB]) => (checklistMap[idA]?.order ?? 0) - (checklistMap[idB]?.order ?? 0))
+          return (
+            <React.Fragment key={itemId}>
+              <div
+                style={{ paddingLeft: `${depth * 16 + 12}px` }}
+                className={`flex items-start gap-2 pr-3 py-1.5 text-xs border-t border-gray-100 ${triggered ? 'bg-red-50' : ''}`}
+              >
+                {triggered
+                  ? <XCircle size={12} className="text-red-500 mt-0.5 flex-shrink-0" />
+                  : <CheckCircle size={12} className="text-green-500 mt-0.5 flex-shrink-0" />
+                }
+                <div className="flex-1 min-w-0">
+                  <p className={`font-medium leading-tight ${triggered ? 'text-red-700' : 'text-gray-700'}`}>
+                    {desc}
+                  </p>
+                  {reasoningText && (
+                    <p className="text-gray-500 mt-0.5 leading-tight">{reasoningText}</p>
+                  )}
+                </div>
+                <span className="text-gray-400 flex-shrink-0 mt-0.5">
+                  {Math.round(conf * 100)}%
+                </span>
+              </div>
+              {childEntries.map(([childId]) => renderNode(childId, depth + 1))}
+            </React.Fragment>
+          )
+        }
+
+        const rootEntries = Object.entries(itemReasoning)
+          .filter(([_, data]) => !data.parent_id)
+          .sort(([idA], [idB]) => (checklistMap[idA]?.order ?? 0) - (checklistMap[idB]?.order ?? 0))
 
         return (
           <div key={ruleId} className="border border-gray-200 rounded overflow-hidden">
@@ -684,47 +733,14 @@ function TestResults({
               <span className="opacity-60 flex-shrink-0">{Math.round(confidence * 100)}%</span>
             </div>
 
-            {/* Checklist items */}
-            {itemEntries.length > 0 && (
+            {/* Checklist items — hierarchical */}
+            {rootEntries.length > 0 && (
               <div>
-                {itemEntries.map(([itemId, itemData]) => {
-                  const triggered = Boolean(itemData.triggered)
-                  const isFailed = triggered
-                  // Show triggered items always; hide non-triggered items when there are violations
-                  if (!triggered && hasViolations) return null
-                  const description = String(
-                    checklistMap[itemId]?.description || itemData.description || itemId
-                  )
-                  const itemReasoning = itemData.reasoning ? String(itemData.reasoning) : null
-                  const itemConfidence = Number(itemData.confidence ?? 0)
-
-                  return (
-                    <div
-                      key={itemId}
-                      className={`flex items-start gap-2 px-3 py-1.5 text-xs border-t border-gray-100 ${isFailed ? 'bg-red-50' : ''}`}
-                    >
-                      {triggered
-                        ? <XCircle size={12} className="text-red-500 mt-0.5 flex-shrink-0" />
-                        : <CheckCircle size={12} className="text-green-500 mt-0.5 flex-shrink-0" />
-                      }
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium leading-tight ${isFailed ? 'text-red-700' : 'text-gray-700'}`}>
-                          {description}
-                        </p>
-                        {itemReasoning && (
-                          <p className="text-gray-500 mt-0.5 leading-tight">{itemReasoning}</p>
-                        )}
-                      </div>
-                      <span className="text-gray-400 flex-shrink-0 mt-0.5">
-                        {Math.round(itemConfidence * 100)}%
-                      </span>
-                    </div>
-                  )
-                })}
+                {rootEntries.map(([itemId]) => renderNode(itemId, 0))}
               </div>
             )}
 
-            {itemEntries.length === 0 && (
+            {rootEntries.length === 0 && (
               <div className="px-3 py-1.5 text-xs text-gray-400 border-t border-gray-100">
                 No checklist items evaluated.
               </div>

@@ -96,6 +96,10 @@ class ChecklistItem(Base):
     suggestions: Mapped[list["Suggestion"]] = relationship(
         "Suggestion", back_populates="checklist_item", cascade="all, delete-orphan"
     )
+    example_links: Mapped[list["ExampleChecklistItemLink"]] = relationship(
+        "ExampleChecklistItemLink", back_populates="checklist_item"
+        # No cascade: links are preserved (checklist_item_id nulled) when item is deleted
+    )
 
 
 class Example(Base):
@@ -103,7 +107,7 @@ class Example(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
     content: Mapped[dict] = mapped_column(JSON, nullable=False)
-    label: Mapped[str] = mapped_column(String, nullable=False)  # positive | negative | borderline
+    label: Mapped[str] = mapped_column(String, nullable=False)  # compliant | violating | borderline
     source: Mapped[str] = mapped_column(String, nullable=False, default="manual")
     # manual | moderator_decision | generated
     moderator_reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -112,6 +116,9 @@ class Example(Base):
 
     rule_links: Mapped[list["ExampleRuleLink"]] = relationship(
         "ExampleRuleLink", back_populates="example", cascade="all, delete-orphan"
+    )
+    checklist_item_links: Mapped[list["ExampleChecklistItemLink"]] = relationship(
+        "ExampleChecklistItemLink", back_populates="example", cascade="all, delete-orphan"
     )
 
 
@@ -124,6 +131,25 @@ class ExampleRuleLink(Base):
 
     example: Mapped["Example"] = relationship("Example", back_populates="rule_links")
     rule: Mapped["Rule"] = relationship("Rule", back_populates="example_links")
+
+
+class ExampleChecklistItemLink(Base):
+    __tablename__ = "example_checklist_item_links"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    example_id: Mapped[str] = mapped_column(String, ForeignKey("examples.id"), nullable=False)
+    # Nullable: set to NULL when the item is deleted during recompile; re-resolved by description later
+    checklist_item_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("checklist_items.id"), nullable=True
+    )
+    # Stable fallback: survives item deletion and enables re-resolution after recompile
+    checklist_item_description: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+    example: Mapped["Example"] = relationship("Example", back_populates="checklist_item_links")
+    checklist_item: Mapped[Optional["ChecklistItem"]] = relationship(
+        "ChecklistItem", back_populates="example_links"
+        # No cascade: when item is deleted we null checklist_item_id, not delete this row
+    )
 
 
 class Decision(Base):

@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ChevronDown, ChevronUp, CheckCircle, XCircle, Flag, Filter, Inbox, Loader2,
+  ChevronDown, ChevronUp, CheckCircle, XCircle, Filter, Inbox, Loader2, Sparkles,
 } from 'lucide-react'
-import { listDecisions, resolveDecision, Decision, listRules } from '../api/client'
+import {
+  listDecisions, resolveDecision, Decision, listRules,
+  suggestRuleFromDecisions, acceptSuggestion, dismissSuggestion, NewRuleSuggestion,
+} from '../api/client'
 import PostCard from '../components/PostCard'
+import UnlinkedOverridesPanel from '../components/UnlinkedOverridesPanel'
+import NewRuleSuggestionModal from '../components/NewRuleSuggestionModal'
 
 interface DecisionQueueProps {
   communityId: string
@@ -21,8 +26,43 @@ const REASONING_CATEGORIES = [
 export default function DecisionQueue({ communityId }: DecisionQueueProps) {
   const [filter, setFilter] = useState<'pending' | 'resolved' | 'all'>('pending')
   const [verdictFilter, setVerdictFilter] = useState<string>('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestion, setSuggestion] = useState<NewRuleSuggestion | null>(null)
 
   const queryClient = useQueryClient()
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
+      return next
+    })
+
+  const acceptMutation = useMutation({
+    mutationFn: (suggestionId: string) => acceptSuggestion(suggestionId),
+    onSuccess: () => {
+      setSuggestion(null)
+      setSelectedIds(new Set())
+      queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+    },
+  })
+
+  const dismissMutation = useMutation({
+    mutationFn: (suggestionId: string) => dismissSuggestion(suggestionId),
+    onSuccess: () => setSuggestion(null),
+  })
+
+  const handleSuggestRule = async () => {
+    if (selectedIds.size === 0) return
+    setSuggesting(true)
+    try {
+      const result = await suggestRuleFromDecisions(communityId, [...selectedIds])
+      setSuggestion(result)
+    } finally {
+      setSuggesting(false)
+    }
+  }
 
   const { data: decisions = [], isLoading } = useQuery({
     queryKey: ['decisions', communityId, filter, verdictFilter],
@@ -93,6 +133,16 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
           ))}
         </div>
         <div className="flex items-center gap-2 ml-auto">
+          {selectedIds.size > 0 && (
+            <button
+              className="btn-primary text-xs flex items-center gap-1.5"
+              onClick={handleSuggestRule}
+              disabled={suggesting}
+            >
+              {suggesting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              Suggest Rule ({selectedIds.size})
+            </button>
+          )}
           <Filter size={14} className="text-gray-400" />
           <select
             className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none"
@@ -102,10 +152,12 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             <option value="">All verdicts</option>
             <option value="approve">Approve</option>
             <option value="remove">Remove</option>
-            <option value="review">Review</option>
           </select>
         </div>
       </div>
+
+      {/* Unlinked overrides banner */}
+      <UnlinkedOverridesPanel communityId={communityId} />
 
       {/* Decision cards */}
       <div className="flex-1 overflow-auto p-6 space-y-4">
@@ -129,6 +181,8 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             key={decision.id}
             decision={decision}
             rulesMap={rulesMap}
+            selected={selectedIds.has(decision.id)}
+            onToggleSelect={() => toggleSelect(decision.id)}
             onResolve={(verdict, reasoningCategory, notes, ruleIds) =>
               resolveMutation.mutate({
                 decisionId: decision.id,
@@ -141,6 +195,17 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             resolving={resolveMutation.isPending && resolveMutation.variables?.decisionId === decision.id}
           />
         ))}
+
+      {suggestion && (
+        <NewRuleSuggestionModal
+          result={suggestion}
+          onAccept={() => acceptMutation.mutate(suggestion.suggestion.id)}
+          onDismiss={() => dismissMutation.mutate(suggestion.suggestion.id)}
+          accepting={acceptMutation.isPending}
+          dismissing={dismissMutation.isPending}
+          onClose={() => setSuggestion(null)}
+        />
+      )}
       </div>
     </div>
   )
@@ -189,11 +254,15 @@ function ItemReasoningTree({
 function DecisionCard({
   decision,
   rulesMap,
+  selected,
+  onToggleSelect,
   onResolve,
   resolving,
 }: {
   decision: Decision
   rulesMap: Record<string, { title: string }>
+  selected: boolean
+  onToggleSelect: () => void
   onResolve: (verdict: string, reasoningCategory?: string, notes?: string, ruleIds?: string[]) => void
   resolving: boolean
 }) {
@@ -236,10 +305,16 @@ function DecisionCard({
   }
 
   return (
-    <div className={`card overflow-hidden ${decision.was_override ? 'border-amber-200' : ''}`}>
+    <div className={`card overflow-hidden ${selected ? 'ring-2 ring-indigo-400' : ''} ${decision.was_override ? 'border-amber-200' : ''}`}>
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            className="mt-1 flex-shrink-0 cursor-pointer"
+            checked={selected}
+            onChange={onToggleSelect}
+          />
           <div className="flex-1 min-w-0">
             <PostCard post={decision.post_content} compact />
           </div>
@@ -284,13 +359,6 @@ function DecisionCard({
               >
                 <XCircle size={13} />
                 Remove
-              </button>
-              <button
-                className={`btn text-xs bg-amber-500 text-white hover:bg-amber-600 ${selectedVerdict === 'review' ? 'ring-2 ring-amber-500' : ''}`}
-                onClick={() => setSelectedVerdict('review')}
-              >
-                <Flag size={13} />
-                Review
               </button>
             </>
           ) : (

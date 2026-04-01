@@ -11,8 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Example, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import ChecklistItemCreate, ChecklistItemRead, ChecklistItemUpdate, SuggestionRead
+from .rules import _apply_diff_operations, _persist_new_examples, _persist_new_items, _re_resolve_checklist_links
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["checklist"])
@@ -180,10 +181,23 @@ async def delete_checklist_item(
     item_id: str,
     db: AsyncSession = Depends(get_db),
 ) -> None:
+    from sqlalchemy import delete as sa_delete, update as sa_update
     result = await db.execute(select(ChecklistItem).where(ChecklistItem.id == item_id))
     item = result.scalar_one_or_none()
     if not item:
         raise HTTPException(status_code=404, detail="Checklist item not found")
+    # Null out checklist item links before deleting (preserve description for re-resolve)
+    child_ids_result = await db.execute(
+        select(ChecklistItem.id).where(ChecklistItem.parent_id == item_id)
+    )
+    child_ids = [r[0] for r in child_ids_result]
+    ids_to_null = child_ids + [item_id]
+    await db.execute(
+        sa_update(ExampleChecklistItemLink)
+        .where(ExampleChecklistItemLink.checklist_item_id.in_(ids_to_null))
+        .values(checklist_item_id=None)
+    )
+    await db.execute(sa_delete(ChecklistItem).where(ChecklistItem.parent_id == item_id))
     await db.delete(item)
     await db.commit()
 
@@ -217,14 +231,6 @@ async def recompile_rule(
     )
     existing_items = list(items_result.scalars().all())
 
-    # Fetch existing examples
-    examples_result = await db.execute(
-        select(Example)
-        .join(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
-        .where(ExampleRuleLink.rule_id == rule_id)
-    )
-    existing_examples = list(examples_result.scalars().all())
-
     # Fetch other rules
     other_rules_result = await db.execute(
         select(Rule).where(
@@ -236,19 +242,36 @@ async def recompile_rule(
     other_rules = list(other_rules_result.scalars().all())
 
     compiler = get_compiler()
-    diff = await compiler.recompile_rule(
+
+    if not existing_items:
+        # No checklist yet (e.g. rule was just re-triaged to actionable) — full compile
+        checklist_items, example_dicts = await compiler.compile_rule(
+            rule=rule,
+            community=community,
+            other_rules=other_rules,
+        )
+        await _persist_new_items(db, checklist_items, rule_id)
+        await db.flush()
+        items_result = await db.execute(
+            select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+        )
+        item_desc_map = {i.description: i.id for i in items_result.scalars()}
+        await _persist_new_examples(db, example_dicts, rule_id, item_description_map=item_desc_map)
+        await db.commit()
+        return {"suggestion_id": None, "diff": {"mode": "full_compile"}}
+
+    # Existing checklist — diff only, store as suggestion for review
+    operations = await compiler.recompile_with_diff(
         rule=rule,
         community=community,
         other_rules=other_rules,
         existing_items=existing_items,
-        existing_examples=existing_examples,
     )
 
-    # Store diff as a suggestion
     suggestion = Suggestion(
         rule_id=rule_id,
         suggestion_type="checklist",
-        content=diff,
+        content={"operations": operations},
         status="pending",
     )
     db.add(suggestion)
@@ -257,7 +280,7 @@ async def recompile_rule(
 
     return {
         "suggestion_id": suggestion.id,
-        "diff": diff,
+        "diff": {"operations": operations},
     }
 
 
@@ -280,33 +303,18 @@ async def accept_recompile(
     if not suggestion:
         raise HTTPException(status_code=404, detail="Pending suggestion not found")
 
-    diff = suggestion.content
-    new_items_raw = diff.get("new_items_raw", [])
+    operations = suggestion.content.get("operations", [])
 
-    # Delete existing checklist items
     existing_result = await db.execute(
         select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
     )
-    for item in existing_result.scalars().all():
-        await db.delete(item)
+    existing_by_id = {item.id: item for item in existing_result.scalars().all()}
+
+    await _apply_diff_operations(db, operations, existing_by_id, rule_id)
     await db.flush()
+    await _re_resolve_checklist_links(db, rule_id)
 
-    # Create new items
-    for i, item_data in enumerate(new_items_raw):
-        item = ChecklistItem(
-            rule_id=rule_id,
-            order=item_data.get("order", i),
-            parent_id=None,  # Simplified: no parent linking in accept
-            description=item_data.get("description", ""),
-            rule_text_anchor=item_data.get("rule_text_anchor"),
-            item_type=item_data.get("item_type", "subjective"),
-            logic=item_data.get("logic", {}),
-            action=item_data.get("action", "flag"),
-        )
-        db.add(item)
-
-    # Mark suggestion as accepted
     suggestion.status = "accepted"
     await db.commit()
 
-    return {"status": "accepted", "items_created": len(new_items_raw)}
+    return {"status": "accepted", "operations_applied": len(operations)}

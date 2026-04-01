@@ -64,10 +64,14 @@ _COMPILE_TOOL = {
                     "properties": {
                         "label": {
                             "type": "string",
-                            "enum": ["positive", "negative", "borderline"],
+                            "enum": ["compliant", "violating", "borderline"],
                         },
                         "content": {"type": "object"},
                         "relevance_note": {"type": "string"},
+                        "related_checklist_item_description": {
+                            "type": ["string", "null"],
+                            "description": "Exact description of the checklist item this example primarily tests",
+                        },
                     },
                     "required": ["label", "content", "relevance_note"],
                 },
@@ -161,6 +165,58 @@ _INFER_ITEM_TOOL = {
     },
 }
 
+_SYNTHESIZE_RULE_TOOL = {
+    "name": "synthesize_rule",
+    "description": "Propose a new community rule based on moderator override examples",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string", "description": "Short rule title, ≤ 10 words"},
+            "text": {"type": "string", "description": "Full rule text as it would appear in community rules"},
+            "confidence": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+                "description": "How confident you are that these examples reflect a real recurring pattern",
+            },
+            "reasoning": {
+                "type": "string",
+                "description": "Brief explanation of the inferred pattern and what the examples have in common",
+            },
+        },
+        "required": ["title", "text", "confidence", "reasoning"],
+    },
+}
+
+_FILL_EXAMPLES_TOOL = {
+    "name": "submit_fill_examples",
+    "description": "Submit one violating example per checklist item that is missing one",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "examples": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                            "enum": ["violating", "borderline"],
+                        },
+                        "content": {"type": "object"},
+                        "relevance_note": {"type": "string"},
+                        "related_checklist_item_description": {"type": "string"},
+                    },
+                    "required": [
+                        "label", "content", "relevance_note",
+                        "related_checklist_item_description",
+                    ],
+                },
+            },
+        },
+        "required": ["examples"],
+    },
+}
+
 _SUGGEST_FROM_CHECKLIST_TOOL = {
     "name": "submit_checklist_suggestions",
     "description": "Submit suggested examples and optional rule text updates",
@@ -174,7 +230,7 @@ _SUGGEST_FROM_CHECKLIST_TOOL = {
                     "properties": {
                         "label": {
                             "type": "string",
-                            "enum": ["positive", "negative", "borderline"],
+                            "enum": ["compliant", "violating", "borderline"],
                         },
                         "content": {"type": "object"},
                         "relevance_note": {"type": "string"},
@@ -494,3 +550,57 @@ class RuleCompiler:
                 "reasoning": rt.get("reasoning", ""),
             })
         return suggestions
+
+    async def generate_examples_for_items(
+        self,
+        rule: Rule,
+        community: Community,
+        items: list[ChecklistItem],
+        existing_examples: Optional[list] = None,
+    ) -> list[dict]:
+        """Generate one violating example per checklist item in the given list."""
+        logger.info(
+            f"Generating {len(items)} missing violating example(s) for rule '{rule.title}'"
+        )
+        item_dicts = [self._checklist_item_to_dict(i) for i in items]
+        existing_dicts = (
+            [self._example_to_dict(e) for e in existing_examples]
+            if existing_examples
+            else None
+        )
+        user_prompt = prompts.build_fill_examples_prompt(
+            rule_text=rule.text,
+            community_name=community.name,
+            platform=community.platform,
+            items_needing_examples=item_dicts,
+            existing_examples=existing_dicts,
+        )
+        result = await self._call_claude(
+            prompts.FILL_EXAMPLES_SYSTEM, user_prompt, tool=_FILL_EXAMPLES_TOOL
+        )
+        return result.get("examples", [])
+
+    async def synthesize_rule_from_examples(
+        self,
+        example_dicts: list[dict],
+        community: Community,
+    ) -> dict:
+        """Infer a new rule from a list of example dicts with keys: label, content, moderator_reasoning."""
+        logger.info(
+            f"Synthesizing rule from {len(example_dicts)} examples "
+            f"for community '{community.name}'"
+        )
+        user_prompt = prompts.build_synthesize_rule_prompt(
+            examples=example_dicts,
+            community_name=community.name,
+            platform=community.platform,
+        )
+        result = await self._call_claude(
+            prompts.SYNTHESIZE_RULE_SYSTEM, user_prompt, tool=_SYNTHESIZE_RULE_TOOL
+        )
+        return {
+            "title": result.get("title", ""),
+            "text": result.get("text", ""),
+            "confidence": result.get("confidence", "low"),
+            "reasoning": result.get("reasoning", ""),
+        }
