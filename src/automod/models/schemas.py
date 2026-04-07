@@ -16,6 +16,26 @@ class CommunityRead(BaseModel):
     name: str
     platform: str
     platform_config: Optional[dict[str, Any]] = None
+    atmosphere: Optional[dict[str, Any]] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── CommunitySamplePost ────────────────────────────────────────────────────────
+
+class CommunitySamplePostCreate(BaseModel):
+    content: dict[str, Any]
+    label: str  # acceptable | unacceptable
+    note: Optional[str] = None
+
+
+class CommunitySamplePostRead(BaseModel):
+    id: str
+    community_id: str
+    content: dict[str, Any]
+    label: str
+    note: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -104,6 +124,7 @@ class ExampleCreate(BaseModel):
     source: str = "manual"
     moderator_reasoning: Optional[str] = None
     relevance_note: Optional[str] = None
+    checklist_item_id: Optional[str] = None
 
 
 class ExampleRead(BaseModel):

@@ -268,6 +268,10 @@ async def recompile_rule(
         existing_items=existing_items,
     )
 
+    # If all operations are "keep", nothing changed — skip creating a suggestion
+    if all(op.get("op") == "keep" for op in operations):
+        return {"suggestion_id": None, "diff": {"operations": operations, "no_changes": True}}
+
     suggestion = Suggestion(
         rule_id=rule_id,
         suggestion_type="checklist",

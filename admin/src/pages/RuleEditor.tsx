@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Lightbulb, BookOpen, AlertCircle, Loader2, Upload,
-  CheckCircle, XCircle, Edit2, Check, X, Play,
+  CheckCircle, XCircle, Edit2, Check, X, Play, Image,
 } from 'lucide-react'
 import {
   listRules,
@@ -107,10 +107,12 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
 
   const recompileMutation = useMutation({
     mutationFn: () => recompileRule(selectedRuleId!),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['checklist', selectedRuleId] })
       queryClient.invalidateQueries({ queryKey: ['suggestions', selectedRuleId] })
-      setShowSuggestions(true)
+      if (!data.diff?.no_changes) {
+        setShowSuggestions(true)
+      }
     },
   })
 
@@ -294,24 +296,6 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                           <RefreshCw size={12} className={recompileMutation.isPending ? 'animate-spin' : ''} />
                           Recompile
                         </button>
-                        <button
-                          className="btn-secondary text-xs"
-                          onClick={() => suggestFromExamplesMutation.mutate()}
-                          disabled={suggestFromExamplesMutation.isPending}
-                          title="Generate suggestions from examples"
-                        >
-                          <Lightbulb size={12} />
-                          From Examples
-                        </button>
-                        <button
-                          className="btn-secondary text-xs"
-                          onClick={() => suggestFromChecklistMutation.mutate()}
-                          disabled={suggestFromChecklistMutation.isPending}
-                          title="Generate suggestions from checklist"
-                        >
-                          <Lightbulb size={12} />
-                          From Checklist
-                        </button>
                       </>
                     )}
                     {pendingSuggestions.length > 0 && (
@@ -325,14 +309,6 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                     )}
                   </div>
                 </div>
-
-                {/* Rule type reasoning */}
-                {selectedRule.rule_type_reasoning && (
-                  <div className="mx-4 mt-3 p-3 bg-gray-50 rounded text-xs text-gray-600 border border-gray-200 flex-shrink-0">
-                    <span className="font-medium">Classification reasoning: </span>
-                    {selectedRule.rule_type_reasoning}
-                  </div>
-                )}
 
                 {/* Text editor */}
                 <div className="flex-1 p-4 overflow-hidden flex flex-col">
@@ -409,7 +385,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
           {/* Checklist column */}
           <div className="w-[35%] flex-shrink-0 flex flex-col border-r border-gray-200 bg-white overflow-hidden">
             <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Checklist</h3>
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Automoderator Logic</h3>
             </div>
             <div className="flex-1 overflow-auto p-3">
               {selectedRuleId ? (
@@ -431,7 +407,13 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
             </div>
             <div className="flex-1 overflow-hidden">
               {selectedRuleId ? (
-                <ExamplesPanel ruleId={selectedRuleId} filterItemId={selectedChecklistItemId} onItemHighlight={setHighlightedItemId} />
+                <ExamplesPanel
+                  ruleId={selectedRuleId}
+                  filterItemId={selectedChecklistItemId}
+                  onItemHighlight={setHighlightedItemId}
+                  onSuggest={selectedRule?.rule_type === 'actionable' ? () => suggestFromExamplesMutation.mutate() : undefined}
+                  isSuggesting={suggestFromExamplesMutation.isPending}
+                />
               ) : (
                 <div className="p-3 text-xs text-gray-400 italic">Select a rule to view examples.</div>
               )}
@@ -503,9 +485,19 @@ function TestingPanel({
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
   const [threadContext, setThreadContext] = useState('')
+  const [imageUrls, setImageUrls] = useState<string[]>([])
+  const [imageInput, setImageInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<Decision | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const addImageUrl = () => {
+    const url = imageInput.trim()
+    if (url && !imageUrls.includes(url)) {
+      setImageUrls(prev => [...prev, url])
+    }
+    setImageInput('')
+  }
 
   const checklistMap = useMemo(() => flattenChecklist(checklist), [checklist])
 
@@ -518,6 +510,7 @@ function TestingPanel({
         content: {
           title: title || undefined,
           body: body || undefined,
+          ...(imageUrls.length ? { media: imageUrls } : {}),
         },
         ...(threadContext.trim() ? {
           context: { platform_metadata: { thread_context: threadContext } },
@@ -573,6 +566,41 @@ function TestingPanel({
               onChange={e => setBody(e.target.value)}
               placeholder="Post or comment text..."
             />
+          </div>
+          <div className="flex-shrink-0">
+            <label className="block text-xs font-medium text-gray-600 mb-0.5">
+              Images{' '}
+              <span className="text-gray-400 font-normal">(paste image URLs)</span>
+            </label>
+            <div className="flex gap-1.5 mb-1.5">
+              <input
+                className="flex-1 border border-gray-300 rounded px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                value={imageInput}
+                onChange={e => setImageInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && addImageUrl()}
+                placeholder="https://..."
+              />
+              <button
+                className="btn-secondary text-xs flex items-center gap-1 px-2"
+                onClick={addImageUrl}
+                disabled={!imageInput.trim()}
+              >
+                <Plus size={12} /> Add
+              </button>
+            </div>
+            {imageUrls.length > 0 && (
+              <ul className="space-y-1">
+                {imageUrls.map(url => (
+                  <li key={url} className="flex items-center gap-1.5 text-xs bg-gray-50 border border-gray-200 rounded px-2 py-1">
+                    <Image size={11} className="text-gray-400 flex-shrink-0" />
+                    <span className="flex-1 truncate text-gray-600">{url}</span>
+                    <button onClick={() => setImageUrls(prev => prev.filter(u => u !== url))} className="text-gray-400 hover:text-red-500">
+                      <X size={11} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
           <div className="flex-shrink-0">
             <label className="block text-xs font-medium text-gray-600 mb-0.5">

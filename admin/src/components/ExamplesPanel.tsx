@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, ThumbsUp, ThumbsDown, Minus } from 'lucide-react'
-import { listExamples, addExample, deleteExample, Example } from '../api/client'
+import { Plus, Trash2, ThumbsUp, ThumbsDown, Minus, Lightbulb } from 'lucide-react'
+import { listExamples, addExample, deleteExample, updateExample, Example } from '../api/client'
 
 interface ExamplesPanelProps {
   ruleId: string
   filterItemId?: string | null
   onItemHighlight?: (itemId: string | null) => void
+  onSuggest?: () => void
+  isSuggesting?: boolean
 }
 
 const LABELS = ['compliant', 'violating', 'borderline'] as const
@@ -30,7 +32,7 @@ const labelConfig: Record<Label, { badge: string; icon: React.ReactNode; color: 
   },
 }
 
-export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight }: ExamplesPanelProps) {
+export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, onSuggest, isSuggesting }: ExamplesPanelProps) {
   const [activeTab, setActiveTab] = useState<Label>('compliant')
   const [showAdd, setShowAdd] = useState(false)
 
@@ -47,6 +49,12 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight }:
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['examples', ruleId] }),
   })
 
+  const resolveMutation = useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) =>
+      updateExample(id, { label } as Partial<Example>),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['examples', ruleId] }),
+  })
+
   const byLabel = examples.filter((e: Example) => e.label === activeTab)
   const filtered = filterItemId
     ? byLabel.filter((e: Example) => e.checklist_item_id === filterItemId)
@@ -54,34 +62,51 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight }:
 
   return (
     <div className="flex flex-col h-full">
-      {/* Tabs */}
-      <div className="flex items-center gap-0.5 mb-3">
-        {LABELS.map(label => {
-          const count = examples.filter((e: Example) => e.label === label && (!filterItemId || e.checklist_item_id === filterItemId)).length
-          const cfg = labelConfig[label]
-          return (
+      {/* Toolbar */}
+      <div className="flex flex-col gap-1 mb-3">
+        {/* Tabs row */}
+        <div className="flex items-center gap-0.5">
+          {LABELS.map(label => {
+            const count = examples.filter((e: Example) => e.label === label && (!filterItemId || e.checklist_item_id === filterItemId)).length
+            const cfg = labelConfig[label]
+            return (
+              <button
+                key={label}
+                onClick={() => setActiveTab(label)}
+                className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                  activeTab === label
+                    ? 'bg-gray-200 text-gray-800'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+              >
+                {cfg.icon}
+                {label}
+                <span className="ml-1 bg-gray-300 text-gray-700 rounded-full px-1.5 py-0.5 text-xs">
+                  {count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        {/* Actions row */}
+        <div className="flex items-center gap-1">
+          {onSuggest && (
             <button
-              key={label}
-              onClick={() => setActiveTab(label)}
-              className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                activeTab === label
-                  ? 'bg-gray-200 text-gray-800'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
+              className="btn-secondary text-xs"
+              onClick={onSuggest}
+              disabled={isSuggesting}
+              title="Generate checklist/rule suggestions from these examples"
             >
-              {cfg.icon}
-              {label}
-              <span className="ml-1 bg-gray-300 text-gray-700 rounded-full px-1.5 py-0.5 text-xs">
-                {count}
-              </span>
+              <Lightbulb size={12} />
+              {isSuggesting ? 'Analyzing...' : 'Analyze'}
             </button>
-          )
-        })}
-        <div className="flex-1" />
-        <button className="btn-secondary text-xs" onClick={() => setShowAdd(true)}>
-          <Plus size={12} />
-          Add
-        </button>
+          )}
+          <div className="flex-1" />
+          <button className="btn-secondary text-xs" onClick={() => setShowAdd(true)}>
+            <Plus size={12} />
+            Add
+          </button>
+        </div>
       </div>
 
       {/* Active checklist item filter */}
@@ -104,9 +129,8 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight }:
         )}
         {filtered.map((ex: Example) => {
           const content = ex.content as Record<string, unknown>
-          const postContent = (content.content as Record<string, unknown>) || {}
-          const title = (postContent.title as string) || ''
-          const body = (postContent.body as string) || ''
+          const title = (content.title as string) || ''
+          const body = (content.body as string) || ''
           return (
             <div
               key={ex.id}
@@ -131,6 +155,26 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight }:
                   )}
                   {ex.moderator_reasoning && (
                     <p className="text-xs text-gray-600 mt-1 italic">{ex.moderator_reasoning}</p>
+                  )}
+                  {ex.label === 'borderline' && (
+                    <div className="flex gap-1 mt-1.5">
+                      <button
+                        className="btn-success text-xs py-0.5"
+                        onClick={() => resolveMutation.mutate({ id: ex.id, label: 'compliant' })}
+                        disabled={resolveMutation.isPending}
+                        title="Mark as compliant"
+                      >
+                        Compliant
+                      </button>
+                      <button
+                        className="btn-danger text-xs py-0.5"
+                        onClick={() => resolveMutation.mutate({ id: ex.id, label: 'violating' })}
+                        disabled={resolveMutation.isPending}
+                        title="Mark as violating"
+                      >
+                        Violating
+                      </button>
+                    </div>
                   )}
                 </div>
                 <button
@@ -180,11 +224,7 @@ function AddExampleModal({
     setLoading(true)
     try {
       await addExample(ruleId, {
-        content: {
-          content: { title: title.trim(), body: body.trim(), media: [], links: [] },
-          author: { username: '', account_age_days: null, platform_metadata: {} },
-          context: { channel: '', post_type: null, flair: null, platform_metadata: {} },
-        },
+        content: { title: title.trim(), body: body.trim() },
         label,
         source: 'manual',
       })

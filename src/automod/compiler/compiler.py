@@ -135,12 +135,18 @@ _SUGGEST_FROM_EXAMPLES_TOOL = {
                         },
                         "target": {"type": ["string", "null"]},
                         "description": {"type": "string"},
-                        "proposed_change": {"type": "object"},
+                        "proposed_text": {
+                            "type": "string",
+                            "description": "For rule_text suggestions: the COMPLETE updated rule text (all paragraphs, not just the changed portion)",
+                        },
+                        "proposed_change": {
+                            "type": "object",
+                            "description": "For checklist suggestions: the updated checklist item object",
+                        },
                         "reasoning": {"type": "string"},
                     },
                     "required": [
-                        "suggestion_type", "target", "description",
-                        "proposed_change", "reasoning",
+                        "suggestion_type", "target", "description", "reasoning",
                     ],
                 },
             },
@@ -217,6 +223,22 @@ _FILL_EXAMPLES_TOOL = {
     },
 }
 
+_GENERATE_ATMOSPHERE_TOOL = {
+    "name": "submit_community_atmosphere",
+    "description": "Submit a structured community atmosphere profile inferred from post samples",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "tone": {"type": "string"},
+            "typical_content": {"type": "string"},
+            "what_belongs": {"type": "string"},
+            "what_doesnt_belong": {"type": "string"},
+            "moderation_style": {"type": "string"},
+        },
+        "required": ["tone", "typical_content", "what_belongs", "what_doesnt_belong", "moderation_style"],
+    },
+}
+
 _SUGGEST_FROM_CHECKLIST_TOOL = {
     "name": "submit_checklist_suggestions",
     "description": "Submit suggested examples and optional rule text updates",
@@ -234,6 +256,10 @@ _SUGGEST_FROM_CHECKLIST_TOOL = {
                         },
                         "content": {"type": "object"},
                         "relevance_note": {"type": "string"},
+                        "related_checklist_item_description": {
+                            "type": ["string", "null"],
+                            "description": "Exact description of the checklist item this example primarily tests",
+                        },
                     },
                     "required": ["label", "content", "relevance_note"],
                 },
@@ -351,6 +377,8 @@ class RuleCompiler:
         other_rules: list[Rule],
         existing_items: Optional[list[ChecklistItem]] = None,
         existing_examples: Optional[list[Example]] = None,
+        community_atmosphere: Optional[dict] = None,
+        community_posts_sample: Optional[list[dict]] = None,
     ) -> tuple[list[ChecklistItem], list[dict]]:
         """Compile actionable rule into checklist tree + examples.
 
@@ -377,6 +405,8 @@ class RuleCompiler:
             other_rules_summary=other_rules_summary,
             existing_checklist=existing_checklist_dicts,
             existing_examples=existing_example_dicts,
+            community_atmosphere=community_atmosphere,
+            community_posts_sample=community_posts_sample,
         )
 
         compiled = await self._call_claude(prompts.COMPILE_SYSTEM, user_prompt, tool=_COMPILE_TOOL)
@@ -390,6 +420,36 @@ class RuleCompiler:
         examples = compiled.get("examples", [])
 
         return checklist_items, examples
+
+    async def generate_community_atmosphere(
+        self,
+        community: Community,
+        acceptable_posts: list[dict],
+        unacceptable_posts: list[dict],
+        other_rules: Optional[list[Rule]] = None,
+    ) -> dict:
+        """Generate a structured community atmosphere profile from representative posts."""
+        logger.info(f"Generating atmosphere profile for community '{community.name}'")
+        rules_summary = self._make_other_rules_summary(other_rules) if other_rules else None
+        user_prompt = prompts.build_generate_atmosphere_prompt(
+            community_name=community.name,
+            platform=community.platform,
+            acceptable_posts=acceptable_posts,
+            unacceptable_posts=unacceptable_posts,
+            rules_summary=rules_summary,
+        )
+        result = await self._call_claude(
+            prompts.GENERATE_ATMOSPHERE_SYSTEM,
+            user_prompt,
+            tool=_GENERATE_ATMOSPHERE_TOOL,
+        )
+        return {
+            "tone": result.get("tone", ""),
+            "typical_content": result.get("typical_content", ""),
+            "what_belongs": result.get("what_belongs", ""),
+            "what_doesnt_belong": result.get("what_doesnt_belong", ""),
+            "moderation_style": result.get("moderation_style", ""),
+        }
 
     def _parse_flat_items(
         self, items_data: list[dict], rule_id: str
@@ -490,6 +550,7 @@ class RuleCompiler:
         rule: Rule,
         checklist: list[ChecklistItem],
         examples: list[Example],
+        violating_counts: dict[str, int] | None = None,
     ) -> list[dict]:
         """Generate checklist/rule text suggestions from examples."""
         logger.info(f"Generating suggestions from examples for rule '{rule.title}'")
@@ -505,6 +566,7 @@ class RuleCompiler:
             checklist_items=checklist_dicts,
             examples=example_dicts,
             community_name=community_name,
+            violating_counts=violating_counts,
         )
 
         result = await self._call_claude(
@@ -540,14 +602,12 @@ class RuleCompiler:
         for ex in result.get("suggested_examples", []):
             suggestions.append({
                 "suggestion_type": "example",
-                "content": ex,
-                "reasoning": ex.get("relevance_note", ""),
+                **ex,
             })
         for rt in result.get("rule_text_suggestions", []):
             suggestions.append({
                 "suggestion_type": "rule_text",
-                "content": rt,
-                "reasoning": rt.get("reasoning", ""),
+                **rt,
             })
         return suggestions
 

@@ -9,11 +9,29 @@ const api = axios.create({
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+export interface CommunityAtmosphere {
+  tone: string
+  typical_content: string
+  what_belongs: string
+  what_doesnt_belong: string
+  moderation_style: string
+}
+
 export interface Community {
   id: string
   name: string
   platform: string
   platform_config: Record<string, unknown> | null
+  atmosphere: CommunityAtmosphere | null
+  created_at: string
+}
+
+export interface CommunitySamplePost {
+  id: string
+  community_id: string
+  content: Record<string, unknown>
+  label: 'acceptable' | 'unacceptable'
+  note: string | null
   created_at: string
 }
 
@@ -108,7 +126,7 @@ export interface PostContent {
   content?: {
     title?: string
     body?: string
-    media?: unknown[]
+    media?: string[]
     links?: string[]
   }
   context?: {
@@ -130,6 +148,28 @@ export const createCommunity = (data: { name: string; platform: string; platform
 
 export const getCommunity = (id: string) =>
   api.get<Community>(`/communities/${id}`).then(r => r.data)
+
+export const generateAtmosphere = (communityId: string) =>
+  api.post<Community>(`/communities/${communityId}/atmosphere/generate`).then(r => r.data)
+
+export const listSamplePosts = (communityId: string) =>
+  api.get<CommunitySamplePost[]>(`/communities/${communityId}/sample-posts`).then(r => r.data)
+
+export const addSamplePost = (
+  communityId: string,
+  data: { content: Record<string, unknown>; label: 'acceptable' | 'unacceptable'; note?: string }
+) => api.post<CommunitySamplePost>(`/communities/${communityId}/sample-posts`, data).then(r => r.data)
+
+export const deleteSamplePost = (communityId: string, postId: string) =>
+  api.delete(`/communities/${communityId}/sample-posts/${postId}`)
+
+export const importSamplePostFromUrl = (
+  communityId: string,
+  data: { url: string; label: 'acceptable' | 'unacceptable'; note?: string }
+) =>
+  api
+    .post<CommunitySamplePost>(`/communities/${communityId}/sample-posts/import-url`, data)
+    .then(r => r.data)
 
 // ── Rules ──────────────────────────────────────────────────────────────────────
 
@@ -192,7 +232,7 @@ export const deleteChecklistItem = (itemId: string) =>
   api.delete(`/checklist-items/${itemId}`)
 
 export const recompileRule = (ruleId: string) =>
-  api.post<{ suggestion_id: string; diff: Record<string, unknown> }>(`/rules/${ruleId}/recompile`).then(r => r.data)
+  api.post<{ suggestion_id: string | null; diff: Record<string, unknown> & { no_changes?: boolean } }>(`/rules/${ruleId}/recompile`).then(r => r.data)
 
 export const acceptRecompile = (ruleId: string, suggestionId: string) =>
   api.post(`/rules/${ruleId}/recompile/accept`, null, { params: { suggestion_id: suggestionId } }).then(r => r.data)
@@ -224,6 +264,15 @@ export const listSuggestions = (ruleId: string, status?: string) =>
 
 export const acceptSuggestion = (suggestionId: string) =>
   api.post<Suggestion>(`/suggestions/${suggestionId}/accept`).then(r => r.data)
+
+export const acceptSuggestionWithLabel = (suggestionId: string, labelOverride?: string) =>
+  api.post<Suggestion>(
+    `/suggestions/${suggestionId}/accept`,
+    labelOverride ? { label_override: labelOverride } : {},
+  ).then(r => r.data)
+
+export const refreshSuggestions = (ruleId: string) =>
+  api.post<Suggestion[]>(`/rules/${ruleId}/suggest-from-examples`).then(r => r.data)
 
 export const dismissSuggestion = (suggestionId: string) =>
   api.post<Suggestion>(`/suggestions/${suggestionId}/dismiss`).then(r => r.data)

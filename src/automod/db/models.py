@@ -31,8 +31,11 @@ class Community(Base):
     platform_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
+    atmosphere: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     rules: Mapped[list["Rule"]] = relationship("Rule", back_populates="community", cascade="all, delete-orphan")
     decisions: Mapped[list["Decision"]] = relationship("Decision", back_populates="community", cascade="all, delete-orphan")
+    sample_posts: Mapped[list["CommunitySamplePost"]] = relationship("CommunitySamplePost", back_populates="community", cascade="all, delete-orphan")
 
 
 class Rule(Base):
@@ -194,3 +197,16 @@ class Suggestion(Base):
     checklist_item: Mapped[Optional["ChecklistItem"]] = relationship(
         "ChecklistItem", back_populates="suggestions"
     )
+
+
+class CommunitySamplePost(Base):
+    __tablename__ = "community_sample_posts"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    community_id: Mapped[str] = mapped_column(String, ForeignKey("communities.id"), nullable=False)
+    content: Mapped[dict] = mapped_column(JSON, nullable=False)
+    label: Mapped[str] = mapped_column(String, nullable=False)  # acceptable | unacceptable
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    community: Mapped["Community"] = relationship("Community", back_populates="sample_posts")

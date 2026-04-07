@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule
+from ..db.models import ChecklistItem, CommunitySamplePost, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import (
     RuleBatchImportRequest,
     RuleBatchImportResponse,
@@ -113,6 +113,38 @@ async def _compile_rule_background(
             )
             existing_items = list(existing_result.scalars().all())
 
+            # Fetch community atmosphere and representative posts for compilation context
+            community_atmosphere = community.atmosphere
+
+            approved_result = await db.execute(
+                select(Decision)
+                .where(Decision.community_id == community_id, Decision.moderator_verdict == "approve")
+                .order_by(Decision.created_at.desc())
+                .limit(5)
+            )
+            removed_result = await db.execute(
+                select(Decision)
+                .where(Decision.community_id == community_id, Decision.moderator_verdict == "remove")
+                .order_by(Decision.created_at.desc())
+                .limit(5)
+            )
+            sample_result = await db.execute(
+                select(CommunitySamplePost)
+                .where(CommunitySamplePost.community_id == community_id)
+                .order_by(CommunitySamplePost.created_at.desc())
+                .limit(20)
+            )
+            community_posts_sample = [
+                {"content": d.post_content, "label": "acceptable"}
+                for d in approved_result.scalars().all()
+            ] + [
+                {"content": d.post_content, "label": "unacceptable"}
+                for d in removed_result.scalars().all()
+            ] + [
+                {"content": p.content, "label": p.label, "note": p.note}
+                for p in sample_result.scalars().all()
+            ]
+
             compiler = get_compiler()
 
             if not existing_items:
@@ -121,6 +153,8 @@ async def _compile_rule_background(
                     rule=rule,
                     community=community,
                     other_rules=other_rules,
+                    community_atmosphere=community_atmosphere,
+                    community_posts_sample=community_posts_sample or None,
                 )
                 await _persist_new_items(db, checklist_items, rule_id)
                 await db.flush()
@@ -191,9 +225,26 @@ async def _persist_new_examples(
     related_checklist_item_description on an example.
     """
     for ex_dict in example_dicts:
+        label = ex_dict.get("label", "compliant")
+        if label == "borderline":
+            # Route borderline examples through the suggestion pipeline so
+            # moderators must make an explicit compliant/violating decision.
+            db.add(Suggestion(
+                rule_id=rule_id,
+                suggestion_type="example",
+                content={
+                    "label": "borderline",
+                    "content": ex_dict.get("content", {}),
+                    "relevance_note": ex_dict.get("relevance_note", ""),
+                    "related_checklist_item_description": ex_dict.get("related_checklist_item_description"),
+                },
+                status="pending",
+            ))
+            continue
+
         example = Example(
             content=ex_dict.get("content", {}),
-            label=ex_dict.get("label", "compliant"),
+            label=label,
             source="generated",
         )
         db.add(example)

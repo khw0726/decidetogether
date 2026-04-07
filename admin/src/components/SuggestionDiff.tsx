@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X, AlertCircle } from 'lucide-react'
-import { acceptSuggestion, acceptRecompile, dismissSuggestion, Suggestion } from '../api/client'
+import { Check, X, AlertCircle, RefreshCw } from 'lucide-react'
+import { acceptSuggestionWithLabel, acceptRecompile, dismissSuggestion, refreshSuggestions, Suggestion } from '../api/client'
 
 interface SuggestionDiffProps {
   suggestions: Suggestion[]
@@ -13,10 +13,10 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
   const queryClient = useQueryClient()
 
   const acceptMutation = useMutation({
-    mutationFn: (suggestion: Suggestion) =>
+    mutationFn: ({ suggestion, labelOverride }: { suggestion: Suggestion; labelOverride?: string }) =>
       suggestion.suggestion_type === 'checklist'
         ? acceptRecompile(ruleId, suggestion.id)
-        : acceptSuggestion(suggestion.id),
+        : acceptSuggestionWithLabel(suggestion.id, labelOverride),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suggestions', ruleId] })
       queryClient.invalidateQueries({ queryKey: ['checklist', ruleId] })
@@ -27,6 +27,13 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
 
   const dismissMutation = useMutation({
     mutationFn: dismissSuggestion,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['suggestions', ruleId] })
+    },
+  })
+
+  const refreshMutation = useMutation({
+    mutationFn: () => refreshSuggestions(ruleId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suggestions', ruleId] })
     },
@@ -47,9 +54,20 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
             <h3 className="font-semibold">Pending Suggestions</h3>
             <span className="badge badge-yellow">{pending.length}</span>
           </div>
-          <button className="text-gray-400 hover:text-gray-600" onClick={onClose}>
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className="btn-secondary text-xs flex items-center gap-1"
+              onClick={() => refreshMutation.mutate()}
+              disabled={refreshMutation.isPending}
+              title="Re-analyze examples and generate new suggestions"
+            >
+              <RefreshCw size={12} className={refreshMutation.isPending ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+            <button className="text-gray-400 hover:text-gray-600" onClick={onClose}>
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto p-4 space-y-4">
@@ -58,7 +76,7 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
               key={suggestion.id}
               suggestion={suggestion}
               currentRuleText={currentRuleText}
-              onAccept={() => acceptMutation.mutate(suggestion)}
+              onAccept={(labelOverride?: string) => acceptMutation.mutate({ suggestion, labelOverride })}
               onDismiss={() => dismissMutation.mutate(suggestion.id)}
               isPending={acceptMutation.isPending || dismissMutation.isPending}
             />
@@ -84,7 +102,7 @@ function SuggestionCard({
 }: {
   suggestion: Suggestion
   currentRuleText?: string
-  onAccept: () => void
+  onAccept: (labelOverride?: string) => void
   onDismiss: () => void
   isPending: boolean
 }) {
@@ -97,25 +115,65 @@ function SuggestionCard({
 
   const content = suggestion.content as Record<string, unknown>
 
+  // Check if this is a borderline example suggestion requiring a verdict
+  const isBorderlineExample =
+    suggestion.suggestion_type === 'example' && content.label === 'borderline'
+
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-3">
             <span className="badge badge-blue">{typeLabels[suggestion.suggestion_type] || suggestion.suggestion_type}</span>
+            {isBorderlineExample && (
+              <span className="badge badge-yellow">needs verdict</span>
+            )}
           </div>
           <SuggestionBody type={suggestion.suggestion_type} content={content} currentRuleText={currentRuleText} />
         </div>
         <div className="flex flex-col gap-1.5 flex-shrink-0">
-          <button
-            className="btn-success text-xs py-1"
-            onClick={onAccept}
-            disabled={isPending}
-            title="Accept suggestion"
-          >
-            <Check size={12} />
-            Accept
-          </button>
+          {isBorderlineExample ? (
+            <>
+              <button
+                className="btn-success text-xs py-1"
+                onClick={() => onAccept('compliant')}
+                disabled={isPending}
+                title="Mark as compliant"
+              >
+                <Check size={12} />
+                Compliant
+              </button>
+              <button
+                className="btn-danger text-xs py-1"
+                onClick={() => onAccept('violating')}
+                disabled={isPending}
+                title="Mark as violating"
+              >
+                <X size={12} />
+                Violating
+              </button>
+              <button
+                className="btn-secondary text-xs py-1"
+                onClick={() => onAccept()}
+                disabled={isPending}
+                title="Keep as borderline"
+              >
+                Keep
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="btn-success text-xs py-1"
+                onClick={() => onAccept()}
+                disabled={isPending}
+                title="Accept suggestion"
+              >
+                <Check size={12} />
+                Accept
+              </button>
+            </>
+          )}
           <button
             className="btn-secondary text-xs py-1"
             onClick={onDismiss}
@@ -157,34 +215,30 @@ function SuggestionBody({ type, content, currentRuleText }: { type: string; cont
 
 type DiffToken = { type: 'equal' | 'remove' | 'add'; text: string }
 
-function wordDiff(oldText: string, newText: string): DiffToken[] {
-  // Tokenize preserving whitespace as separate tokens
-  const tokenize = (s: string) => s.split(/(\s+)/)
-  const a = tokenize(oldText)
-  const b = tokenize(newText)
-
-  // LCS via DP
+function lcs<T>(a: T[], b: T[], eq: (x: T, y: T) => boolean): Array<{ type: 'equal' | 'remove' | 'add'; val: T }> {
   const m = a.length, n = b.length
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
   for (let i = m - 1; i >= 0; i--)
     for (let j = n - 1; j >= 0; j--)
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
-
-  const tokens: DiffToken[] = []
+      dp[i][j] = eq(a[i], b[j]) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
+  const ops: Array<{ type: 'equal' | 'remove' | 'add'; val: T }> = []
   let i = 0, j = 0
   while (i < m || j < n) {
-    if (i < m && j < n && a[i] === b[j]) {
-      tokens.push({ type: 'equal', text: a[i] })
-      i++; j++
+    if (i < m && j < n && eq(a[i], b[j])) {
+      ops.push({ type: 'equal', val: a[i] }); i++; j++
     } else if (j < n && (i >= m || dp[i][j + 1] >= dp[i + 1][j])) {
-      tokens.push({ type: 'add', text: b[j] })
-      j++
+      ops.push({ type: 'add', val: b[j] }); j++
     } else {
-      tokens.push({ type: 'remove', text: a[i] })
-      i++
+      ops.push({ type: 'remove', val: a[i] }); i++
     }
   }
-  return tokens
+  return ops
+}
+
+function wordDiff(oldText: string, newText: string): DiffToken[] {
+  const tokenize = (s: string) => s.split(/(\s+)/)
+  return lcs(tokenize(oldText), tokenize(newText), (a, b) => a === b)
+    .map(op => ({ type: op.type, text: op.val }))
 }
 
 function InlineDiff({ oldText, newText }: { oldText: string; newText: string }) {
@@ -204,22 +258,73 @@ function InlineDiff({ oldText, newText }: { oldText: string; newText: string }) 
   )
 }
 
+function ParagraphDiff({ oldText, newText }: { oldText: string; newText: string }) {
+  const splitParas = (s: string) => s.split(/\n\n+/)
+  const ops = lcs(splitParas(oldText), splitParas(newText), (a, b) => a === b)
+
+  const nodes: React.ReactNode[] = []
+  let i = 0
+  while (i < ops.length) {
+    const op = ops[i]
+    if (op.type === 'equal') {
+      nodes.push(
+        <p key={i} className="text-sm text-gray-700 leading-relaxed py-0.5">{op.val}</p>
+      )
+      i++
+    } else {
+      // Collect a run of non-equal ops, then pair removes+adds
+      const removes: string[] = []
+      const adds: string[] = []
+      const runStart = i
+      while (i < ops.length && ops[i].type !== 'equal') {
+        if (ops[i].type === 'remove') removes.push(ops[i].val)
+        else adds.push(ops[i].val)
+        i++
+      }
+      const pairs = Math.min(removes.length, adds.length)
+      // Paired: show word-level inline diff
+      for (let k = 0; k < pairs; k++) {
+        nodes.push(
+          <div key={`pair-${runStart}-${k}`} className="border border-amber-200 rounded px-3 py-2 my-1 bg-amber-50">
+            <InlineDiff oldText={removes[k]} newText={adds[k]} />
+          </div>
+        )
+      }
+      // Unpaired removes
+      for (let k = pairs; k < removes.length; k++) {
+        nodes.push(
+          <div key={`rem-${runStart}-${k}`} className="border-l-4 border-red-400 bg-red-50 pl-3 py-1.5 my-1 rounded-r">
+            <p className="text-xs text-red-500 font-semibold mb-0.5">Removed</p>
+            <p className="text-sm text-red-700 leading-relaxed line-through">{removes[k]}</p>
+          </div>
+        )
+      }
+      // Unpaired adds
+      for (let k = pairs; k < adds.length; k++) {
+        nodes.push(
+          <div key={`add-${runStart}-${k}`} className="border-l-4 border-green-400 bg-green-50 pl-3 py-1.5 my-1 rounded-r">
+            <p className="text-xs text-green-600 font-semibold mb-0.5">Added</p>
+            <p className="text-sm text-green-800 leading-relaxed">{adds[k]}</p>
+          </div>
+        )
+      }
+    }
+  }
+
+  return <div className="space-y-1">{nodes}</div>
+}
+
 function extractProposedRuleText(content: Record<string, unknown>): string {
-  // Fields may be at top level or nested under content.content
-  const inner = content.content as Record<string, unknown> | undefined
-  if (typeof inner?.proposed_text === 'string') return inner.proposed_text
   if (typeof content.proposed_text === 'string') return content.proposed_text
-  // suggest_from_examples uses proposed_change (object), text may be in .text
-  const change = (inner?.proposed_change ?? content.proposed_change) as Record<string, unknown> | undefined
+  const change = content.proposed_change as Record<string, unknown> | undefined
   if (change && typeof change.text === 'string') return change.text
   if (change && typeof change.proposed_text === 'string') return change.proposed_text
   return ''
 }
 
 function RuleTextSuggestion({ content, currentRuleText }: { content: Record<string, unknown>; currentRuleText?: string }) {
-  const inner = content.content as Record<string, unknown> | undefined
-  const description = (inner?.description as string) || (content.description as string) || ''
-  const reasoning = (inner?.reasoning as string) || (content.reasoning as string) || ''
+  const description = (content.description as string) || ''
+  const reasoning = (content.reasoning as string) || ''
   const proposedText = extractProposedRuleText(content)
 
   return (
@@ -228,7 +333,7 @@ function RuleTextSuggestion({ content, currentRuleText }: { content: Record<stri
       {proposedText ? (
         <div className="border border-gray-200 rounded p-3 bg-gray-50">
           {currentRuleText
-            ? <InlineDiff oldText={currentRuleText} newText={proposedText} />
+            ? <ParagraphDiff oldText={currentRuleText} newText={proposedText} />
             : <p className="text-sm text-gray-700 whitespace-pre-wrap">{proposedText}</p>
           }
         </div>
@@ -247,11 +352,9 @@ const labelColors: Record<string, string> = {
 }
 
 function ExampleSuggestion({ content }: { content: Record<string, unknown> }) {
-  // The API nests example fields under content.content
-  const innerContent = (content.content as Record<string, unknown>) || {}
-  const label = (innerContent.label as string) || (content.label as string) || 'compliant'
-  const relevanceNote = (innerContent.relevance_note as string) || (content.reasoning as string) || ''
-  const postBody = (innerContent.content as Record<string, unknown>) || {}
+  const label = (content.label as string) || 'compliant'
+  const relevanceNote = (content.relevance_note as string) || ''
+  const postBody = (content.content as Record<string, unknown>) || {}
   const title = postBody.title as string | undefined
   const body = postBody.body as string | undefined
   const context = postBody.context as string | undefined
@@ -278,10 +381,9 @@ function ExampleSuggestion({ content }: { content: Record<string, unknown> }) {
 }
 
 function ChecklistSuggestion({ content }: { content: Record<string, unknown> }) {
-  const inner = content.content as Record<string, unknown> | undefined
-  const description = (inner?.description as string) || (content.description as string) || ''
-  const reasoning = (inner?.reasoning as string) || (content.reasoning as string) || ''
-  const proposed = (inner?.proposed_change ?? content.proposed_change) as Record<string, unknown> | null | undefined
+  const description = (content.description as string) || ''
+  const reasoning = (content.reasoning as string) || ''
+  const proposed = content.proposed_change as Record<string, unknown> | null | undefined
 
   const itemTypeColors: Record<string, string> = {
     deterministic: 'bg-violet-100 text-violet-800',

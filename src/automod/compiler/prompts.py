@@ -62,7 +62,7 @@ Logic schemas:
   - triggered when the condition is true (e.g. account_age_days < 7 triggers for new accounts)
 - subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
 
-Keep trees shallow (2 levels max). Generate exactly 3 compliant examples (posts that follow the rule) and one violating example per top-level checklist item (so if you generate 3 checklist items, generate 3 violating examples — one clearly triggering each item).
+Keep trees shallow (2 levels max). Generate exactly 3 compliant examples (posts that follow the rule), one violating example, and one borderline example per top-level checklist item (so if you generate 3 checklist items, generate 3 violating + 3 borderline examples — one of each clearly targeting each item). Borderline examples are posts that reasonable moderators might genuinely disagree on — they sit at the gray area of the rule.
 
 For each example, include `related_checklist_item_description`: the exact description string of the checklist item this example is designed to trigger (for violating/borderline examples), or null for compliant examples.
 
@@ -239,21 +239,69 @@ def build_compile_prompt(
     other_rules_summary: str,
     existing_checklist: Optional[list] = None,
     existing_examples: Optional[list] = None,
+    community_atmosphere: Optional[dict] = None,
+    community_posts_sample: Optional[list] = None,
 ) -> str:
+    import json
+
     existing_context = ""
     if existing_checklist:
-        import json
         existing_context += f"\n\nExisting checklist (preserve user customizations where rule intent unchanged):\n{json.dumps(existing_checklist, indent=2)}"
     if existing_examples:
-        import json
         existing_context += f"\n\nExisting examples:\n{json.dumps(existing_examples, indent=2)}"
+
+    atmosphere_section = ""
+    if community_atmosphere:
+        atm = community_atmosphere
+        lines = []
+        if atm.get("tone"):
+            lines.append(f"  Tone: {atm['tone']}")
+        if atm.get("typical_content"):
+            lines.append(f"  Typical content: {atm['typical_content']}")
+        if atm.get("what_belongs"):
+            lines.append(f"  What belongs: {atm['what_belongs']}")
+        if atm.get("what_doesnt_belong"):
+            lines.append(f"  What doesn't belong: {atm['what_doesnt_belong']}")
+        if atm.get("moderation_style"):
+            lines.append(f"  Moderation style: {atm['moderation_style']}")
+        atmosphere_section = "\n\nCommunity atmosphere:\n" + "\n".join(lines)
+
+    posts_section = ""
+    if community_posts_sample:
+        acceptable = [p for p in community_posts_sample if p.get("label") == "acceptable"]
+        unacceptable = [p for p in community_posts_sample if p.get("label") == "unacceptable"]
+        parts = []
+        if acceptable:
+            snippets = []
+            for p in acceptable[:4]:
+                c = p.get("content", {}).get("content", {})
+                title = c.get("title", "")
+                body = (c.get("body", "") or "")[:120]
+                note = p.get("note", "")
+                snippets.append(f'    - "{title}" — {body}{"..." if len(c.get("body",""))>120 else ""}' + (f' [{note}]' if note else ''))
+            parts.append("  Acceptable posts:\n" + "\n".join(snippets))
+        if unacceptable:
+            snippets = []
+            for p in unacceptable[:4]:
+                c = p.get("content", {}).get("content", {})
+                title = c.get("title", "")
+                body = (c.get("body", "") or "")[:120]
+                note = p.get("note", "")
+                snippets.append(f'    - "{title}" — {body}{"..." if len(c.get("body",""))>120 else ""}' + (f' [{note}]' if note else ''))
+            parts.append("  Removed/unacceptable posts:\n" + "\n".join(snippets))
+        if parts:
+            posts_section = (
+                "\n\nRepresentative community posts (use these to calibrate subjective rubric "
+                "language/thresholds and to generate borderline examples realistic to this community's "
+                "actual content style):\n" + "\n".join(parts)
+            )
 
     return f"""{COMPILE_FEW_SHOT_EXAMPLES}
 
 Now compile the following rule for the "{community_name}" community on {platform}.
 
 Community context (other rules, for background):
-{other_rules_summary if other_rules_summary else "No other rules yet."}
+{other_rules_summary if other_rules_summary else "No other rules yet."}{atmosphere_section}{posts_section}
 {existing_context}
 
 Rule to compile:
@@ -289,12 +337,15 @@ def build_subjective_eval_prompt(
     items_with_rubrics: list[dict],
     community_name: str,
     examples: list[dict],
+    borderline_examples: list[dict] | None = None,
 ) -> str:
     import json
 
     examples_str = ""
     if examples:
-        examples_str = f"\n\nRelevant examples from this community:\n{json.dumps(examples[:10], indent=2)}"
+        examples_str = f"\n\nClear community examples (compliant/violating — use for calibration):\n{json.dumps(examples[:8], indent=2)}"
+    if borderline_examples:
+        examples_str += f"\n\nBorderline calibration examples (reasonable moderators disagree on these — use to understand edge cases):\n{json.dumps(borderline_examples[:4], indent=2)}"
 
     items_str = json.dumps(items_with_rubrics, indent=2)
     post_str = json.dumps(post_content, indent=2)
@@ -413,6 +464,46 @@ Return JSON in exactly this format:
 }}"""
 
 
+# ── Community Atmosphere Generation ───────────────────────────────────────────
+
+GENERATE_ATMOSPHERE_SYSTEM = """You are a community culture analyst. Given a sample of posts from a community (labeled as acceptable or removed/unacceptable), infer the community's atmosphere, tone, and norms.
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_generate_atmosphere_prompt(
+    community_name: str,
+    platform: str,
+    acceptable_posts: list[dict],
+    unacceptable_posts: list[dict],
+    rules_summary: Optional[str] = None,
+) -> str:
+    import json
+
+    rules_section = ""
+    if rules_summary:
+        rules_section = f"\nCommunity rules (for context on what the community explicitly enforces):\n{rules_summary}\n"
+
+    return f"""Analyze these sample posts from the "{community_name}" community on {platform} and infer the community's atmosphere and norms.
+{rules_section}
+Acceptable posts (approved by moderators or marked as good examples):
+{json.dumps(acceptable_posts, indent=2)}
+
+Removed/unacceptable posts (removed by moderators or marked as bad examples):
+{json.dumps(unacceptable_posts, indent=2)}
+
+Based on the rules and post samples, characterize the community's culture and moderation standards. Go beyond what the rules literally say — infer tone, style, and the unwritten norms that the post samples reveal.
+
+Return JSON in exactly this format:
+{{
+  "tone": "Short description of the community's tone and vibe (e.g. 'casual, wholesome, family-friendly')",
+  "typical_content": "What kinds of posts are typical and welcome here",
+  "what_belongs": "A sentence describing what content fits this community",
+  "what_doesnt_belong": "A sentence describing what content doesn't fit, even if not explicitly rule-violating",
+  "moderation_style": "How strict or lenient moderators tend to be, and what they prioritize"
+}}"""
+
+
 # ── Recompile (diff) ───────────────────────────────────────────────────────────
 
 RECOMPILE_SYSTEM = """You are an expert community moderation system architect. Your job is to update an existing \
@@ -484,16 +575,25 @@ def build_suggest_from_examples_prompt(
     checklist_items: list[dict],
     examples: list[dict],
     community_name: str,
+    violating_counts: dict[str, int] | None = None,
 ) -> str:
     import json
+
+    # Annotate each item with its violating example count
+    annotated_items = []
+    for item in checklist_items:
+        annotated = dict(item)
+        if violating_counts is not None:
+            annotated["violating_example_count"] = violating_counts.get(item.get("id", ""), 0)
+        annotated_items.append(annotated)
 
     return f"""Analyze these labeled examples for the "{community_name}" community and suggest improvements to the moderation checklist.
 
 Rule text:
 {rule_text}
 
-Current checklist:
-{json.dumps(checklist_items, indent=2)}
+Current checklist (each item includes violating_example_count — the number of violating examples linked to it):
+{json.dumps(annotated_items, indent=2)}
 
 Labeled examples:
 {json.dumps(examples, indent=2)}
@@ -504,14 +604,21 @@ Identify patterns where the checklist might be:
 3. Under-triggering (missing clear violations)
 4. Using thresholds or patterns that need adjustment
 
+For deterministic items: only propose a pattern update if the item's violating_example_count >= 3. When that threshold is met, analyze the literal text of those violating examples and propose a refined regex pattern in proposed_change (under the "patterns" key) that matches them but not the compliant examples.
+
+For each suggestion:
+- If suggestion_type is "rule_text": set proposed_text to the COMPLETE updated rule text (all paragraphs preserved — only modify the specific sentences that need changing, leave the rest intact). Do NOT return a partial snippet.
+- If suggestion_type is "checklist": set proposed_change to the updated checklist item object.
+
 Return JSON in exactly this format:
 {{
   "suggestions": [
     {{
       "suggestion_type": "checklist" | "rule_text",
-      "target": "item_id or null for new items",
+      "target": "item_id or null for new items or null for rule_text",
       "description": "What to change and why",
-      "proposed_change": {{...the updated item or rule text snippet...}},
+      "proposed_text": "For rule_text: the COMPLETE updated rule text",
+      "proposed_change": {{...for checklist: the updated checklist item object...}},
       "reasoning": "Which examples motivated this suggestion"
     }}
   ]
@@ -549,19 +656,22 @@ Generate examples that:
 2. Cover scenarios the existing examples don't address
 3. Include both compliant (rule-following) and violating (triggering checklist) cases
 
+For rule_text_suggestions: proposed_text must be the COMPLETE updated rule text (all paragraphs, not a snippet — only modify the specific sentences that need changing, leave the rest intact).
+
 Return JSON in exactly this format:
 {{
   "suggested_examples": [
     {{
       "label": "compliant" | "violating" | "borderline",
       "content": {{...normalized post content...}},
-      "relevance_note": "What aspect of the updated checklist this example tests"
+      "relevance_note": "What aspect of the updated checklist this example tests",
+      "related_checklist_item_description": "Exact description of the checklist item this example primarily tests (null if it spans multiple items)"
     }}
   ],
   "rule_text_suggestions": [
     {{
       "description": "Optional suggestion to update rule text if checklist has diverged",
-      "proposed_text": "...",
+      "proposed_text": "Complete updated rule text here, not a snippet",
       "reasoning": "..."
     }}
   ]

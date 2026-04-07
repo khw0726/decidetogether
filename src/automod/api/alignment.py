@@ -4,19 +4,25 @@ import logging
 from typing import Any
 
 import anthropic
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Example, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import SuggestionRead
 from .rules import _compile_rule_background
+from .examples import _generate_suggestions_from_example
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["alignment"])
+
+
+class AcceptSuggestionBody(BaseModel):
+    label_override: str | None = None
 
 
 def get_compiler() -> RuleCompiler:
@@ -153,6 +159,7 @@ async def list_suggestions(
 async def accept_suggestion(
     suggestion_id: str,
     background_tasks: BackgroundTasks,
+    body: AcceptSuggestionBody = Body(default=AcceptSuggestionBody()),
     db: AsyncSession = Depends(get_db),
 ) -> SuggestionRead:
     result = await db.execute(
@@ -172,14 +179,19 @@ async def accept_suggestion(
         rule_result = await db.execute(select(Rule).where(Rule.id == suggestion.rule_id))
         rule = rule_result.scalar_one_or_none()
         if rule:
-            proposed = suggestion.content.get("proposed_text")
+            c = suggestion.content
+            proposed = (
+                c.get("proposed_text")
+                or c.get("proposed_change", {}).get("text")
+            )
             if proposed:
                 rule.text = proposed
 
     # Apply if it's an example suggestion
     if suggestion.suggestion_type == "example" and suggestion.rule_id:
         ex_content = suggestion.content.get("content", {})
-        ex_label = suggestion.content.get("label", "compliant")
+        # Use label_override if provided (moderator decision on borderline examples)
+        ex_label = body.label_override or suggestion.content.get("label", "compliant")
         relevance = suggestion.content.get("relevance_note", "")
         if ex_content:
             example = Example(
@@ -195,6 +207,24 @@ async def accept_suggestion(
                 relevance_note=relevance,
             )
             db.add(link)
+            related_desc = suggestion.content.get("related_checklist_item_description")
+            if related_desc and suggestion.rule_id:
+                item_result = await db.execute(
+                    select(ChecklistItem)
+                    .where(ChecklistItem.rule_id == suggestion.rule_id)
+                    .where(ChecklistItem.description == related_desc)
+                    .limit(1)
+                )
+                item = item_result.scalar_one_or_none()
+                db.add(ExampleChecklistItemLink(
+                    example_id=example.id,
+                    checklist_item_id=item.id if item else None,
+                    checklist_item_description=related_desc,
+                ))
+            # Trigger tuning when a borderline example is resolved to a clear label
+            original_label = suggestion.content.get("label", "compliant")
+            if original_label == "borderline" and ex_label in ("compliant", "violating"):
+                background_tasks.add_task(_generate_suggestions_from_example, suggestion.rule_id)
 
     # Create a new rule from synthesized suggestion
     if suggestion.suggestion_type == "new_rule":

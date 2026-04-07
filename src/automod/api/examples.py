@@ -4,7 +4,7 @@ import logging
 
 import anthropic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
@@ -50,8 +50,26 @@ async def _generate_suggestions_from_example(rule_id: str) -> None:
             if not checklist or not examples:
                 return
 
+            # Count violating examples per checklist item for deterministic regex threshold
+            checklist_ids = [i.id for i in checklist]
+            links_result = await db.execute(
+                select(ExampleChecklistItemLink)
+                .join(Example, ExampleChecklistItemLink.example_id == Example.id)
+                .where(
+                    and_(
+                        ExampleChecklistItemLink.checklist_item_id.in_(checklist_ids),
+                        Example.label == "violating",
+                    )
+                )
+            )
+            violating_counts: dict[str, int] = {}
+            for link in links_result.scalars():
+                cid = link.checklist_item_id
+                if cid:
+                    violating_counts[cid] = violating_counts.get(cid, 0) + 1
+
             compiler = get_compiler()
-            suggestions = await compiler.suggest_from_examples(rule, checklist, examples)
+            suggestions = await compiler.suggest_from_examples(rule, checklist, examples, violating_counts)
 
             for sug in suggestions:
                 suggestion = Suggestion(
@@ -74,7 +92,6 @@ async def _generate_suggestions_from_example(rule_id: str) -> None:
 async def add_example(
     rule_id: str,
     body: ExampleCreate,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> ExampleRead:
     # Verify rule exists
@@ -104,11 +121,19 @@ async def add_example(
         relevance_note=body.relevance_note,
     )
     db.add(link)
+    if body.checklist_item_id:
+        item_result = await db.execute(
+            select(ChecklistItem).where(ChecklistItem.id == body.checklist_item_id)
+        )
+        item = item_result.scalar_one_or_none()
+        if item:
+            db.add(ExampleChecklistItemLink(
+                example_id=example.id,
+                checklist_item_id=item.id,
+                checklist_item_description=item.description,
+            ))
     await db.commit()
     await db.refresh(example)
-
-    # Trigger suggestion generation in background
-    background_tasks.add_task(_generate_suggestions_from_example, rule_id)
 
     return ExampleRead.model_validate(example)
 
@@ -168,6 +193,7 @@ async def list_examples(
 async def update_example(
     example_id: str,
     body: ExampleUpdate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> ExampleRead:
     result = await db.execute(select(Example).where(Example.id == example_id))
@@ -181,7 +207,16 @@ async def update_example(
         valid_labels = {"compliant", "violating", "borderline"}
         if body.label not in valid_labels:
             raise HTTPException(status_code=422, detail=f"label must be one of {valid_labels}")
+        old_label = example.label
         example.label = body.label
+        # Trigger suggestion/tuning generation when a borderline example is resolved
+        if old_label == "borderline" and body.label in ("compliant", "violating"):
+            link_result = await db.execute(
+                select(ExampleRuleLink).where(ExampleRuleLink.example_id == example_id)
+            )
+            rule_link = link_result.scalar_one_or_none()
+            if rule_link:
+                background_tasks.add_task(_generate_suggestions_from_example, rule_link.rule_id)
     if body.moderator_reasoning is not None:
         example.moderator_reasoning = body.moderator_reasoning
 

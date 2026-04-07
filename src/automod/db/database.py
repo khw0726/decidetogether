@@ -71,11 +71,20 @@ async def _migrate_example_checklist_item_links(conn) -> None:
     await conn.execute(text("DROP TABLE _ecil_old"))
 
 
+async def _migrate_community_atmosphere(conn) -> None:
+    """Add atmosphere column to communities table if missing."""
+    cols_result = await conn.execute(text("PRAGMA table_info(communities)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if "atmosphere" not in col_names and col_names:
+        await conn.execute(text("ALTER TABLE communities ADD COLUMN atmosphere JSON"))
+
+
 async def init_db() -> None:
     """Create all database tables."""
     async with engine.begin() as conn:
         from . import models  # noqa: F401 - ensure models are imported
         await _migrate_example_checklist_item_links(conn)
+        await _migrate_community_atmosphere(conn)
         await conn.run_sync(Base.metadata.create_all)
 
 

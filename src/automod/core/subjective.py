@@ -41,16 +41,29 @@ class SubjectiveEvaluator:
         self.client = client
         self.settings = settings
 
-    async def _call_model(self, user_prompt: str, model: str) -> dict[str, Any]:
+    async def _call_model(self, content: str | list[dict[str, Any]], model: str) -> dict[str, Any]:
         response = await self.client.messages.create(
             model=model,
             max_tokens=4096,
             system=SUBJECTIVE_EVAL_SYSTEM,
-            messages=[{"role": "user", "content": user_prompt}],
+            messages=[{"role": "user", "content": content}],
             tools=[_EVAL_TOOL],
             tool_choice={"type": "tool", "name": _EVAL_TOOL["name"]},
         )
         return response.content[0].input
+
+    def _build_content(self, post: dict[str, Any], text_prompt: str) -> str | list[dict[str, Any]]:
+        """Return a multimodal content list if the post has image URLs, otherwise plain text."""
+        media = post.get("content", {}).get("media", [])
+        image_urls = [m for m in media if isinstance(m, str) and m.startswith("http")][:10]
+        if not image_urls:
+            return text_prompt
+        blocks: list[dict[str, Any]] = [
+            {"type": "image", "source": {"type": "url", "url": url}}
+            for url in image_urls
+        ]
+        blocks.append({"type": "text", "text": text_prompt})
+        return blocks
 
     def _prepare_item_dict(self, item: ChecklistItem) -> dict[str, Any]:
         """Convert a checklist item to the dict format for the evaluation prompt."""
@@ -62,15 +75,19 @@ class SubjectiveEvaluator:
             "threshold": item.logic.get("threshold", 0.7),
         }
 
-    def _prepare_example_dicts(self, examples: list[Example]) -> list[dict[str, Any]]:
-        """Convert examples to dicts for the evaluation prompt."""
-        result = []
-        for ex in examples[:10]:  # Limit to 10 examples
-            result.append({
-                "label": ex.label,
-                "content": ex.content,
-            })
-        return result
+    def _prepare_example_dicts(self, examples: list[Example]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Split examples into primary (clear) and borderline (calibration) dicts."""
+        primary = [
+            {"label": ex.label, "content": ex.content}
+            for ex in examples
+            if ex.label in ("compliant", "violating")
+        ][:8]
+        borderline = [
+            {"label": ex.label, "content": ex.content}
+            for ex in examples
+            if ex.label == "borderline"
+        ][:4]
+        return primary, borderline
 
     async def evaluate_batch(
         self,
@@ -89,19 +106,21 @@ class SubjectiveEvaluator:
             return []
 
         items_dicts = [self._prepare_item_dict(item) for item in items]
-        example_dicts = self._prepare_example_dicts(examples)
+        primary_dicts, borderline_dicts = self._prepare_example_dicts(examples)
 
         user_prompt = build_subjective_eval_prompt(
             post_content=post,
             items_with_rubrics=items_dicts,
             community_name=community_name,
-            examples=example_dicts,
+            examples=primary_dicts,
+            borderline_examples=borderline_dicts,
         )
+        content = self._build_content(post, user_prompt)
 
         # First pass: Haiku (fast, cheap)
         logger.info(f"Batch evaluating {len(items)} subjective items with Haiku")
         try:
-            haiku_response = await self._call_model(user_prompt, self.settings.haiku_model)
+            haiku_response = await self._call_model(content, self.settings.haiku_model)
             haiku_results = haiku_response.get("results", [])
         except Exception as e:
             logger.error(f"Haiku evaluation failed: {e}")
@@ -133,10 +152,12 @@ class SubjectiveEvaluator:
                 post_content=post,
                 items_with_rubrics=escalated_items_dicts,
                 community_name=community_name,
-                examples=example_dicts,
+                examples=primary_dicts,
+                borderline_examples=borderline_dicts,
             )
+            escalation_content = self._build_content(post, escalation_prompt)
             try:
-                sonnet_response = await self._call_model(escalation_prompt, self.settings.sonnet_model)
+                sonnet_response = await self._call_model(escalation_content, self.settings.sonnet_model)
                 sonnet_results = sonnet_response.get("results", [])
                 sonnet_by_id = {r["item_id"]: r for r in sonnet_results}
             except Exception as e:
