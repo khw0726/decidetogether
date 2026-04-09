@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus } from 'lucide-react'
+import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus, Sparkles } from 'lucide-react'
 import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem } from '../api/client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
@@ -311,10 +311,18 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
               </div>
             ) : (
               <>
-                {item.rule_text_anchor && (
+                {/* {item.rule_text_anchor && (
                   <p className="text-xs text-indigo-600 mt-1">
                     Anchor: &ldquo;{item.rule_text_anchor}&rdquo;
                   </p>
+                )} */}
+                {item.atmosphere_influenced && (
+                  <div className="flex items-start gap-1 mt-1" title={item.atmosphere_note ?? 'Shaped by community atmosphere'}>
+                    <Sparkles size={11} className="text-teal-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-xs text-teal-700">
+                      {item.atmosphere_note ?? 'Influenced by community atmosphere'}
+                    </span>
+                  </div>
                 )}
                 {showLogic && <LogicInspector item={item} />}
               </>

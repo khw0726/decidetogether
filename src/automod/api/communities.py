@@ -7,13 +7,24 @@ import anthropic
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..compiler.compiler import RuleCompiler
 from ..config import settings
+from ..core.reddit_crawler import crawl_subreddit_top_posts
 from ..db.database import get_db
-from ..db.models import Community, CommunitySamplePost, Decision, Rule
+from ..db.models import (
+    ChecklistItem,
+    Community,
+    CommunitySamplePost,
+    Decision,
+    Example,
+    ExampleChecklistItemLink,
+    ExampleRuleLink,
+    Rule,
+    Suggestion,
+)
 from ..models.schemas import (
     CommunityCreate,
     CommunityRead,
@@ -22,6 +33,11 @@ from ..models.schemas import (
 )
 
 router = APIRouter(tags=["communities"])
+
+
+class AtmosphereGenerateResponse(BaseModel):
+    community: CommunityRead
+    crawled_count: int
 
 
 def get_compiler() -> RuleCompiler:
@@ -68,6 +84,44 @@ async def get_community(
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
     return CommunityRead.model_validate(community)
+
+
+@router.delete("/communities/{community_id}", status_code=204)
+async def delete_community(
+    community_id: str, db: AsyncSession = Depends(get_db)
+) -> None:
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    # Fetch rule IDs for this community
+    rules_result = await db.execute(select(Rule.id).where(Rule.community_id == community_id))
+    rule_ids = [r[0] for r in rules_result.all()]
+
+    if rule_ids:
+        # Checklist items linked to these rules
+        ci_result = await db.execute(select(ChecklistItem.id).where(ChecklistItem.rule_id.in_(rule_ids)))
+        ci_ids = [r[0] for r in ci_result.all()]
+        if ci_ids:
+            await db.execute(delete(ExampleChecklistItemLink).where(ExampleChecklistItemLink.checklist_item_id.in_(ci_ids)))
+        await db.execute(delete(ChecklistItem).where(ChecklistItem.rule_id.in_(rule_ids)))
+
+        # Examples linked to these rules
+        erl_result = await db.execute(select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id.in_(rule_ids)))
+        example_ids = [r[0] for r in erl_result.all()]
+        if example_ids:
+            await db.execute(delete(ExampleChecklistItemLink).where(ExampleChecklistItemLink.example_id.in_(example_ids)))
+            await db.execute(delete(Example).where(Example.id.in_(example_ids)))
+        await db.execute(delete(ExampleRuleLink).where(ExampleRuleLink.rule_id.in_(rule_ids)))
+
+        await db.execute(delete(Suggestion).where(Suggestion.rule_id.in_(rule_ids)))
+        await db.execute(delete(Rule).where(Rule.community_id == community_id))
+
+    await db.execute(delete(Decision).where(Decision.community_id == community_id))
+    await db.execute(delete(CommunitySamplePost).where(CommunitySamplePost.community_id == community_id))
+    await db.delete(community)
+    await db.commit()
 
 
 # ── Sample Posts ───────────────────────────────────────────────────────────────
@@ -268,13 +322,13 @@ async def import_sample_post_from_url(
 
 # ── Atmosphere Generation ──────────────────────────────────────────────────────
 
-@router.post("/communities/{community_id}/atmosphere/generate", response_model=CommunityRead)
+@router.post("/communities/{community_id}/atmosphere/generate", response_model=AtmosphereGenerateResponse)
 async def generate_atmosphere(
     community_id: str,
     db: AsyncSession = Depends(get_db),
     compiler: RuleCompiler = Depends(get_compiler),
-) -> CommunityRead:
-    """Generate a community atmosphere profile from existing decisions and sample posts."""
+) -> AtmosphereGenerateResponse:
+    """Generate a community atmosphere profile from existing decisions, sample posts, and crawled Reddit posts."""
     result = await db.execute(select(Community).where(Community.id == community_id))
     community = result.scalar_one_or_none()
     if not community:
@@ -313,13 +367,25 @@ async def generate_atmosphere(
     )
     sample_posts = sample_result.scalars().all()
 
-    acceptable_posts = [
-        {"content": d.post_content, "label": "acceptable"}
-        for d in approved_decisions
-    ] + [
-        {"content": p.content, "label": "acceptable", "note": p.note}
-        for p in sample_posts if p.label == "acceptable"
-    ]
+    # Crawl top posts from Reddit if credentials are configured
+    crawled_posts: list[dict] = []
+    if community.platform == "reddit" and settings.reddit_client_id:
+        m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
+        if m:
+            crawled_posts = await crawl_subreddit_top_posts(
+                m.group(1),
+                client_id=settings.reddit_client_id,
+                client_secret=settings.reddit_client_secret,
+                user_agent=settings.reddit_user_agent,
+                username=settings.reddit_username,
+                password=settings.reddit_password,
+            )
+
+    acceptable_posts = (
+        [{"content": p["content"], "label": "acceptable"} for p in crawled_posts]
+        + [{"content": d.post_content, "label": "acceptable"} for d in approved_decisions]
+        + [{"content": p.content, "label": "acceptable", "note": p.note} for p in sample_posts if p.label == "acceptable"]
+    )
 
     unacceptable_posts = [
         {"content": d.post_content, "label": "unacceptable"}
@@ -352,4 +418,7 @@ async def generate_atmosphere(
     community.atmosphere = atmosphere
     await db.commit()
     await db.refresh(community)
-    return CommunityRead.model_validate(community)
+    return AtmosphereGenerateResponse(
+        community=CommunityRead.model_validate(community),
+        crawled_count=len(crawled_posts),
+    )

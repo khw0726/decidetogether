@@ -17,6 +17,7 @@ interface CommunitySettingsProps {
 
 export default function CommunitySettings({ communityId }: CommunitySettingsProps) {
   const queryClient = useQueryClient()
+  const [crawledCount, setCrawledCount] = useState<number | null>(null)
 
   const { data: community } = useQuery({
     queryKey: ['community', communityId],
@@ -32,7 +33,8 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
 
   const generateMutation = useMutation({
     mutationFn: () => generateAtmosphere(communityId),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      setCrawledCount(data.crawled_count)
       queryClient.invalidateQueries({ queryKey: ['community', communityId] })
     },
   })
@@ -102,13 +104,22 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
         )}
 
         {atm ? (
-          <div className="card divide-y divide-gray-100">
-            <AtmosphereRow label="Tone" value={atm.tone} />
-            <AtmosphereRow label="Typical content" value={atm.typical_content} />
-            <AtmosphereRow label="What belongs" value={atm.what_belongs} />
-            <AtmosphereRow label="What doesn't belong" value={atm.what_doesnt_belong} />
-            <AtmosphereRow label="Moderation style" value={atm.moderation_style} />
-          </div>
+          <>
+            <div className="card divide-y divide-gray-100">
+              <AtmosphereRow label="Tone" value={atm.tone} />
+              <AtmosphereRow label="Typical content" value={atm.typical_content} />
+              <AtmosphereRow label="What belongs" value={atm.what_belongs} />
+              <AtmosphereRow label="What doesn't belong" value={atm.what_doesnt_belong} />
+              <AtmosphereRow label="Moderation style" value={atm.moderation_style} />
+            </div>
+            {crawledCount !== null && (
+              <p className="text-xs text-gray-400 mt-2">
+                {crawledCount > 0
+                  ? `Atmosphere includes ${crawledCount} posts crawled from ${community?.name}.`
+                  : 'Generated from sample posts and moderation history only.'}
+              </p>
+            )}
+          </>
         ) : (
           <div className="card p-6 text-center text-gray-400 text-sm">
             No atmosphere profile yet. Add sample posts below, then click Generate.

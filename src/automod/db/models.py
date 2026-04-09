@@ -50,6 +50,7 @@ class Rule(Base):
     rule_type: Mapped[str] = mapped_column(String, nullable=False, default="actionable")
     # actionable | procedural | meta | informational
     rule_type_reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    override_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -81,6 +82,8 @@ class ChecklistItem(Base):
     logic: Mapped[dict] = mapped_column(JSON, nullable=False)
     action: Mapped[str] = mapped_column(String, nullable=False, default="flag")
     # remove | flag | continue
+    atmosphere_influenced: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    atmosphere_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     rule: Mapped["Rule"] = relationship("Rule", back_populates="checklist_items", foreign_keys=[rule_id])
@@ -171,6 +174,8 @@ class Decision(Base):
     moderator_reasoning_category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # rule_doesnt_apply | edge_case_allow | rule_needs_update | agent_wrong_interpretation | agree
     moderator_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    moderator_tag: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    # tag for unlinked removes: spam | off-topic | hostile_tone | low_quality | other
     was_override: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

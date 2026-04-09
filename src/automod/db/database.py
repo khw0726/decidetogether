@@ -79,12 +79,55 @@ async def _migrate_community_atmosphere(conn) -> None:
         await conn.execute(text("ALTER TABLE communities ADD COLUMN atmosphere JSON"))
 
 
+async def _migrate_checklist_atmosphere_fields(conn) -> None:
+    """Add atmosphere_influenced and atmosphere_note to checklist_items if missing."""
+    cols_result = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if not col_names:
+        return  # Table doesn't exist yet
+    if "atmosphere_influenced" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN atmosphere_influenced BOOLEAN NOT NULL DEFAULT 0"
+        ))
+    if "atmosphere_note" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN atmosphere_note TEXT"
+        ))
+
+
+async def _migrate_decision_tag_field(conn) -> None:
+    """Add moderator_tag to decisions if missing."""
+    cols_result = await conn.execute(text("PRAGMA table_info(decisions)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if not col_names:
+        return
+    if "moderator_tag" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE decisions ADD COLUMN moderator_tag VARCHAR"
+        ))
+
+
+async def _migrate_rule_override_count(conn) -> None:
+    """Add override_count to rules if missing."""
+    cols_result = await conn.execute(text("PRAGMA table_info(rules)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if not col_names:
+        return
+    if "override_count" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN override_count INTEGER NOT NULL DEFAULT 0"
+        ))
+
+
 async def init_db() -> None:
     """Create all database tables."""
     async with engine.begin() as conn:
         from . import models  # noqa: F401 - ensure models are imported
         await _migrate_example_checklist_item_links(conn)
         await _migrate_community_atmosphere(conn)
+        await _migrate_checklist_atmosphere_fields(conn)
+        await _migrate_decision_tag_field(conn)
+        await _migrate_rule_override_count(conn)
         await conn.run_sync(Base.metadata.create_all)
 
 

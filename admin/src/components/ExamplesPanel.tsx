@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Trash2, ThumbsUp, ThumbsDown, Minus, Lightbulb } from 'lucide-react'
-import { listExamples, addExample, deleteExample, updateExample, Example } from '../api/client'
+import { listExamples, addExample, deleteExample, updateExample, Example, DraftEvaluationResult } from '../api/client'
 
 interface ExamplesPanelProps {
   ruleId: string
@@ -9,6 +9,8 @@ interface ExamplesPanelProps {
   onItemHighlight?: (itemId: string | null) => void
   onSuggest?: () => void
   isSuggesting?: boolean
+  previewVerdicts?: Array<{ example_id: string; may_change: boolean; affected_checklist_items: string[] }>
+  draftEvalResults?: DraftEvaluationResult[]
 }
 
 const LABELS = ['compliant', 'violating', 'borderline'] as const
@@ -32,7 +34,28 @@ const labelConfig: Record<Label, { badge: string; icon: React.ReactNode; color: 
   },
 }
 
-export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, onSuggest, isSuggesting }: ExamplesPanelProps) {
+// Maps example label → expected verdict. A "flip" occurs when new_verdict doesn't match.
+const LABEL_TO_VERDICT: Record<string, string> = {
+  compliant: 'approve',
+  violating: 'remove',
+  borderline: 'review',
+}
+
+const VERDICT_BADGE: Record<string, string> = {
+  approve: 'badge-green',
+  remove: 'badge-red',
+  review: 'badge-yellow',
+  error: 'badge-gray',
+}
+
+const VERDICT_LABEL: Record<string, string> = {
+  approve: 'approve',
+  remove: 'remove',
+  review: 'review',
+  error: 'error',
+}
+
+export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, onSuggest, isSuggesting, previewVerdicts, draftEvalResults }: ExamplesPanelProps) {
   const [activeTab, setActiveTab] = useState<Label>('compliant')
   const [showAdd, setShowAdd] = useState(false)
 
@@ -129,8 +152,8 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, o
         )}
         {filtered.map((ex: Example) => {
           const content = ex.content as Record<string, unknown>
-          const title = (content.title as string) || ''
-          const body = (content.body as string) || ''
+          const title = (content.content.title as string) || ''
+          const body = (content.content.body as string) || ''
           return (
             <div
               key={ex.id}
@@ -148,11 +171,6 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, o
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs text-gray-400">Source: {ex.source}</span>
                   </div>
-                  {ex.checklist_item_description && (
-                    <span className="text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded mt-1 inline-block">
-                      {ex.checklist_item_description}
-                    </span>
-                  )}
                   {ex.moderator_reasoning && (
                     <p className="text-xs text-gray-600 mt-1 italic">{ex.moderator_reasoning}</p>
                   )}
@@ -185,6 +203,45 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, o
                   <Trash2 size={14} />
                 </button>
               </div>
+              {(() => {
+                const draftResult = draftEvalResults?.find(r => r.example_id === ex.id)
+                if (draftResult) {
+                  const expectedVerdict = LABEL_TO_VERDICT[ex.label]
+                  const isFlip = draftResult.new_verdict !== 'error' && draftResult.new_verdict !== expectedVerdict
+                  return (
+                    <div className={`mt-2 rounded border px-2 py-1.5 text-xs ${isFlip ? 'border-red-300 bg-red-50 text-red-800' : 'border-green-200 bg-green-50 text-green-800'}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium">{isFlip ? '⚠ Verdict flip:' : '✓ Consistent:'}</span>
+                        <span className={`badge ${labelConfig[ex.label].badge}`}>{ex.label}</span>
+                        <span className="text-gray-400">→</span>
+                        <span className={`badge ${VERDICT_BADGE[draftResult.new_verdict]}`}>
+                          {VERDICT_LABEL[draftResult.new_verdict]}
+                        </span>
+                        <span className="text-gray-400 ml-auto">{Math.round(draftResult.new_confidence * 100)}%</span>
+                      </div>
+                    </div>
+                  )
+                }
+                const previewVerdict = previewVerdicts?.find(v => v.example_id === ex.id)
+                if (!previewVerdict?.may_change) return null
+                return (
+                  <div className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+                    <div className="font-medium mb-1">⚠ Checklist changes may affect this example</div>
+                    {previewVerdict.affected_checklist_items.length > 0 ? (
+                      <ul className="space-y-0.5 list-none">
+                        {previewVerdict.affected_checklist_items.map((desc, i) => (
+                          <li key={i} className="flex items-start gap-1">
+                            <span className="text-amber-500 flex-shrink-0">•</span>
+                            <span className="text-amber-900">{desc}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="italic">New checklist items may change how this is evaluated</span>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
           )
         })}

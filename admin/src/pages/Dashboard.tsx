@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { BookOpen, Inbox, BarChart2, AlertTriangle, CheckCircle, Flag, Clock } from 'lucide-react'
+import { BookOpen, Inbox, BarChart2, AlertTriangle, CheckCircle, Clock, AlertCircle } from 'lucide-react'
 import { listRules, getDecisionStats, getCommunity } from '../api/client'
 
 interface DashboardProps {
@@ -38,6 +38,7 @@ export default function Dashboard({ communityId }: DashboardProps) {
 
   const activeRules = rules.filter(r => r.is_active).length
   const actionableRules = rules.filter(r => r.rule_type === 'actionable' && r.is_active).length
+  const rulesNeedingAttention = rules.filter(r => r.is_active && (r.override_count ?? 0) >= 3)
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -80,6 +81,22 @@ export default function Dashboard({ communityId }: DashboardProps) {
           bg="bg-green-50"
         />
       </div>
+
+      {/* Override alert */}
+      {rulesNeedingAttention.length > 0 && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3">
+          <AlertCircle size={18} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-amber-800">
+            <strong>{rulesNeedingAttention.length} rule{rulesNeedingAttention.length !== 1 ? 's' : ''}</strong> have 3+ moderator overrides and may need checklist updates:{' '}
+            {rulesNeedingAttention.map((r, i) => (
+              <span key={r.id}>
+                <Link to="/rules" className="underline hover:no-underline font-medium">{r.title}</Link>
+                {i < rulesNeedingAttention.length - 1 ? ', ' : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Verdict breakdown */}
       {stats && (

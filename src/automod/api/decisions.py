@@ -6,13 +6,13 @@ from typing import Any
 
 import anthropic
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, outerjoin, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Community, CommunitySamplePost, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import (
     DecisionRead, DecisionResolve, DecisionStats,
     ExampleRead, SuggestRuleFromDecisionsRequest, SuggestRuleFromOverridesRequest, SuggestionRead,
@@ -91,6 +91,7 @@ async def resolve_decision(
     decision.moderator_verdict = body.verdict
     decision.moderator_reasoning_category = body.reasoning_category
     decision.moderator_notes = body.notes
+    decision.moderator_tag = body.tag
     decision.was_override = decision.agent_verdict != body.verdict
     decision.resolved_at = datetime.utcnow()
 
@@ -104,6 +105,7 @@ async def resolve_decision(
     agent_approved = decision.agent_verdict == "approve"
     mod_approved = body.verdict == "approve"
     agent_triggered = decision.triggered_rules or []
+    agent_reasoning = decision.agent_reasoning or {}
 
     skip_example = agent_approved and mod_approved and not agent_triggered
 
@@ -134,7 +136,8 @@ async def resolve_decision(
 
         for rule_id in rule_ids_to_link:
             rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-            if rule_result.scalar_one_or_none():
+            rule = rule_result.scalar_one_or_none()
+            if rule:
                 link = ExampleRuleLink(
                     example_id=example.id,
                     rule_id=rule_id,
@@ -142,8 +145,13 @@ async def resolve_decision(
                 )
                 db.add(link)
 
+                # Increment override_count when moderator removes a post linked to this rule
+                # but agent approved it (agent missed the violation)
+                if not mod_approved and agent_approved:
+                    rule.override_count = (rule.override_count or 0) + 1
+
             # Link to specific checklist items the agent triggered (empty for agent=approve cases)
-            rule_reasoning = decision.agent_reasoning.get(rule_id, {})
+            rule_reasoning = agent_reasoning.get(rule_id, {})
             for item_id in rule_reasoning.get("triggered_items", []):
                 item_result = await db.execute(
                     select(ChecklistItem).where(ChecklistItem.id == item_id)
@@ -156,9 +164,122 @@ async def resolve_decision(
                         checklist_item_description=item.description,
                     ))
 
+    # When the agent flagged a community norm violation but the moderator approved the post,
+    # auto-add the post as an acceptable sample post to community settings.
+    agent_cited_norm_violation = "__community_norms__" in agent_reasoning
+    if mod_approved and not agent_approved and agent_cited_norm_violation:
+        sample_post = CommunitySamplePost(
+            community_id=decision.community_id,
+            content=decision.post_content,
+            label="acceptable",
+            note="Auto-added: moderator approved post that agent flagged for community norm violation",
+        )
+        db.add(sample_post)
+
+    # After a remove-override with no rule linked (unlinked remove), check if we've hit
+    # the M=3 threshold and auto-trigger a new-rule suggestion.
+    if not mod_approved and agent_approved and not (body.rule_ids or []):
+        await _maybe_auto_cluster_unlinked_removes(db, decision.community_id)
+
     await db.commit()
     await db.refresh(decision)
     return DecisionRead.model_validate(decision)
+
+
+_UNLINKED_REMOVE_THRESHOLD = 3
+
+
+async def _maybe_auto_cluster_unlinked_removes(db: AsyncSession, community_id: str) -> None:
+    """Auto-cluster unlinked removes into a new rule suggestion when threshold is reached."""
+    # Count decisions where agent approved, moderator removed, and no rule was linked
+    # (identified by the moderator not providing rule_ids — this function is only called in that case)
+    unlinked_count_result = await db.execute(
+        select(func.count(Decision.id))
+        .where(
+            Decision.community_id == community_id,
+            Decision.moderator_verdict == "remove",
+            Decision.agent_verdict == "approve",
+            Decision.was_override == True,
+        )
+    )
+    unlinked_count = unlinked_count_result.scalar() or 0
+
+    if unlinked_count < _UNLINKED_REMOVE_THRESHOLD:
+        return
+
+    # Check if we already have a pending auto-generated suggestion for this community
+    # to avoid spamming — fetch all pending new_rule suggestions and check in Python
+    existing_suggestions_result = await db.execute(
+        select(Suggestion)
+        .where(
+            Suggestion.rule_id == None,  # noqa: E711
+            Suggestion.suggestion_type == "new_rule",
+            Suggestion.status == "pending",
+        )
+    )
+    for s in existing_suggestions_result.scalars():
+        if s.content.get("community_id") == community_id and s.content.get("auto_generated"):
+            return  # Already have a pending auto-generated suggestion
+
+    # Fetch recent unlinked remove decisions
+    decisions_result = await db.execute(
+        select(Decision)
+        .where(
+            Decision.community_id == community_id,
+            Decision.moderator_verdict == "remove",
+            Decision.agent_verdict == "approve",
+            Decision.was_override == True,
+        )
+        .order_by(Decision.resolved_at.desc())
+        .limit(20)
+    )
+    decisions = list(decisions_result.scalars().all())
+    if not decisions:
+        return
+
+    comm_result = await db.execute(select(Community).where(Community.id == community_id))
+    community = comm_result.scalar_one_or_none()
+    if not community:
+        return
+
+    compiler = get_compiler()
+    example_dicts = [
+        {
+            "label": "violating",
+            "content": d.post_content,
+            "moderator_reasoning": (
+                f"[{d.moderator_tag}] {d.moderator_notes or ''}".strip()
+                if d.moderator_tag
+                else d.moderator_notes or ""
+            ),
+        }
+        for d in decisions
+    ]
+    try:
+        synthesis = await compiler.synthesize_rule_from_examples(example_dicts, community)
+    except Exception as e:
+        logger.error(f"Auto-cluster synthesis failed for community {community_id}: {e}")
+        return
+
+    suggestion = Suggestion(
+        rule_id=None,
+        suggestion_type="new_rule",
+        content={
+            "title": synthesis["title"],
+            "text": synthesis["text"],
+            "confidence": synthesis["confidence"],
+            "reasoning": synthesis["reasoning"],
+            "community_id": community_id,
+            "auto_generated": True,
+            "unlinked_remove_count": unlinked_count,
+        },
+        status="pending",
+    )
+    db.add(suggestion)
+    logger.info(
+        f"Auto-generated new rule suggestion for community {community_id} "
+        f"from {unlinked_count} unlinked removes"
+    )
 
 
 @router.get("/communities/{community_id}/decisions/stats", response_model=DecisionStats)

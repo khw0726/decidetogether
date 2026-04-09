@@ -65,6 +65,7 @@ class RuleRead(BaseModel):
     is_active: bool
     rule_type: str
     rule_type_reasoning: Optional[str] = None
+    override_count: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -92,6 +93,8 @@ class ChecklistItemRead(BaseModel):
     item_type: str
     logic: dict[str, Any]
     action: str
+    atmosphere_influenced: bool = False
+    atmosphere_note: Optional[str] = None
     updated_at: datetime
     children: list["ChecklistItemRead"] = []
 
@@ -161,6 +164,7 @@ class DecisionRead(BaseModel):
     moderator_verdict: str
     moderator_reasoning_category: Optional[str] = None
     moderator_notes: Optional[str] = None
+    moderator_tag: Optional[str] = None
     was_override: bool
     created_at: datetime
     resolved_at: Optional[datetime] = None
@@ -173,6 +177,8 @@ class DecisionResolve(BaseModel):
     reasoning_category: Optional[str] = None
     # rule_doesnt_apply | edge_case_allow | rule_needs_update | agent_wrong_interpretation | agree
     notes: Optional[str] = None
+    tag: Optional[str] = None
+    # For unlinked removes (no rule applies): spam | off-topic | hostile_tone | low_quality | other
     rule_ids: Optional[list[str]] = None
     # Required when moderator overrides to remove/review on a post the agent approved
     # (agent had no triggered_rules to link the example to)

@@ -6,6 +6,7 @@ import RuleEditor from './pages/RuleEditor'
 import DecisionQueue from './pages/DecisionQueue'
 import AlignmentDashboard from './pages/AlignmentDashboard'
 import CommunitySettings from './pages/CommunitySettings'
+import CommunitySetup from './pages/CommunitySetup'
 
 export default function App() {
   const [communityId, setCommunityId] = useState<string>('')
@@ -13,6 +14,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/setup" element={<CommunitySetup onCommunityChange={setCommunityId} />} />
         <Route
           path="/"
           element={

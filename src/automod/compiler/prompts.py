@@ -35,14 +35,16 @@ natural-language rule into a precise, structured decision tree that an automated
 Each node in the tree is a YES/NO question where YES = a potential violation is detected.
 
 Each checklist item must have:
-- description: A yes/no question framed so that YES = violation signal (e.g. "Does the post contain spam keywords?")
-- rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred)
+- description: A short, concise yes/no question framed so that YES = violation signal (e.g. "Does the post contain spam keywords?")
+- rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred). Keep the exact punctuation and wording. 
 - item_type: "deterministic" (regex), "structural" (metadata), or "subjective" (LLM judgment)
 - logic: Type-specific schema (see below)
 - action: "remove", "flag", or "continue"
-  - Leaf nodes (no children): use "remove" or "flag" to set the consequence.
+  - Leaf nodes (no children): use "remove" or "flag" to set the consequence. "continue" is not allowed for leaf nodes.
   - Non-leaf nodes (has children): MUST always be "continue". The verdict comes entirely from the children.
 - children: Sub-items evaluated when this item says YES (empty list for leaf nodes)
+- atmosphere_influenced: true if the community atmosphere profile shaped how this item was framed, calibrated, or phrased (e.g. threshold adjusted based on the community's known leniency, rubric reworded to match the community's tone). Set false when the item derives purely from the rule text.
+- atmosphere_note: If atmosphere_influenced is true, a one-sentence explanation of how the atmosphere influenced this item (e.g. "Threshold lowered to 0.6 because community atmosphere indicates strict enforcement of tone"). Set null otherwise.
 
 Tree evaluation semantics:
 - If an item says NO: no action, children are skipped.
@@ -62,7 +64,7 @@ Logic schemas:
   - triggered when the condition is true (e.g. account_age_days < 7 triggers for new accounts)
 - subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
 
-Keep trees shallow (2 levels max). Generate exactly 3 compliant examples (posts that follow the rule), one violating example, and one borderline example per top-level checklist item (so if you generate 3 checklist items, generate 3 violating + 3 borderline examples — one of each clearly targeting each item). Borderline examples are posts that reasonable moderators might genuinely disagree on — they sit at the gray area of the rule.
+Keep trees shallow (3 levels max). Generate one violating example and one borderline example per top-level checklist item. Borderline examples are posts that reasonable moderators might genuinely disagree on — they sit at the gray area of the rule.
 
 For each example, include `related_checklist_item_description`: the exact description string of the checklist item this example is designed to trigger (for violating/borderline examples), or null for compliant examples.
 
@@ -90,7 +92,9 @@ Output:
         "negate": false
       },
       "action": "flag",
-      "children": []
+      "children": [],
+      "atmosphere_influenced": false,
+      "atmosphere_note": null
     },
     {
       "description": "Does the content contain known spam domains or URL shorteners?",
@@ -105,7 +109,9 @@ Output:
         "negate": false
       },
       "action": "flag",
-      "children": []
+      "children": [],
+      "atmosphere_influenced": false,
+      "atmosphere_note": null
     },
     {
       "description": "Is this content primarily self-promotional, even without explicit keywords?",
@@ -119,10 +125,12 @@ Output:
         "examples_to_include": 5
       },
       "action": "remove",
-      "children": []
+      "children": [],
+      "atmosphere_influenced": false,
+      "atmosphere_note": null
     },
     {
-      "description": "Check if account is new (spam signal)",
+      "description": "Is the account new, which is a spam signal?",
       "rule_text_anchor": null,
       "item_type": "structural",
       "logic": {
@@ -133,7 +141,9 @@ Output:
         "match_mode": "all"
       },
       "action": "flag",
-      "children": []
+      "children": [],
+      "atmosphere_influenced": false,
+      "atmosphere_note": null
     }
   ],
   "examples": [
@@ -151,9 +161,22 @@ Output:
       "related_checklist_item_description": "Does the content contain explicit promotional language or calls to action?"
     },
     {
+      "label": "borderline",
+      "content": {
+        "id": "example-2b",
+        "platform": "reddit",
+        "author": {"username": "indie_dev", "account_age_days": 180, "platform_metadata": {}},
+        "content": {"title": "I built a free tool that might help this community", "body": "After struggling with X myself, I spent a month building a small free tool. No monetization, just open source. Would love feedback if anyone finds it useful.", "media": [], "links": ["https://github.com/indie_dev/mytool"]},
+        "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      "relevance_note": "Shares a personal project but it's free/open-source and frames itself as community contribution — moderators might genuinely disagree on whether this crosses into self-promotion",
+      "related_checklist_item_description": "Is this content primarily self-promotional, even without explicit keywords?"
+    },
+    {
       "label": "compliant",
       "content": {
-        "id": "example-2",
+        "id": "example-2c",
         "platform": "reddit",
         "author": {"username": "helpfuluser", "account_age_days": 365, "platform_metadata": {}},
         "content": {"title": "Tutorial: How I built a REST API in Python", "body": "I spent the weekend learning FastAPI and wanted to share what I learned. Here are the key concepts...", "media": [], "links": []},
@@ -183,7 +206,9 @@ Output:
         "examples_to_include": 5
       },
       "action": "remove",
-      "children": []
+      "children": [],
+      "atmosphere_influenced": true,
+      "atmosphere_note": "Threshold lowered to 0.55 because the community atmosphere emphasizes keeping content light and fun, so even mild soap-boxing warrants removal."
     },
     {
       "description": "Is the post or comment irrelevant to the Pikmin Bloom game?",
@@ -197,7 +222,9 @@ Output:
         "examples_to_include": 5
       },
       "action": "remove",
-      "children": []
+      "children": [],
+      "atmosphere_influenced": false,
+      "atmosphere_note": null
     }
   ],
   "examples": [
@@ -215,9 +242,22 @@ Output:
       "related_checklist_item_description": "Does the post or the comment contain political, religious, or soap-boxing content?"
     },
     {
+      "label": "borderline",
+      "content": {
+        "id": "example-4b",
+        "platform": "reddit",
+        "author": {"username": "casualplayer", "account_age_days": 90, "platform_metadata": {}},
+        "content": {"title": "Anyone else feel like the new update is ruining the game?", "body": "I know this is just a game but the devs really seem to not care about the community anymore. It's frustrating and kind of insulting honestly.", "media": [], "links": []},
+        "context": {"channel": "r/PikminBloomApp", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      "relevance_note": "Game-related but venting/negative in tone — could be borderline soap-boxing depending on how strictly the community enforces the 'keep it light' atmosphere",
+      "related_checklist_item_description": "Does the post or the comment contain political, religious, or soap-boxing content?"
+    },
+    {
       "label": "compliant",
       "content": {
-        "id": "example-4",
+        "id": "example-4c",
         "platform": "reddit",
         "author": {"username": "regularuser", "account_age_days": 200, "platform_metadata": {}},
         "content": {"title": " Greetings from the White House ", "body": "<a photo of Pikmin in front of the White House>", "media": [], "links": []},
@@ -233,6 +273,7 @@ Output:
 
 
 def build_compile_prompt(
+    rule_title: str,
     rule_text: str,
     community_name: str,
     platform: str,
@@ -276,18 +317,18 @@ def build_compile_prompt(
             for p in acceptable[:4]:
                 c = p.get("content", {}).get("content", {})
                 title = c.get("title", "")
-                body = (c.get("body", "") or "")[:120]
+                body = (c.get("body", "") or "")
                 note = p.get("note", "")
-                snippets.append(f'    - "{title}" — {body}{"..." if len(c.get("body",""))>120 else ""}' + (f' [{note}]' if note else ''))
+                snippets.append(f'    - "{title}" — {body}' + (f' [{note}]' if note else ''))
             parts.append("  Acceptable posts:\n" + "\n".join(snippets))
         if unacceptable:
             snippets = []
             for p in unacceptable[:4]:
                 c = p.get("content", {}).get("content", {})
                 title = c.get("title", "")
-                body = (c.get("body", "") or "")[:120]
+                body = (c.get("body", "") or "")
                 note = p.get("note", "")
-                snippets.append(f'    - "{title}" — {body}{"..." if len(c.get("body",""))>120 else ""}' + (f' [{note}]' if note else ''))
+                snippets.append(f'    - "{title}" — {body}' + (f' [{note}]' if note else ''))
             parts.append("  Removed/unacceptable posts:\n" + "\n".join(snippets))
         if parts:
             posts_section = (
@@ -305,17 +346,35 @@ Community context (other rules, for background):
 {existing_context}
 
 Rule to compile:
-{rule_text}
+{rule_title}: {rule_text}
 
-Generate a checklist tree with 2-3 items (can have children), plus 3 compliant examples and one violating example per top-level checklist item.
+Generate a minimal checklist tree — only as many items as the rule genuinely requires, no more. Simple rules need one item; complex rules may need several. Do not pad with redundant or overlapping items. For each item, provide one violating example and one borderline example.
 
 Return JSON in exactly this format:
 {{
-  "checklist_tree": [...],
+  "checklist_tree": [
+    {{
+      "description": "...",
+      "rule_text_anchor": "...",
+      "item_type": "...",
+      "logic": {{}},
+      "action": "...",
+      "children": [],
+      "atmosphere_influenced": true | false,
+      "atmosphere_note": "explanation if atmosphere_influenced is true, else null"
+    }}
+  ],
   "examples": [
     {{
       "label": "compliant" | "violating" | "borderline",
-      "content": {{...post content object...}},
+      "content": {{
+        "id": "...",
+        "platform": "...",
+        "author": "...",
+        "content": {{"title": "...", "body": "...", "media": [], "links": []}},
+        "context": "...",
+        "timestamp": "..."
+      }},
       "relevance_note": "Why this example relates to the rule",
       "related_checklist_item_description": "Exact description of the checklist item this example primarily tests, or null for compliant examples"
     }}
@@ -343,9 +402,9 @@ def build_subjective_eval_prompt(
 
     examples_str = ""
     if examples:
-        examples_str = f"\n\nClear community examples (compliant/violating — use for calibration):\n{json.dumps(examples[:8], indent=2)}"
+        examples_str = f"\n\nClear community examples (compliant/violating — use for calibration):\n{json.dumps(examples[:4], indent=2)}"
     if borderline_examples:
-        examples_str += f"\n\nBorderline calibration examples (reasonable moderators disagree on these — use to understand edge cases):\n{json.dumps(borderline_examples[:4], indent=2)}"
+        examples_str += f"\n\nBorderline calibration examples (reasonable moderators disagree on these — use to understand edge cases):\n{json.dumps(borderline_examples[:8], indent=2)}"
 
     items_str = json.dumps(items_with_rubrics, indent=2)
     post_str = json.dumps(post_content, indent=2)
@@ -432,6 +491,7 @@ def build_community_norms_prompt(
     community_name: str,
     rules_summary: str,
     recent_decisions: list[dict],
+    community_atmosphere: Optional[dict] = None,
 ) -> str:
     import json
 
@@ -446,6 +506,9 @@ def build_community_norms_prompt(
 Community rules summary:
 {rules_summary}
 {decisions_str}
+
+{"Community atmosphere:" if community_atmosphere else ""}
+{json.dumps(community_atmosphere, indent=2) if community_atmosphere else ""}
 
 Post:
 {post_str}
@@ -525,7 +588,10 @@ Guidelines:
 - Use rule_text_anchor as the primary signal. If the anchor phrase still appears in the updated rule text \
 (even if reworded), prefer "keep" or "update" over "delete"+"add".
 - Only "delete" an item when the concept it checks is genuinely gone from the rule.
-- Only "add" when the rule text introduces a new concept not covered by any existing item.
+- Only "add" when the rule text introduces a brand-new concept with no equivalent in any existing item. \
+Do NOT add items to "improve" or "complete" the checklist — your job is strictly to reflect the diff.
+- If the updated rule text is shorter or simpler than before, expect mostly "keep"/"delete" ops and zero or very few "add" ops.
+- Prefer fewer operations. When in doubt, keep an existing item rather than replacing it.
 - Preserve existing items' ids exactly — do not invent new ids for updated items.
 - Children of kept/updated items are handled inline — include them under "children" as before.
 
@@ -663,7 +729,14 @@ Return JSON in exactly this format:
   "suggested_examples": [
     {{
       "label": "compliant" | "violating" | "borderline",
-      "content": {{...normalized post content...}},
+      "content": {{
+        "id": "...",
+        "platform": "...",
+        "author": "...",
+        "content": {{"title": "...", "body": "...", "media": [], "links": []}},
+        "context": "...",
+        "timestamp": "..."
+      }},
       "relevance_note": "What aspect of the updated checklist this example tests",
       "related_checklist_item_description": "Exact description of the checklist item this example primarily tests (null if it spans multiple items)"
     }}
@@ -682,7 +755,7 @@ Return JSON in exactly this format:
 
 FILL_EXAMPLES_SYSTEM = """You are a content moderation testing specialist. Generate realistic post examples that clearly trigger specific moderation checklist items.
 
-For each checklist item provided, generate exactly one violating example — a post that clearly and unambiguously triggers that specific item. Make examples realistic and specific enough to be useful test cases.
+For each checklist item provided, generate exactly one violating example — a post that clearly and unambiguously triggers that specific item --- and one borderline example — a post that is on the edge of triggering the item. Make examples realistic and specific enough to be useful test cases.
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -716,9 +789,157 @@ Return JSON in exactly this format:
   "examples": [
     {{
       "label": "violating",
-      "content": {{...post content object...}},
+      "content": {{
+        "id": "...",
+        "platform": "...",
+        "author": "...",
+        "content": {{"title": "...", "body": "...", "media": [], "links": []}},
+        "context": "...",
+        "timestamp": "..."
+      }},
       "relevance_note": "Why this example triggers the checklist item",
       "related_checklist_item_description": "Exact description of the checklist item this triggers"
+    }},
+    {{
+      "label": "borderline",
+      "content": {{
+        "id": "...",
+        "platform": "...",
+        "author": "...",
+        "content": {{"title": "...", "body": "...", "media": [], "links": []}},
+        "context": "...",
+        "timestamp": "..."
+      }},
+      "relevance_note": "Why this example triggers the checklist item",
+      "related_checklist_item_description": "Exact description of the checklist item this triggers"
+    }}
+  ]
+}}"""
+
+
+# ── Diagnose Rule Health ────────────────────────────────────────────────────────
+
+DIAGNOSE_HEALTH_SYSTEM = """You are a moderation rule health analyst. You will be given a community rule, its checklist items, and accumulated performance metrics from moderator decisions (false positive rates, false negative rates, confidence distributions, and example posts).
+
+Your job is to diagnose which specific problem each underperforming item has and propose the minimal, targeted fix.
+
+Five possible diagnoses:
+- **tighten_rubric**: The rubric description is too vague — the model is guessing and making inconsistent calls. Fix: rewrite the rubric to be more precise and unambiguous.
+- **adjust_threshold**: The rubric logic is correct but the sensitivity is miscalibrated. Fix: raise or lower the threshold value in the logic field. You MUST include the specific new threshold value (e.g., change threshold from 0.6 → 0.75).
+- **promote_to_deterministic**: Clear text patterns have emerged that a regex can catch reliably — no LLM needed. Fix: change item_type to "deterministic" and add regex patterns.
+- **split_item**: One item is trying to evaluate two different things, causing confusion. Fix: propose splitting into two focused items.
+- **add_item** (new_items only): Violations exist that aren't covered by any current item. Fix: add a new checklist item.
+
+Diagnosis rules:
+- Only diagnose items with decision_count ≥ 3 and fp_rate > 0.15 OR fn_rate > 0.15 (unless uncovered violations force an add_item).
+- Items with both low FP and FN rates are healthy — skip them entirely.
+- For threshold adjustments: high confidence errors (avg_confidence_errors > 0.70) with fp_rate > 0.20 → threshold too low (raise it). Low confidence errors (avg_confidence_errors < 0.60) with fn_rate > 0.20 → rubric ambiguous (tighten_rubric instead).
+- One diagnosis per item maximum. Choose the single most impactful fix.
+- proposed_change must be a complete, valid ChecklistItem dict (same schema as the existing item, not a partial patch).
+- For split_item: proposed_change represents the first item. Add the second item to new_items.
+- Skip items with decision_count < 3.
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_diagnose_health_prompt(
+    rule_text: str,
+    checklist_items: list[dict],
+    health_data: dict,
+) -> str:
+    import json
+
+    items_section = []
+    item_metrics_by_id = {m["item_id"]: m for m in health_data.get("items", [])}
+
+    for item in checklist_items:
+        metrics = item_metrics_by_id.get(item["id"], {})
+        examples = metrics.get("examples", {})
+
+        # Build compact example list (max 5 per item)
+        example_rows = []
+        for label in ("violating", "compliant", "borderline"):
+            for ex in (examples.get(label) or [])[:2]:
+                example_rows.append(f"  [{label.upper()}] {ex.get('title', '(no title)')}")
+
+        fp_rate = metrics.get("false_positive_rate", 0.0)
+        fn_rate = metrics.get("false_negative_rate", 0.0)
+        fp_count = metrics.get("false_positive_count", 0)
+        fn_count = metrics.get("false_negative_count", 0)
+        total = metrics.get("decision_count", 0)
+        avg_conf_correct = metrics.get("avg_confidence_correct")
+        avg_conf_errors = metrics.get("avg_confidence_errors")
+
+        item_block = {
+            "id": item["id"],
+            "description": item["description"],
+            "item_type": item["item_type"],
+            "action": item["action"],
+            "logic": item.get("logic", {}),
+            "metrics": {
+                "decision_count": total,
+                "fp_rate": round(fp_rate, 3),
+                "fp_count": fp_count,
+                "fn_rate": round(fn_rate, 3),
+                "fn_count": fn_count,
+                "avg_confidence_correct": round(avg_conf_correct, 3) if avg_conf_correct is not None else None,
+                "avg_confidence_errors": round(avg_conf_errors, 3) if avg_conf_errors is not None else None,
+            },
+            "examples": example_rows,
+        }
+        items_section.append(item_block)
+
+    overall = health_data.get("overall", {})
+    uncovered = health_data.get("uncovered_violations", [])
+
+    return f"""Analyze the health of this rule's checklist and diagnose which items need fixing.
+
+Rule text:
+{rule_text}
+
+Overall stats: {overall.get("total_decisions", 0)} decisions, {overall.get("override_rate", 0.0):.1%} override rate
+
+Checklist items with performance metrics:
+{json.dumps(items_section, indent=2)}
+
+Uncovered violations (removed by moderators but match no checklist item):
+{json.dumps([u.get("title", "") for u in uncovered[:8]], indent=2) if uncovered else "None"}
+
+Return JSON in exactly this format:
+{{
+  "diagnoses": [
+    {{
+      "item_id": "<exact item id from above>",
+      "action": "tighten_rubric | adjust_threshold | promote_to_deterministic | split_item",
+      "reasoning": "Concise explanation of what the metrics reveal and why this fix addresses it",
+      "proposed_change": {{
+        "description": "...",
+        "item_type": "deterministic | structural | subjective",
+        "logic": {{}},
+        "action": "remove | flag | continue",
+        "rule_text_anchor": null,
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      }},
+      "confidence": "high | medium | low"
+    }}
+  ],
+  "new_items": [
+    {{
+      "action": "add_item",
+      "reasoning": "What pattern the uncovered violations share",
+      "proposed_item": {{
+        "description": "...",
+        "item_type": "deterministic | structural | subjective",
+        "logic": {{}},
+        "action": "remove | flag | continue",
+        "rule_text_anchor": null,
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      }},
+      "motivated_by": ["<example_id>"]
     }}
   ]
 }}"""

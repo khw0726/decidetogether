@@ -90,14 +90,16 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
       verdict,
       reasoningCategory,
       notes,
+      tag,
       ruleIds,
     }: {
       decisionId: string
       verdict: string
       reasoningCategory?: string
       notes?: string
+      tag?: string
       ruleIds?: string[]
-    }) => resolveDecision(decisionId, { verdict, reasoning_category: reasoningCategory, notes, rule_ids: ruleIds }),
+    }) => resolveDecision(decisionId, { verdict, reasoning_category: reasoningCategory, notes, tag, rule_ids: ruleIds }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['decisions', communityId] })
       queryClient.invalidateQueries({ queryKey: ['stats', communityId] })
@@ -183,12 +185,13 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             rulesMap={rulesMap}
             selected={selectedIds.has(decision.id)}
             onToggleSelect={() => toggleSelect(decision.id)}
-            onResolve={(verdict, reasoningCategory, notes, ruleIds) =>
+            onResolve={(verdict, reasoningCategory, notes, ruleIds, tag) =>
               resolveMutation.mutate({
                 decisionId: decision.id,
                 verdict,
                 reasoningCategory,
                 notes,
+                tag,
                 ruleIds,
               })
             }
@@ -251,6 +254,14 @@ function ItemReasoningTree({
   )
 }
 
+const UNLINKED_REMOVE_TAGS = [
+  { value: 'spam', label: 'Spam' },
+  { value: 'off-topic', label: 'Off-topic' },
+  { value: 'hostile_tone', label: 'Hostile tone' },
+  { value: 'low_quality', label: 'Low quality' },
+  { value: 'other', label: 'Other' },
+]
+
 function DecisionCard({
   decision,
   rulesMap,
@@ -263,18 +274,21 @@ function DecisionCard({
   rulesMap: Record<string, { title: string }>
   selected: boolean
   onToggleSelect: () => void
-  onResolve: (verdict: string, reasoningCategory?: string, notes?: string, ruleIds?: string[]) => void
+  onResolve: (verdict: string, reasoningCategory?: string, notes?: string, ruleIds?: string[], tag?: string) => void
   resolving: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedVerdict, setSelectedVerdict] = useState<string | null>(null)
   const [reasoningCategory, setReasoningCategory] = useState('')
   const [notes, setNotes] = useState('')
+  const [tag, setTag] = useState('')
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
 
   // Rule picker is needed when agent approved (no triggered rules) but moderator disagrees
   const agentApproved = decision.agent_verdict === 'approve'
   const needsRulePicker = agentApproved && selectedVerdict && selectedVerdict !== 'approve'
+  // Show memo+tag UI when moderator removes with no rule selected
+  const showUnlinkedMemo = needsRulePicker && selectedVerdict === 'remove' && selectedRuleIds.length === 0
 
   const isPending = decision.moderator_verdict === 'pending'
 
@@ -299,9 +313,11 @@ function DecisionCard({
       reasoningCategory || undefined,
       notes || undefined,
       needsRulePicker ? selectedRuleIds : undefined,
+      showUnlinkedMemo ? (tag || undefined) : undefined,
     )
     setSelectedVerdict(null)
     setSelectedRuleIds([])
+    setTag('')
   }
 
   return (
@@ -384,7 +400,7 @@ function DecisionCard({
             {needsRulePicker && (
               <div>
                 <p className="text-xs text-amber-700 font-medium mb-1">
-                  Agent did not trigger any rules — which rule(s) does this post violate?
+                  Agent did not trigger any rules — which rule(s) does this post violate? (leave blank if no rule applies)
                 </p>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {Object.entries(rulesMap).map(([id, rule]) => (
@@ -400,6 +416,21 @@ function DecisionCard({
                     </label>
                   ))}
                 </div>
+              </div>
+            )}
+            {showUnlinkedMemo && (
+              <div className="space-y-1.5 border-t border-dashed border-gray-200 pt-2">
+                <p className="text-xs text-gray-500">No rule selected — categorize why this was removed:</p>
+                <select
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none"
+                  value={tag}
+                  onChange={e => setTag(e.target.value)}
+                >
+                  <option value="">Select category (optional)</option>
+                  {UNLINKED_REMOVE_TAGS.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
               </div>
             )}
             <select

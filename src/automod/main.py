@@ -16,6 +16,7 @@ from .api import (
     alignment_router,
     decisions_router,
     evaluation_router,
+    health_router,
 )
 
 
@@ -49,6 +50,7 @@ app.include_router(examples_router, prefix="/api")
 app.include_router(alignment_router, prefix="/api")
 app.include_router(decisions_router, prefix="/api")
 app.include_router(evaluation_router, prefix="/api")
+app.include_router(health_router, prefix="/api")
 
 # Serve admin frontend if built
 admin_dist = os.path.join(os.path.dirname(__file__), "../../admin/dist")

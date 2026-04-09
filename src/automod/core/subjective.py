@@ -77,16 +77,25 @@ class SubjectiveEvaluator:
 
     def _prepare_example_dicts(self, examples: list[Example]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         """Split examples into primary (clear) and borderline (calibration) dicts."""
-        primary = [
+        compliant = [
             {"label": ex.label, "content": ex.content}
             for ex in examples
-            if ex.label in ("compliant", "violating")
-        ][:8]
+            if ex.label == "compliant"
+        ]
+        violating = [
+            {"label": ex.label, "content": ex.content}
+            for ex in examples
+            if ex.label == "violating"
+        ]
+
+        # Keep equal counts of compliant/violating examples (up to 4 total => 2 each)
+        n = min(len(compliant), len(violating), 2)
+        primary = compliant[:n] + violating[:n]
         borderline = [
             {"label": ex.label, "content": ex.content}
             for ex in examples
             if ex.label == "borderline"
-        ][:4]
+        ][:8]
         return primary, borderline
 
     async def evaluate_batch(

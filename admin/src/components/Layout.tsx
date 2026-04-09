@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Shield, LayoutDashboard, BookOpen, Inbox, BarChart2, Settings, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
-import { listCommunities, createCommunity, Community } from '../api/client'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Shield, LayoutDashboard, BookOpen, Inbox, BarChart2, Settings, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { listCommunities, deleteCommunity, Community } from '../api/client'
 import { useState } from 'react'
 
 interface LayoutProps {
@@ -10,13 +10,21 @@ interface LayoutProps {
 }
 
 export default function Layout({ communityId, onCommunityChange }: LayoutProps) {
-  const [showCreateModal, setShowCreateModal] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
-  const { data: communities = [], refetch } = useQuery({
+  const { data: communities = [] } = useQuery({
     queryKey: ['communities'],
     queryFn: listCommunities,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteCommunity(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['communities'] })
+      if (communityId === id) onCommunityChange('')
+    },
   })
 
   const navItems = [
@@ -41,21 +49,34 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
         {sidebarOpen && (
           <div className="px-3 py-3 border-b border-gray-700">
             <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">Community</div>
-            <select
-              className="w-full bg-gray-800 text-gray-100 text-sm rounded px-2 py-1.5 border border-gray-600 focus:outline-none focus:border-indigo-500"
-              value={communityId}
-              onChange={e => onCommunityChange(e.target.value)}
-            >
-              <option value="">Select community...</option>
+            <div className="space-y-0.5">
+              {communities.length === 0 && (
+                <p className="text-xs text-gray-500 py-1">No communities yet.</p>
+              )}
               {communities.map((c: Community) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.platform})
-                </option>
+                <div
+                  key={c.id}
+                  className={`flex items-center gap-1 rounded px-2 py-1.5 cursor-pointer group ${communityId === c.id ? 'bg-indigo-700' : 'hover:bg-gray-800'}`}
+                  onClick={() => onCommunityChange(c.id)}
+                >
+                  <span className="flex-1 text-sm truncate">{c.name}</span>
+                  <button
+                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-all flex-shrink-0"
+                    title={`Delete ${c.name}`}
+                    onClick={e => {
+                      e.stopPropagation()
+                      if (confirm(`Delete ${c.name} and all its data?`)) deleteMutation.mutate(c.id)
+                    }}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               ))}
-            </select>
+            </div>
             <button
               className="mt-2 w-full flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-100 transition-colors py-1"
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => navigate('/setup')}
             >
               <Plus size={12} />
               New community
@@ -106,86 +127,6 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
         <Outlet />
       </main>
 
-      {/* Create Community Modal */}
-      {showCreateModal && (
-        <CreateCommunityModal
-          onClose={() => setShowCreateModal(false)}
-          onCreate={async (name, platform) => {
-            const comm = await createCommunity({ name, platform })
-            await refetch()
-            onCommunityChange(comm.id)
-            setShowCreateModal(false)
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-function CreateCommunityModal({
-  onClose,
-  onCreate,
-}: {
-  onClose: () => void
-  onCreate: (name: string, platform: string) => Promise<void>
-}) {
-  const [name, setName] = useState('')
-  const [platform, setPlatform] = useState('reddit')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    setLoading(true)
-    setError('')
-    try {
-      await onCreate(name.trim(), platform)
-    } catch (err) {
-      setError('Failed to create community')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="card p-6 w-full max-w-sm">
-        <h2 className="text-lg font-semibold mb-4">New Community</h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Community Name</label>
-            <input
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., r/programming"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Platform</label>
-            <select
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={platform}
-              onChange={e => setPlatform(e.target.value)}
-            >
-              <option value="reddit">Reddit</option>
-              <option value="chatroom">Chatroom</option>
-              <option value="forum">Forum</option>
-            </select>
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex gap-2 justify-end">
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancel
-            </button>
-            <button type="submit" className="btn-primary" disabled={loading || !name.trim()}>
-              {loading ? 'Creating...' : 'Create'}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   )
 }

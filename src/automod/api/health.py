@@ -1,0 +1,301 @@
+"""Rule health metrics computation + LLM-based diagnosis."""
+
+from collections import defaultdict
+from typing import Any
+
+import anthropic
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..config import settings
+from ..compiler.compiler import RuleCompiler
+from ..db.database import get_db
+from ..db.models import (
+    ChecklistItem,
+    Decision,
+    Example,
+    ExampleChecklistItemLink,
+    ExampleRuleLink,
+    Rule,
+    Suggestion,
+)
+
+router = APIRouter(tags=["health"])
+
+
+def get_compiler() -> RuleCompiler:
+    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    return RuleCompiler(client, settings)
+
+
+@router.get("/rules/{rule_id}/health")
+async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """Pure computation — no LLM. Returns per-item FP/FN rates from resolved decisions."""
+    rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = rule_result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    # Fetch all checklist items for this rule
+    items_result = await db.execute(
+        select(ChecklistItem)
+        .where(ChecklistItem.rule_id == rule_id)
+        .order_by(ChecklistItem.order.asc())
+    )
+    all_items = list(items_result.scalars().all())
+    items_by_id = {item.id: item for item in all_items}
+
+    # Fetch resolved decisions where this rule is in agent_reasoning
+    decisions_result = await db.execute(
+        select(Decision)
+        .where(
+            Decision.community_id == rule.community_id,
+            Decision.moderator_verdict != "pending",
+        )
+    )
+    all_resolved = list(decisions_result.scalars().all())
+
+    # Filter to decisions where this rule was evaluated
+    rule_decisions = [
+        d for d in all_resolved
+        if rule_id in (d.agent_reasoning or {})
+    ]
+
+    # Per-item accumulators
+    item_fp_count: dict[str, int] = defaultdict(int)
+    item_fn_count: dict[str, int] = defaultdict(int)
+    item_total: dict[str, int] = defaultdict(int)
+    item_conf_correct: dict[str, list[float]] = defaultdict(list)
+    item_conf_errors: dict[str, list[float]] = defaultdict(list)
+
+    total_decisions = len(rule_decisions)
+    override_count = sum(1 for d in rule_decisions if d.was_override)
+
+    for decision in rule_decisions:
+        reasoning = decision.agent_reasoning.get(rule_id, {})
+        item_reasoning = reasoning.get("item_reasoning", {})
+        mod_verdict = decision.moderator_verdict  # approve | remove | review
+
+        for item_id, item_data in item_reasoning.items():
+            if item_id not in items_by_id:
+                continue  # item was recompiled away
+
+            triggered = item_data.get("triggered", False)
+            confidence = item_data.get("confidence", 0.5)
+            item_total[item_id] += 1
+
+            # FP: item fired but mod approved (agent wrongly flagged)
+            if triggered and mod_verdict == "approve":
+                item_fp_count[item_id] += 1
+                item_conf_errors[item_id].append(confidence)
+            # FN: item didn't fire but mod removed
+            elif not triggered and mod_verdict == "remove":
+                item_fn_count[item_id] += 1
+                item_conf_errors[item_id].append(confidence)
+            else:
+                item_conf_correct[item_id].append(confidence)
+
+    # Fetch examples linked to this rule
+    example_ids_result = await db.execute(
+        select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
+    )
+    example_ids = [r[0] for r in example_ids_result]
+
+    # Group examples by checklist item
+    item_example_groups: dict[str, dict[str, list]] = defaultdict(
+        lambda: {"compliant": [], "violating": [], "borderline": []}
+    )
+    uncovered_violations: list[dict] = []
+
+    if example_ids:
+        examples_result = await db.execute(
+            select(Example).where(Example.id.in_(example_ids))
+        )
+        examples_by_id = {e.id: e for e in examples_result.scalars().all()}
+
+        links_result = await db.execute(
+            select(ExampleChecklistItemLink)
+            .where(ExampleChecklistItemLink.example_id.in_(example_ids))
+        )
+        all_links = list(links_result.scalars().all())
+
+        linked_example_ids: set[str] = set()
+        for link in all_links:
+            if link.checklist_item_id and link.checklist_item_id in items_by_id:
+                linked_example_ids.add(link.example_id)
+                example = examples_by_id.get(link.example_id)
+                if example:
+                    content = example.content or {}
+                    inner = content.get("content", {})
+                    title = inner.get("title", "") if isinstance(inner, dict) else ""
+                    summary = {
+                        "example_id": example.id,
+                        "label": example.label,
+                        "title": title or "(no title)",
+                    }
+                    item_example_groups[link.checklist_item_id][example.label].append(summary)
+
+        # Uncovered violations: violating examples with no valid item link
+        for eid, example in examples_by_id.items():
+            if example.label == "violating" and eid not in linked_example_ids:
+                content = example.content or {}
+                inner = content.get("content", {})
+                title = inner.get("title", "") if isinstance(inner, dict) else ""
+                uncovered_violations.append({
+                    "example_id": example.id,
+                    "label": "violating",
+                    "title": title or "(no title)",
+                })
+
+    # Compute per-item metrics and attach examples
+    item_metrics = []
+    for item in all_items:
+        total = item_total[item.id]
+        fp = item_fp_count[item.id]
+        fn = item_fn_count[item.id]
+
+        fp_rate = fp / total if total > 0 else 0.0
+        fn_rate = fn / total if total > 0 else 0.0
+        sort_score = max(fp_rate, fn_rate)
+
+        conf_correct_vals = item_conf_correct[item.id]
+        conf_error_vals = item_conf_errors[item.id]
+
+        item_metrics.append({
+            "item_id": item.id,
+            "description": item.description,
+            "item_type": item.item_type,
+            "action": item.action,
+            "sort_score": sort_score,
+            "false_positive_rate": fp_rate,
+            "false_positive_count": fp,
+            "false_negative_rate": fn_rate,
+            "false_negative_count": fn,
+            "avg_confidence_correct": (
+                sum(conf_correct_vals) / len(conf_correct_vals) if conf_correct_vals else None
+            ),
+            "avg_confidence_errors": (
+                sum(conf_error_vals) / len(conf_error_vals) if conf_error_vals else None
+            ),
+            "decision_count": total,
+            "examples": item_example_groups[item.id],
+        })
+
+    # Sort worst first
+    item_metrics.sort(key=lambda x: x["sort_score"], reverse=True)
+
+    # % items with at least one linked example
+    items_with_examples = sum(
+        1 for iid in items_by_id
+        if any(item_example_groups[iid][label] for label in ("compliant", "violating", "borderline"))
+    )
+    covered_pct = items_with_examples / len(all_items) if all_items else 0.0
+
+    return {
+        "rule_id": rule_id,
+        "overall": {
+            "total_decisions": total_decisions,
+            "override_rate": override_count / total_decisions if total_decisions > 0 else 0.0,
+            "covered_by_examples": covered_pct,
+        },
+        "items": item_metrics,
+        "uncovered_violations": uncovered_violations,
+    }
+
+
+@router.post("/rules/{rule_id}/analyze-health")
+async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """LLM call: diagnose per-item issues and create Suggestion records."""
+    rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = rule_result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    items_result = await db.execute(
+        select(ChecklistItem)
+        .where(ChecklistItem.rule_id == rule_id)
+        .order_by(ChecklistItem.order.asc())
+    )
+    checklist = list(items_result.scalars().all())
+    items_by_id = {item.id: item for item in checklist}
+
+    health_data = await get_rule_health(rule_id, db)
+
+    compiler = get_compiler()
+    diagnoses = await compiler.diagnose_rule_health(rule, checklist, health_data)
+
+    created: list[Suggestion] = []
+
+    for diag in diagnoses.get("diagnoses", []):
+        item_id = diag.get("item_id")
+        if not item_id or item_id not in items_by_id:
+            continue
+
+        action = diag.get("action", "tighten_rubric")
+        reasoning = diag.get("reasoning", "")
+        proposed_change = diag.get("proposed_change") or {}
+        confidence = diag.get("confidence", "medium")
+
+        # Build as a recompile diff operation so accept_recompile can apply it
+        op: dict = {"op": "update", "existing_id": item_id}
+        op.update({k: v for k, v in proposed_change.items() if k != "id"})
+        if "children" not in op:
+            op["children"] = []
+
+        suggestion = Suggestion(
+            rule_id=rule_id,
+            checklist_item_id=item_id,
+            suggestion_type="checklist",
+            content={
+                "operations": [op],
+                "action": action,
+                "reasoning": reasoning,
+                "confidence": confidence,
+                "description": f"[{action}] {reasoning[:100]}",
+            },
+        )
+        db.add(suggestion)
+        created.append(suggestion)
+
+    for new_item_diag in diagnoses.get("new_items", []):
+        action = new_item_diag.get("action", "add_item")
+        reasoning = new_item_diag.get("reasoning", "")
+        proposed_item = new_item_diag.get("proposed_item") or {}
+        motivated_by = new_item_diag.get("motivated_by", [])
+
+        op = {"op": "add", **proposed_item}
+        if "children" not in op:
+            op["children"] = []
+
+        suggestion = Suggestion(
+            rule_id=rule_id,
+            checklist_item_id=None,
+            suggestion_type="checklist",
+            content={
+                "operations": [op],
+                "action": action,
+                "reasoning": reasoning,
+                "description": f"[add_item] {reasoning[:100]}",
+                "motivated_by": motivated_by,
+            },
+        )
+        db.add(suggestion)
+        created.append(suggestion)
+
+    await db.commit()
+    for s in created:
+        await db.refresh(s)
+
+    return [
+        {
+            "id": s.id,
+            "rule_id": s.rule_id,
+            "checklist_item_id": s.checklist_item_id,
+            "suggestion_type": s.suggestion_type,
+            "content": s.content,
+            "status": s.status,
+            "created_at": s.created_at.isoformat(),
+        }
+        for s in created
+    ]

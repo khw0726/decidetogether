@@ -152,14 +152,6 @@ function SuggestionCard({
                 <X size={12} />
                 Violating
               </button>
-              <button
-                className="btn-secondary text-xs py-1"
-                onClick={() => onAccept()}
-                disabled={isPending}
-                title="Keep as borderline"
-              >
-                Keep
-              </button>
             </>
           ) : (
             <>
@@ -355,10 +347,10 @@ function ExampleSuggestion({ content }: { content: Record<string, unknown> }) {
   const label = (content.label as string) || 'compliant'
   const relevanceNote = (content.relevance_note as string) || ''
   const postBody = (content.content as Record<string, unknown>) || {}
-  const title = postBody.title as string | undefined
-  const body = postBody.body as string | undefined
+  const title = postBody.content?.title as string | undefined
+  const body = postBody.content?.body as string | undefined
   const context = postBody.context as string | undefined
-  const author = postBody.author as string | undefined
+  const author = postBody.author as { username: string } | undefined
   const postType = postBody.type as string | undefined
 
   return (
@@ -366,8 +358,8 @@ function ExampleSuggestion({ content }: { content: Record<string, unknown> }) {
       <div className="bg-gray-50 border border-gray-200 rounded p-3 space-y-1.5 text-sm">
         {title && <p className="font-medium text-gray-800">{title}</p>}
         {body && <p className="text-gray-600 text-xs leading-relaxed line-clamp-4">{body}</p>}
-        {context && <p className="text-xs text-gray-400 italic">{context}</p>}
-        {author && <p className="text-xs text-gray-400">u/{author}{postType && ` · ${postType}`}</p>}
+        {/* {context && <p className="text-xs text-gray-400 italic">{context}</p>} */}
+        {author && <p className="text-xs text-gray-400">u/{author.username}{postType && ` · ${postType}`}</p>}
         {!title && !body && <p className="text-xs text-gray-400 italic">No post content preview available.</p>}
       </div>
       <div className="flex items-start gap-2">

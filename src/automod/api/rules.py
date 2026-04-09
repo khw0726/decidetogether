@@ -208,6 +208,8 @@ async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
                 item_type=child_data.get("item_type", "subjective"),
                 logic=child_data.get("logic", {}),
                 action=child_data.get("action", "flag"),
+                atmosphere_influenced=child_data.get("atmosphere_influenced", False),
+                atmosphere_note=child_data.get("atmosphere_note"),
             )
             db.add(child)
 
@@ -370,6 +372,8 @@ async def _apply_diff_operations(
                         item_type=child_data.get("item_type", "subjective"),
                         logic=child_data.get("logic", {}),
                         action=child_data.get("action", "flag"),
+                        atmosphere_influenced=child_data.get("atmosphere_influenced", False),
+                        atmosphere_note=child_data.get("atmosphere_note"),
                     ))
 
         elif kind == "delete":
@@ -403,6 +407,8 @@ async def _apply_diff_operations(
                 item_type=op.get("item_type", "subjective"),
                 logic=op.get("logic", {}),
                 action=op.get("action", "flag"),
+                atmosphere_influenced=op.get("atmosphere_influenced", False),
+                atmosphere_note=op.get("atmosphere_note"),
             )
             db.add(new_item)
             await db.flush()
@@ -416,6 +422,8 @@ async def _apply_diff_operations(
                     item_type=child_data.get("item_type", "subjective"),
                     logic=child_data.get("logic", {}),
                     action=child_data.get("action", "flag"),
+                    atmosphere_influenced=child_data.get("atmosphere_influenced", False),
+                    atmosphere_note=child_data.get("atmosphere_note"),
                 ))
 
         else:

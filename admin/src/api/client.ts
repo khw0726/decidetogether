@@ -26,6 +26,11 @@ export interface Community {
   created_at: string
 }
 
+export interface AtmosphereGenerateResponse {
+  community: Community
+  crawled_count: number
+}
+
 export interface CommunitySamplePost {
   id: string
   community_id: string
@@ -44,6 +49,7 @@ export interface Rule {
   is_active: boolean
   rule_type: string
   rule_type_reasoning: string | null
+  override_count: number
   created_at: string
   updated_at: string
 }
@@ -58,6 +64,8 @@ export interface ChecklistItem {
   item_type: 'deterministic' | 'structural' | 'subjective'
   logic: Record<string, unknown>
   action: string
+  atmosphere_influenced: boolean
+  atmosphere_note: string | null
   updated_at: string
   children: ChecklistItem[]
 }
@@ -86,9 +94,44 @@ export interface Decision {
   moderator_verdict: string
   moderator_reasoning_category: string | null
   moderator_notes: string | null
+  moderator_tag: string | null
   was_override: boolean
   created_at: string
   resolved_at: string | null
+}
+
+export interface PreviewRecompileResult {
+  operations: Array<{
+    op: 'keep' | 'update' | 'delete' | 'add'
+    existing_id?: string
+    description?: string
+    rule_text_anchor?: string | null
+    item_type?: string
+    action?: string
+    atmosphere_influenced?: boolean
+    atmosphere_note?: string | null
+  }>
+  example_verdicts: Array<{
+    example_id: string
+    label: string
+    content_title: string
+    may_change: boolean
+    affected_checklist_items: string[]
+  }>
+  summary: {
+    keep: number
+    update: number
+    delete: number
+    add: number
+    examples_may_change: number
+  }
+}
+
+export interface DraftEvaluationResult {
+  example_id: string
+  old_label: 'compliant' | 'violating' | 'borderline'
+  new_verdict: 'approve' | 'remove' | 'review' | 'error'
+  new_confidence: number
 }
 
 export interface DecisionStats {
@@ -149,8 +192,11 @@ export const createCommunity = (data: { name: string; platform: string; platform
 export const getCommunity = (id: string) =>
   api.get<Community>(`/communities/${id}`).then(r => r.data)
 
+export const deleteCommunity = (id: string) =>
+  api.delete(`/communities/${id}`)
+
 export const generateAtmosphere = (communityId: string) =>
-  api.post<Community>(`/communities/${communityId}/atmosphere/generate`).then(r => r.data)
+  api.post<AtmosphereGenerateResponse>(`/communities/${communityId}/atmosphere/generate`).then(r => r.data)
 
 export const listSamplePosts = (communityId: string) =>
   api.get<CommunitySamplePost[]>(`/communities/${communityId}/sample-posts`).then(r => r.data)
@@ -237,6 +283,12 @@ export const recompileRule = (ruleId: string) =>
 export const acceptRecompile = (ruleId: string, suggestionId: string) =>
   api.post(`/rules/${ruleId}/recompile/accept`, null, { params: { suggestion_id: suggestionId } }).then(r => r.data)
 
+export const previewRecompile = (ruleId: string, ruleText: string) =>
+  api.post<PreviewRecompileResult>(`/rules/${ruleId}/preview-recompile`, { rule_text: ruleText }).then(r => r.data)
+
+export const evaluateExamplesWithDraft = (ruleId: string, ruleText: string) =>
+  api.post<DraftEvaluationResult[]>(`/rules/${ruleId}/evaluate-examples-with-draft`, { rule_text: ruleText }).then(r => r.data)
+
 // ── Examples ───────────────────────────────────────────────────────────────────
 
 export const listExamples = (ruleId: string, label?: string) =>
@@ -297,11 +349,56 @@ export const suggestRuleFromDecisions = (communityId: string, decisionIds: strin
 export const listDecisions = (communityId: string, params?: { status?: string; verdict?: string; limit?: number; offset?: number }) =>
   api.get<Decision[]>(`/communities/${communityId}/decisions`, { params }).then(r => r.data)
 
-export const resolveDecision = (decisionId: string, data: { verdict: string; reasoning_category?: string; notes?: string; rule_ids?: string[] }) =>
+export const resolveDecision = (decisionId: string, data: { verdict: string; reasoning_category?: string; notes?: string; tag?: string; rule_ids?: string[] }) =>
   api.put<Decision>(`/decisions/${decisionId}/resolve`, data).then(r => r.data)
 
 export const getDecisionStats = (communityId: string) =>
   api.get<DecisionStats>(`/communities/${communityId}/decisions/stats`).then(r => r.data)
+
+// ── Health ─────────────────────────────────────────────────────────────────────
+
+export interface ExampleSummary {
+  example_id: string
+  label: 'compliant' | 'violating' | 'borderline'
+  title: string
+}
+
+export interface ItemHealthMetrics {
+  item_id: string
+  description: string
+  item_type: 'deterministic' | 'structural' | 'subjective'
+  action: string
+  sort_score: number
+  false_positive_rate: number
+  false_positive_count: number
+  false_negative_rate: number
+  false_negative_count: number
+  avg_confidence_correct: number | null
+  avg_confidence_errors: number | null
+  decision_count: number
+  examples: {
+    compliant: ExampleSummary[]
+    violating: ExampleSummary[]
+    borderline: ExampleSummary[]
+  }
+}
+
+export interface RuleHealth {
+  rule_id: string
+  overall: {
+    total_decisions: number
+    override_rate: number
+    covered_by_examples: number
+  }
+  items: ItemHealthMetrics[]
+  uncovered_violations: ExampleSummary[]
+}
+
+export const getRuleHealth = (ruleId: string) =>
+  api.get<RuleHealth>(`/rules/${ruleId}/health`).then(r => r.data)
+
+export const analyzeRuleHealth = (ruleId: string) =>
+  api.post<Suggestion[]>(`/rules/${ruleId}/analyze-health`).then(r => r.data)
 
 // ── Evaluation ─────────────────────────────────────────────────────────────────
 

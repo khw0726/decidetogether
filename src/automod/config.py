@@ -11,5 +11,11 @@ class Settings(BaseSettings):
     escalation_confidence_threshold: float = 0.75
     database_url: str = "sqlite+aiosqlite:///./automod.db"
 
+    reddit_client_id: str = ""
+    reddit_client_secret: str = ""
+    reddit_username: str = ""
+    reddit_password: str = ""
+    reddit_user_agent: str = "automod-agent/2.0"
+
 
 settings = Settings()

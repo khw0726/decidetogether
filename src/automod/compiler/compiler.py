@@ -39,7 +39,10 @@ _COMPILE_TOOL = {
                     "type": "object",
                     "properties": {
                         "description": {"type": "string"},
-                        "rule_text_anchor": {"type": ["string", "null"]},
+                        "rule_text_anchor": {
+                            "type": ["string", "null"],
+                            "description": "The specific portion of the rule text that this item corresponds to, if applicable. Should be an exact substring of the rule text or null if no specific anchor can be identified.",
+                        },
                         "item_type": {
                             "type": "string",
                             "enum": ["deterministic", "structural", "subjective"],
@@ -50,10 +53,18 @@ _COMPILE_TOOL = {
                             "enum": ["remove", "flag", "continue"],
                         },
                         "children": {"type": "array", "items": {"type": "object"}},
+                        "atmosphere_influenced": {
+                            "type": "boolean",
+                            "description": "True if community atmosphere shaped how this item was framed or calibrated",
+                        },
+                        "atmosphere_note": {
+                            "type": ["string", "null"],
+                            "description": "Brief explanation of how community atmosphere influenced this item",
+                        },
                     },
                     "required": [
                         "description", "item_type", "logic",
-                        "action", "children",
+                        "action", "children", "atmosphere_influenced",
                     ],
                 },
             },
@@ -69,7 +80,7 @@ _COMPILE_TOOL = {
                         "content": {"type": "object"},
                         "relevance_note": {"type": "string"},
                         "related_checklist_item_description": {
-                            "type": ["string", "null"],
+                            "type": ["string"],
                             "description": "Exact description of the checklist item this example primarily tests",
                         },
                     },
@@ -80,6 +91,7 @@ _COMPILE_TOOL = {
         "required": ["checklist_tree", "examples"],
     },
 }
+
 
 _RECOMPILE_TOOL = {
     "name": "submit_recompile_diff",
@@ -98,7 +110,10 @@ _RECOMPILE_TOOL = {
                         },
                         "existing_id": {"type": "string"},
                         "description": {"type": "string"},
-                        "rule_text_anchor": {"type": ["string", "null"]},
+                        "rule_text_anchor": {
+                            "type": ["string", "null"],
+                            "description": "The specific portion of the rule text that this item corresponds to, if applicable. Should be an exact substring of the rule text or null if no specific anchor can be identified.",
+                        },
                         "item_type": {
                             "type": "string",
                             "enum": ["deterministic", "structural", "subjective"],
@@ -210,7 +225,10 @@ _FILL_EXAMPLES_TOOL = {
                         },
                         "content": {"type": "object"},
                         "relevance_note": {"type": "string"},
-                        "related_checklist_item_description": {"type": "string"},
+                        "related_checklist_item_description": {
+                            "type": "string",
+                            "description": "Exact description of the checklist item this example primarily tests",
+                        },
                     },
                     "required": [
                         "label", "content", "relevance_note",
@@ -220,6 +238,50 @@ _FILL_EXAMPLES_TOOL = {
             },
         },
         "required": ["examples"],
+    },
+}
+
+_DIAGNOSE_TOOL = {
+    "name": "submit_health_diagnoses",
+    "description": "Submit per-item health diagnoses with proposed fixes",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "diagnoses": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "item_id": {"type": "string"},
+                        "action": {
+                            "type": "string",
+                            "enum": ["tighten_rubric", "adjust_threshold", "promote_to_deterministic", "split_item"],
+                        },
+                        "reasoning": {"type": "string"},
+                        "proposed_change": {"type": "object"},
+                        "confidence": {
+                            "type": "string",
+                            "enum": ["high", "medium", "low"],
+                        },
+                    },
+                    "required": ["item_id", "action", "reasoning", "proposed_change", "confidence"],
+                },
+            },
+            "new_items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "action": {"type": "string", "enum": ["add_item"]},
+                        "reasoning": {"type": "string"},
+                        "proposed_item": {"type": "object"},
+                        "motivated_by": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["action", "reasoning", "proposed_item"],
+                },
+            },
+        },
+        "required": ["diagnoses", "new_items"],
     },
 }
 
@@ -399,6 +461,7 @@ class RuleCompiler:
             existing_example_dicts = [self._example_to_dict(e) for e in existing_examples]
 
         user_prompt = prompts.build_compile_prompt(
+            rule_title=rule.title,
             rule_text=rule.text,
             community_name=community.name,
             platform=community.platform,
@@ -477,6 +540,8 @@ class RuleCompiler:
                 item_type=item_data.get("item_type", "subjective"),
                 logic=item_data.get("logic", {}),
                 action=item_data.get("action", "flag"),
+                atmosphere_influenced=item_data.get("atmosphere_influenced", False),
+                atmosphere_note=item_data.get("atmosphere_note"),
             )
             result.append(item)
             order += 1
@@ -618,7 +683,7 @@ class RuleCompiler:
         items: list[ChecklistItem],
         existing_examples: Optional[list] = None,
     ) -> list[dict]:
-        """Generate one violating example per checklist item in the given list."""
+        """Generate one violating example and one borderline example per checklist item in the given list."""
         logger.info(
             f"Generating {len(items)} missing violating example(s) for rule '{rule.title}'"
         )
@@ -639,6 +704,28 @@ class RuleCompiler:
             prompts.FILL_EXAMPLES_SYSTEM, user_prompt, tool=_FILL_EXAMPLES_TOOL
         )
         return result.get("examples", [])
+
+    async def diagnose_rule_health(
+        self,
+        rule: Rule,
+        checklist: list[ChecklistItem],
+        health_data: dict,
+    ) -> dict:
+        """Diagnose per-item health issues and propose typed fixes."""
+        logger.info(f"Diagnosing rule health for rule '{rule.title}'")
+        checklist_dicts = [self._checklist_item_to_dict(i) for i in checklist]
+        user_prompt = prompts.build_diagnose_health_prompt(
+            rule_text=rule.text,
+            checklist_items=checklist_dicts,
+            health_data=health_data,
+        )
+        result = await self._call_claude(
+            prompts.DIAGNOSE_HEALTH_SYSTEM, user_prompt, tool=_DIAGNOSE_TOOL
+        )
+        return {
+            "diagnoses": result.get("diagnoses", []),
+            "new_items": result.get("new_items", []),
+        }
 
     async def synthesize_rule_from_examples(
         self,

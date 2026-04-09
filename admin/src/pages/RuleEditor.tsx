@@ -12,20 +12,27 @@ import {
   overrideRuleType,
   getChecklist,
   recompileRule,
+  previewRecompile,
   suggestFromExamples,
   suggestFromChecklist,
   listSuggestions,
+  getRuleHealth,
   batchImportRules,
   evaluatePost,
+  evaluateExamplesWithDraft,
   BatchImportRuleItem,
   BatchImportResponse,
+  PreviewRecompileResult,
+  DraftEvaluationResult,
   Rule,
   ChecklistItem,
   Decision,
 } from '../api/client'
 import ChecklistTree from '../components/ChecklistTree'
+import ChecklistPreview from '../components/ChecklistPreview'
 import ExamplesPanel from '../components/ExamplesPanel'
 import SuggestionDiff from '../components/SuggestionDiff'
+import RuleHealthPanel from '../components/RuleHealthPanel'
 
 function renderTextWithHighlight(text: string, anchor: string | null) {
   if (!anchor) return <>{text}</>
@@ -70,6 +77,11 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
   const [selectedChecklistItemId, setSelectedChecklistItemId] = useState<string | null>(null)
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
   const [ruleListOpen, setRuleListOpen] = useState(true)
+  const [previewResult, setPreviewResult] = useState<PreviewRecompileResult | null>(null)
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false)
+  const [draftEvalResults, setDraftEvalResults] = useState<DraftEvaluationResult[] | null>(null)
+  const [isDraftEvaluating, setIsDraftEvaluating] = useState(false)
+  const [bottomTab, setBottomTab] = useState<'test' | 'health'>('test')
 
   const queryClient = useQueryClient()
 
@@ -85,6 +97,12 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     queryKey: ['checklist', selectedRuleId],
     queryFn: () => getChecklist(selectedRuleId!),
     enabled: !!selectedRuleId,
+    refetchInterval: (query) => {
+      // Poll while the checklist is empty for an actionable rule (background compilation in progress)
+      const items = query.state.data
+      const isActionable = selectedRule?.rule_type === 'actionable'
+      return isActionable && (!items || items.length === 0) ? 3000 : false
+    },
   })
 
   const { data: suggestions = [] } = useQuery({
@@ -92,6 +110,16 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     queryFn: () => listSuggestions(selectedRuleId!, 'pending'),
     enabled: !!selectedRuleId,
   })
+
+  const { data: ruleHealth } = useQuery({
+    queryKey: ['rule-health', selectedRuleId],
+    queryFn: () => getRuleHealth(selectedRuleId!),
+    enabled: !!selectedRuleId,
+  })
+
+  const unhealthyCount = ruleHealth
+    ? ruleHealth.items.filter(item => item.false_positive_rate > 0.15 || item.false_negative_rate > 0.15).length
+    : 0
 
   const createRuleMutation = useMutation({
     mutationFn: ({ title, text }: { title: string; text: string }) =>
@@ -137,8 +165,48 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     setEditingText(rule.text)
     setEditingTitle(rule.title)
     setIsEditingRuleText(false)
+    setPreviewResult(null)
+    setDraftEvalResults(null)
     setHoveredAnchor(null)
     setSelectedChecklistItemId(null)
+  }
+
+  const handlePreviewChanges = async () => {
+    if (!selectedRuleId) return
+    setIsPreviewLoading(true)
+    setPreviewResult(null)
+    try {
+      const result = await previewRecompile(selectedRuleId, editingText)
+      setPreviewResult(result)
+    } finally {
+      setIsPreviewLoading(false)
+    }
+  }
+
+  const handleConfirmSave = async () => {
+    await handleSaveRule()
+    setIsEditingRuleText(false)
+    setPreviewResult(null)
+    setDraftEvalResults(null)
+  }
+
+  const handleDiscardEdit = () => {
+    if (selectedRule) setEditingText(selectedRule.text)
+    setIsEditingRuleText(false)
+    setPreviewResult(null)
+    setDraftEvalResults(null)
+  }
+
+  const handleDraftEvaluate = async () => {
+    if (!selectedRuleId) return
+    setIsDraftEvaluating(true)
+    setDraftEvalResults(null)
+    try {
+      const results = await evaluateExamplesWithDraft(selectedRuleId, editingText)
+      setDraftEvalResults(results)
+    } finally {
+      setIsDraftEvaluating(false)
+    }
   }
 
   const handleSaveRule = async () => {
@@ -275,7 +343,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                       {selectedRule.rule_type}
                     </span>
                     <div className="w-px h-3.5 bg-gray-200 mx-0.5" />
-                    {!isEditingRuleText && (
+                    {/* {!isEditingRuleText && (
                       <button
                         className="btn-secondary text-xs"
                         onClick={handleSaveRule}
@@ -284,7 +352,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                         {isSaving ? <Loader2 size={12} className="animate-spin" /> : null}
                         {isSaving ? 'Saving...' : 'Save'}
                       </button>
-                    )}
+                    )} */}
                     {selectedRule.rule_type === 'actionable' && (
                       <>
                         <button
@@ -317,25 +385,38 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                       <textarea
                         className="flex-1 resize-none border border-indigo-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
                         value={editingText}
-                        onChange={e => setEditingText(e.target.value)}
+                        onChange={e => { setEditingText(e.target.value); setPreviewResult(null); setDraftEvalResults(null) }}
                         placeholder="Rule text..."
                         autoFocus
                       />
                       <div className="flex gap-2 justify-end flex-shrink-0">
-                        <button
-                          className="btn-secondary text-xs"
-                          onClick={() => { setEditingText(selectedRule.text); setIsEditingRuleText(false) }}
-                        >
+                        <button className="btn-secondary text-xs" onClick={handleDiscardEdit}>
                           <X size={12} /> Discard
                         </button>
-                        <button
-                          className="btn-primary text-xs"
-                          onClick={async () => { await handleSaveRule(); setIsEditingRuleText(false) }}
-                          disabled={isSaving}
-                        >
-                          {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                          {isSaving ? 'Saving...' : 'Save'}
-                        </button>
+                        {previewResult ? (
+                          <button className="btn-primary text-xs" onClick={handleConfirmSave} disabled={isSaving}>
+                            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            {isSaving ? 'Saving...' : 'Confirm & Save'}
+                          </button>
+                        ) : selectedRule?.rule_type === 'actionable' ? (
+                          <button
+                            className="btn-primary text-xs"
+                            onClick={handlePreviewChanges}
+                            disabled={isPreviewLoading || editingText === selectedRule?.text}
+                          >
+                            {isPreviewLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                            {isPreviewLoading ? 'Previewing...' : 'Preview Changes'}
+                          </button>
+                        ) : (
+                          <button
+                            className="btn-primary text-xs"
+                            onClick={handleConfirmSave}
+                            disabled={isSaving}
+                          >
+                            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            {isSaving ? 'Saving...' : 'Save'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -384,13 +465,43 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
 
           {/* Checklist column */}
           <div className="w-[35%] flex-shrink-0 flex flex-col border-r border-gray-200 bg-white overflow-hidden">
-            <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0">
+            <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Automoderator Logic</h3>
+              {previewResult && (
+                <span className="text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">Preview</span>
+              )}
             </div>
+            {!previewResult && selectedRule && (selectedRule.override_count ?? 0) >= 3 && (
+              <div className="mx-3 mt-2 mb-1 flex-shrink-0 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
+                <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-500" />
+                <span>
+                  <strong>{selectedRule.override_count} moderator overrides</strong> suggest this checklist may need updating.{' '}
+                  <button
+                    className="underline hover:no-underline"
+                    onClick={() => recompileMutation.mutate()}
+                    disabled={recompileMutation.isPending}
+                  >
+                    Analyze
+                  </button>
+                </span>
+              </div>
+            )}
             <div className="flex-1 overflow-auto p-3">
-              {selectedRuleId ? (
+              {previewResult ? (
+                <ChecklistPreview operations={previewResult.operations} existingItems={checklist} />
+              ) : selectedRuleId ? (
                 selectedRule?.rule_type === 'actionable' ? (
-                  <ChecklistTree items={checklist} ruleId={selectedRuleId} onAnchorHover={setHoveredAnchor} selectedItemId={selectedChecklistItemId} onItemSelect={setSelectedChecklistItemId} highlightedItemId={highlightedItemId} />
+                  checklist.length === 0 ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-400 italic p-1">
+                      <svg className="animate-spin h-3 w-3 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                      </svg>
+                      Compiling checklist… this may take a moment.
+                    </div>
+                  ) : (
+                    <ChecklistTree items={checklist} ruleId={selectedRuleId} onAnchorHover={setHoveredAnchor} selectedItemId={selectedChecklistItemId} onItemSelect={setSelectedChecklistItemId} highlightedItemId={highlightedItemId} />
+                  )
                 ) : (
                   <div className="text-xs text-gray-400 italic">Only actionable rules have checklists.</div>
                 )
@@ -402,8 +513,19 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
 
           {/* Examples column */}
           <div className="w-[35%] flex-shrink-0 flex flex-col bg-white overflow-hidden">
-            <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0">
+            <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Examples</h3>
+              {previewResult && (
+                <button
+                  className="btn-secondary text-xs"
+                  onClick={handleDraftEvaluate}
+                  disabled={isDraftEvaluating}
+                  title="Evaluate examples against the draft checklist"
+                >
+                  {isDraftEvaluating ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                  {isDraftEvaluating ? 'Evaluating…' : 'Test examples'}
+                </button>
+              )}
             </div>
             <div className="flex-1 overflow-hidden">
               {selectedRuleId ? (
@@ -413,6 +535,8 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                   onItemHighlight={setHighlightedItemId}
                   onSuggest={selectedRule?.rule_type === 'actionable' ? () => suggestFromExamplesMutation.mutate() : undefined}
                   isSuggesting={suggestFromExamplesMutation.isPending}
+                  previewVerdicts={previewResult?.example_verdicts}
+                  draftEvalResults={draftEvalResults ?? undefined}
                 />
               ) : (
                 <div className="p-3 text-xs text-gray-400 italic">Select a rule to view examples.</div>
@@ -421,9 +545,48 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
           </div>
         </div>
 
-        {/* Bottom section: testing panel */}
-        <div className="min-h-0 overflow-hidden bg-white" style={{ flex: '2 2 0%' }}>
-          <TestingPanel communityId={communityId} checklist={checklist} />
+        {/* Bottom section: test + health tabs */}
+        <div className="min-h-0 flex flex-col overflow-hidden bg-white" style={{ flex: '2 2 0%' }}>
+          {/* Tab bar */}
+          <div className="flex border-b border-gray-200 flex-shrink-0">
+            <button
+              className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
+                bottomTab === 'test'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setBottomTab('test')}
+            >
+              Test Post
+            </button>
+            <button
+              className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
+                bottomTab === 'health'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setBottomTab('health')}
+            >
+              Rule Health
+              {unhealthyCount > 0 && (
+                <span className="text-xs bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none">
+                  {unhealthyCount}
+                </span>
+              )}
+            </button>
+          </div>
+          {/* Panel content */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            {bottomTab === 'test' && <TestingPanel communityId={communityId} checklist={checklist} />}
+            {bottomTab === 'health' && selectedRuleId && (
+              <RuleHealthPanel ruleId={selectedRuleId} />
+            )}
+            {bottomTab === 'health' && !selectedRuleId && (
+              <div className="flex items-center justify-center h-full text-sm text-gray-400">
+                Select a rule to view health metrics.
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
