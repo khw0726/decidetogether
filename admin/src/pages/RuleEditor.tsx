@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Lightbulb, BookOpen, AlertCircle, Loader2, Upload,
+  Plus, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, BookOpen, AlertCircle, Loader2, Upload,
   CheckCircle, XCircle, Edit2, Check, X, Play, Image,
 } from 'lucide-react'
 import {
@@ -13,10 +13,7 @@ import {
   getChecklist,
   recompileRule,
   previewRecompile,
-  suggestFromExamples,
-  suggestFromChecklist,
   listSuggestions,
-  getRuleHealth,
   batchImportRules,
   evaluatePost,
   evaluateExamplesWithDraft,
@@ -32,7 +29,6 @@ import ChecklistTree from '../components/ChecklistTree'
 import ChecklistPreview from '../components/ChecklistPreview'
 import ExamplesPanel from '../components/ExamplesPanel'
 import SuggestionDiff from '../components/SuggestionDiff'
-import RuleHealthPanel from '../components/RuleHealthPanel'
 
 function renderTextWithHighlight(text: string, anchor: string | null) {
   if (!anchor) return <>{text}</>
@@ -81,7 +77,6 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
   const [draftEvalResults, setDraftEvalResults] = useState<DraftEvaluationResult[] | null>(null)
   const [isDraftEvaluating, setIsDraftEvaluating] = useState(false)
-  const [bottomTab, setBottomTab] = useState<'test' | 'health'>('test')
 
   const queryClient = useQueryClient()
 
@@ -111,16 +106,6 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     enabled: !!selectedRuleId,
   })
 
-  const { data: ruleHealth } = useQuery({
-    queryKey: ['rule-health', selectedRuleId],
-    queryFn: () => getRuleHealth(selectedRuleId!),
-    enabled: !!selectedRuleId,
-  })
-
-  const unhealthyCount = ruleHealth
-    ? ruleHealth.items.filter(item => item.false_positive_rate > 0.15 || item.false_negative_rate > 0.15).length
-    : 0
-
   const createRuleMutation = useMutation({
     mutationFn: ({ title, text }: { title: string; text: string }) =>
       createRule(communityId, { title, text, priority: rules.length }),
@@ -141,22 +126,6 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
       if (!data.diff?.no_changes) {
         setShowSuggestions(true)
       }
-    },
-  })
-
-  const suggestFromExamplesMutation = useMutation({
-    mutationFn: () => suggestFromExamples(selectedRuleId!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['suggestions', selectedRuleId] })
-      setShowSuggestions(true)
-    },
-  })
-
-  const suggestFromChecklistMutation = useMutation({
-    mutationFn: () => suggestFromChecklist(selectedRuleId!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['suggestions', selectedRuleId] })
-      setShowSuggestions(true)
     },
   })
 
@@ -533,8 +502,6 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                   ruleId={selectedRuleId}
                   filterItemId={selectedChecklistItemId}
                   onItemHighlight={setHighlightedItemId}
-                  onSuggest={selectedRule?.rule_type === 'actionable' ? () => suggestFromExamplesMutation.mutate() : undefined}
-                  isSuggesting={suggestFromExamplesMutation.isPending}
                   previewVerdicts={previewResult?.example_verdicts}
                   draftEvalResults={draftEvalResults ?? undefined}
                 />
@@ -545,47 +512,10 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
           </div>
         </div>
 
-        {/* Bottom section: test + health tabs */}
+        {/* Bottom section: test panel */}
         <div className="min-h-0 flex flex-col overflow-hidden bg-white" style={{ flex: '2 2 0%' }}>
-          {/* Tab bar */}
-          <div className="flex border-b border-gray-200 flex-shrink-0">
-            <button
-              className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors ${
-                bottomTab === 'test'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setBottomTab('test')}
-            >
-              Test Post
-            </button>
-            <button
-              className={`px-4 py-2 text-xs font-medium border-b-2 transition-colors flex items-center gap-1.5 ${
-                bottomTab === 'health'
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setBottomTab('health')}
-            >
-              Rule Health
-              {unhealthyCount > 0 && (
-                <span className="text-xs bg-amber-500 text-white rounded-full px-1.5 py-0.5 leading-none">
-                  {unhealthyCount}
-                </span>
-              )}
-            </button>
-          </div>
-          {/* Panel content */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            {bottomTab === 'test' && <TestingPanel communityId={communityId} checklist={checklist} />}
-            {bottomTab === 'health' && selectedRuleId && (
-              <RuleHealthPanel ruleId={selectedRuleId} />
-            )}
-            {bottomTab === 'health' && !selectedRuleId && (
-              <div className="flex items-center justify-center h-full text-sm text-gray-400">
-                Select a rule to view health metrics.
-              </div>
-            )}
+            <TestingPanel communityId={communityId} checklist={checklist} />
           </div>
         </div>
       </div>

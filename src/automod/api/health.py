@@ -68,6 +68,10 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
     item_total: dict[str, int] = defaultdict(int)
     item_conf_correct: dict[str, list[float]] = defaultdict(list)
     item_conf_errors: dict[str, list[float]] = defaultdict(list)
+    # Collect actual FP/FN cases (up to 5 per item) so moderators can inspect them
+    item_fp_cases: dict[str, list[dict]] = defaultdict(list)
+    item_fn_cases: dict[str, list[dict]] = defaultdict(list)
+    _MAX_ERROR_CASES = 5
 
     total_decisions = len(rule_decisions)
     override_count = sum(1 for d in rule_decisions if d.was_override)
@@ -77,6 +81,21 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
         item_reasoning = reasoning.get("item_reasoning", {})
         mod_verdict = decision.moderator_verdict  # approve | remove | review
 
+        # Determine if at least one item on this rule triggered for this decision.
+        # A "missed" (FN) only makes sense for an item when the rule was relevant
+        # to the post — i.e. some sibling item triggered, proving the rule applied.
+        # Without this, unlinked removals (mod removed with no rule association)
+        # get counted as FN for every item on every rule.
+        any_item_triggered = any(
+            ir.get("triggered", False)
+            for iid, ir in item_reasoning.items()
+            if iid in items_by_id
+        )
+
+        post = decision.post_content or {}
+        inner = post.get("content", {})
+        case_title = (inner.get("title", "") if isinstance(inner, dict) else "") or "(no title)"
+
         for item_id, item_data in item_reasoning.items():
             if item_id not in items_by_id:
                 continue  # item was recompiled away
@@ -85,14 +104,29 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
             confidence = item_data.get("confidence", 0.5)
             item_total[item_id] += 1
 
-            # FP: item fired but mod approved (agent wrongly flagged)
+            # FP: item triggered but mod approved (wrongly flagged)
             if triggered and mod_verdict == "approve":
                 item_fp_count[item_id] += 1
                 item_conf_errors[item_id].append(confidence)
-            # FN: item didn't fire but mod removed
-            elif not triggered and mod_verdict == "remove":
+                if len(item_fp_cases[item_id]) < _MAX_ERROR_CASES:
+                    item_fp_cases[item_id].append({
+                        "decision_id": decision.id,
+                        "title": case_title,
+                        "confidence": round(confidence, 2),
+                    })
+            # FN: item didn't trigger but mod removed, AND this rule was relevant
+            # (at least one sibling item triggered — proving the rule applied to this post).
+            # If no items triggered, the removal is unlinked and belongs in
+            # uncovered_violations, not as a per-item miss.
+            elif not triggered and mod_verdict == "remove" and any_item_triggered:
                 item_fn_count[item_id] += 1
                 item_conf_errors[item_id].append(confidence)
+                if len(item_fn_cases[item_id]) < _MAX_ERROR_CASES:
+                    item_fn_cases[item_id].append({
+                        "decision_id": decision.id,
+                        "title": case_title,
+                        "confidence": round(confidence, 2),
+                    })
             else:
                 item_conf_correct[item_id].append(confidence)
 
@@ -180,6 +214,8 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
             ),
             "decision_count": total,
             "examples": item_example_groups[item.id],
+            "wrongly_flagged": item_fp_cases[item.id],
+            "missed_violations": item_fn_cases[item.id],
         })
 
     # Sort worst first
@@ -227,6 +263,16 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
 
     created: list[Suggestion] = []
 
+    # Index new_items by split_from so split halves can be merged into one suggestion
+    new_items_by_split: dict[str, dict] = {}
+    standalone_new_items: list[dict] = []
+    for new_item_diag in diagnoses.get("new_items", []):
+        split_from = new_item_diag.get("split_from")
+        if split_from and split_from in items_by_id:
+            new_items_by_split[split_from] = new_item_diag
+        else:
+            standalone_new_items.append(new_item_diag)
+
     for diag in diagnoses.get("diagnoses", []):
         item_id = diag.get("item_id")
         if not item_id or item_id not in items_by_id:
@@ -238,17 +284,31 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
         confidence = diag.get("confidence", "medium")
 
         # Build as a recompile diff operation so accept_recompile can apply it
-        op: dict = {"op": "update", "existing_id": item_id}
-        op.update({k: v for k, v in proposed_change.items() if k != "id"})
-        if "children" not in op:
-            op["children"] = []
+        update_op: dict = {"op": "update", "existing_id": item_id}
+        update_op.update({k: v for k, v in proposed_change.items() if k != "id"})
+
+        # Only include "children" for actions that restructure child items (split_item).
+        # For other actions (promote, tighten, threshold), preserve existing children.
+        if action != "split_item":
+            update_op.pop("children", None)
+
+        operations = [update_op]
+
+        # For split_item, merge the second half (from new_items) into the same suggestion
+        if action == "split_item" and item_id in new_items_by_split:
+            split_new = new_items_by_split.pop(item_id)
+            add_op = {"op": "add", **(split_new.get("proposed_item") or {})}
+            if "children" not in add_op:
+                add_op["children"] = []
+            operations.append(add_op)
+            reasoning = f"{reasoning} — also adds: {split_new.get('reasoning', '')}"
 
         suggestion = Suggestion(
             rule_id=rule_id,
             checklist_item_id=item_id,
             suggestion_type="checklist",
             content={
-                "operations": [op],
+                "operations": operations,
                 "action": action,
                 "reasoning": reasoning,
                 "confidence": confidence,
@@ -258,7 +318,8 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
         db.add(suggestion)
         created.append(suggestion)
 
-    for new_item_diag in diagnoses.get("new_items", []):
+    # Any new_items not consumed by a split_item diagnosis (+ unlinked ones)
+    for new_item_diag in standalone_new_items + list(new_items_by_split.values()):
         action = new_item_diag.get("action", "add_item")
         reasoning = new_item_diag.get("reasoning", "")
         proposed_item = new_item_diag.get("proposed_item") or {}

@@ -670,21 +670,25 @@ Identify patterns where the checklist might be:
 3. Under-triggering (missing clear violations)
 4. Using thresholds or patterns that need adjustment
 
+Items with a parent_id are children of another item. Items with action "continue" are parent nodes whose children contain the actual checks. You can suggest adding a new child item under an existing parent by setting target to null and parent_id to the parent's ID.
+
 For deterministic items: only propose a pattern update if the item's violating_example_count >= 3. When that threshold is met, analyze the literal text of those violating examples and propose a refined regex pattern in proposed_change (under the "patterns" key) that matches them but not the compliant examples.
 
 For each suggestion:
 - If suggestion_type is "rule_text": set proposed_text to the COMPLETE updated rule text (all paragraphs preserved — only modify the specific sentences that need changing, leave the rest intact). Do NOT return a partial snippet.
-- If suggestion_type is "checklist": set proposed_change to the updated checklist item object.
+- If suggestion_type is "checklist" and target is an item ID: set proposed_change to the fields to update on that item.
+- If suggestion_type is "checklist" and target is null: set proposed_change to the new item object. Set parent_id to an existing item's ID to add it as a child, or null for a new root item.
 
 Return JSON in exactly this format:
 {{
   "suggestions": [
     {{
       "suggestion_type": "checklist" | "rule_text",
-      "target": "item_id or null for new items or null for rule_text",
+      "target": "item_id to update, or null for new items / rule_text",
+      "parent_id": "parent item_id for new child items, or null",
       "description": "What to change and why",
       "proposed_text": "For rule_text: the COMPLETE updated rule text",
-      "proposed_change": {{...for checklist: the updated checklist item object...}},
+      "proposed_change": {{...for checklist: the item fields...}},
       "reasoning": "Which examples motivated this suggestion"
     }}
   ]
@@ -835,8 +839,9 @@ Diagnosis rules:
 - Items with both low FP and FN rates are healthy — skip them entirely.
 - For threshold adjustments: high confidence errors (avg_confidence_errors > 0.70) with fp_rate > 0.20 → threshold too low (raise it). Low confidence errors (avg_confidence_errors < 0.60) with fn_rate > 0.20 → rubric ambiguous (tighten_rubric instead).
 - One diagnosis per item maximum. Choose the single most impactful fix.
-- proposed_change must be a complete, valid ChecklistItem dict (same schema as the existing item, not a partial patch).
-- For split_item: proposed_change represents the first item. Add the second item to new_items.
+- proposed_change must contain all fields you want to update on the existing item. Omit fields you don't want to change.
+- **IMPORTANT**: Only include `"children"` in proposed_change when the fix structurally restructures child items (e.g. split_item). For tighten_rubric, adjust_threshold, and promote_to_deterministic, do NOT include `"children"` — the existing children will be preserved automatically.
+- For split_item: proposed_change represents the first (updated) item. Add the second item to new_items with `"split_from": "<item_id>"` so the system can merge both into a single atomic fix.
 - Skip items with decision_count < 3.
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
@@ -916,11 +921,7 @@ Return JSON in exactly this format:
         "description": "...",
         "item_type": "deterministic | structural | subjective",
         "logic": {{}},
-        "action": "remove | flag | continue",
-        "rule_text_anchor": null,
-        "atmosphere_influenced": false,
-        "atmosphere_note": null,
-        "children": []
+        "action": "remove | flag | continue"
       }},
       "confidence": "high | medium | low"
     }}
@@ -973,3 +974,35 @@ Return JSON in exactly this format:
   "confidence": "low" | "medium" | "high",
   "reasoning": "Brief explanation of the inferred pattern and what the examples have in common"
 }}"""
+
+
+# ── Link violations to checklist items ────────────────────────────────────────
+
+LINK_VIOLATIONS_SYSTEM = """You are a moderation analysis assistant. Your task is to match violating examples (posts that moderators removed) to the checklist items they violate.
+
+Each checklist item describes a specific check the moderation system performs. Each violation is a post that was removed by a moderator but is not yet linked to any checklist item.
+
+For each violation, determine which checklist item (if any) it most closely matches. A violation matches a checklist item if the reason the post was removed aligns with what the checklist item checks for.
+
+Only propose a link if you are reasonably confident the violation is caught by that checklist item. If a violation doesn't clearly match any item, omit it."""
+
+
+def build_link_violations_prompt(
+    rule_text: str,
+    checklist_items: list[dict],
+    violations: list[dict],
+) -> str:
+    import json
+
+    items_str = json.dumps(checklist_items, indent=2)
+    violations_str = json.dumps(violations, indent=2)
+
+    return f"""Rule text: {rule_text}
+
+Current checklist items:
+{items_str}
+
+Uncovered violations (removed by moderators, not yet linked to any checklist item):
+{violations_str}
+
+For each violation that matches a checklist item, return the link. Only include confident matches."""

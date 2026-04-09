@@ -291,6 +291,16 @@ export const evaluateExamplesWithDraft = (ruleId: string, ruleText: string) =>
 
 // ── Examples ───────────────────────────────────────────────────────────────────
 
+export interface CommunityExample extends Example {
+  rule_ids: string[]
+  rule_titles: string[]
+}
+
+export const listCommunityExamples = (
+  communityId: string,
+  params?: { rule_id?: string; label?: string; source?: string },
+) => api.get<CommunityExample[]>(`/communities/${communityId}/examples`, { params }).then(r => r.data)
+
 export const listExamples = (ruleId: string, label?: string) =>
   api.get<Example[]>(`/rules/${ruleId}/examples`, { params: label ? { label } : {} }).then(r => r.data)
 
@@ -363,6 +373,12 @@ export interface ExampleSummary {
   title: string
 }
 
+export interface ErrorCase {
+  decision_id: string
+  title: string
+  confidence: number
+}
+
 export interface ItemHealthMetrics {
   item_id: string
   description: string
@@ -381,6 +397,8 @@ export interface ItemHealthMetrics {
     violating: ExampleSummary[]
     borderline: ExampleSummary[]
   }
+  wrongly_flagged: ErrorCase[]
+  missed_violations: ErrorCase[]
 }
 
 export interface RuleHealth {
@@ -407,3 +425,21 @@ export const evaluatePost = (communityId: string, post_content: PostContent) =>
 
 export const evaluateBatch = (communityId: string, posts: PostContent[]) =>
   api.post<{ decisions: Decision[] }>(`/communities/${communityId}/evaluate/batch`, { posts }).then(r => r.data)
+
+// ── Reddit Import ─────────────────────────────────────────────────────────────
+
+export interface RedditImportRequest {
+  subreddit: string
+  limit?: number
+  time_filter?: string
+}
+
+export interface RedditImportResponse {
+  decisions: Decision[]
+  crawled_count: number
+  evaluated_count: number
+  skipped_count: number
+}
+
+export const importRedditPosts = (communityId: string, data: RedditImportRequest) =>
+  api.post<RedditImportResponse>(`/communities/${communityId}/import-reddit`, data).then(r => r.data)

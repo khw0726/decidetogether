@@ -1,5 +1,7 @@
 """Community CRUD endpoints."""
 
+import asyncio
+import logging
 import re
 from datetime import datetime, timezone
 
@@ -12,8 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..compiler.compiler import RuleCompiler
 from ..config import settings
+from ..core.engine import EvaluationEngine
 from ..core.reddit_crawler import crawl_subreddit_top_posts
-from ..db.database import get_db
+from ..db.database import AsyncSessionLocal, get_db
 from ..db.models import (
     ChecklistItem,
     Community,
@@ -30,9 +33,19 @@ from ..models.schemas import (
     CommunityRead,
     CommunitySamplePostCreate,
     CommunitySamplePostRead,
+    DecisionRead,
+    RedditImportRequest,
+    RedditImportResponse,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(tags=["communities"])
+
+
+def _get_engine(db: AsyncSession = Depends(get_db)) -> EvaluationEngine:
+    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    return EvaluationEngine(db=db, client=client, settings=settings)
 
 
 class AtmosphereGenerateResponse(BaseModel):
@@ -421,4 +434,77 @@ async def generate_atmosphere(
     return AtmosphereGenerateResponse(
         community=CommunityRead.model_validate(community),
         crawled_count=len(crawled_posts),
+    )
+
+
+@router.post("/communities/{community_id}/import-reddit", response_model=RedditImportResponse)
+async def import_reddit_posts(
+    community_id: str,
+    body: RedditImportRequest,
+    db: AsyncSession = Depends(get_db),
+    engine: EvaluationEngine = Depends(_get_engine),
+) -> RedditImportResponse:
+    """Crawl recent posts from a subreddit and run moderation on each."""
+    comm = (await db.execute(select(Community).where(Community.id == community_id))).scalar_one_or_none()
+    if not comm:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    if not settings.reddit_client_id:
+        raise HTTPException(status_code=422, detail="Reddit credentials are not configured")
+
+    raw_posts = await crawl_subreddit_top_posts(
+        subreddit=body.subreddit,
+        client_id=settings.reddit_client_id,
+        client_secret=settings.reddit_client_secret,
+        user_agent=settings.reddit_user_agent,
+        username=settings.reddit_username,
+        password=settings.reddit_password,
+        limit=body.limit,
+        time_filter=body.time_filter,
+    )
+
+    platform_ids = [p["id"] for p in raw_posts]
+    if platform_ids:
+        existing = set(
+            (await db.execute(
+                select(Decision.post_platform_id).where(
+                    Decision.community_id == community_id,
+                    Decision.post_platform_id.in_(platform_ids),
+                )
+            )).scalars().all()
+        )
+    else:
+        existing = set()
+
+    new_posts = [p for p in raw_posts if p["id"] not in existing]
+    skipped_count = len(raw_posts) - len(new_posts)
+
+    sem = asyncio.Semaphore(5)
+
+    async def _eval_one(post: dict) -> Decision:
+        async with sem, AsyncSessionLocal() as session:
+            eng = EvaluationEngine(
+                db=session,
+                client=anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key),
+                settings=settings,
+            )
+            return await eng.evaluate_post(community_id=community_id, post=post)
+
+    results = await asyncio.gather(
+        *[_eval_one(p) for p in new_posts],
+        return_exceptions=True,
+    )
+
+    decisions = []
+    for i, r in enumerate(results):
+        if isinstance(r, Exception):
+            logger.warning("Failed to evaluate post %s: %s", new_posts[i].get("id"), r)
+        else:
+            decisions.append(DecisionRead.model_validate(r))
+
+    return RedditImportResponse(
+        decisions=decisions,
+        crawled_count=len(raw_posts),
+        evaluated_count=len(decisions),
+        skipped_count=skipped_count,
     )

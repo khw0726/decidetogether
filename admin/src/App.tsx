@@ -4,9 +4,9 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import RuleEditor from './pages/RuleEditor'
 import DecisionQueue from './pages/DecisionQueue'
-import AlignmentDashboard from './pages/AlignmentDashboard'
 import CommunitySettings from './pages/CommunitySettings'
 import CommunitySetup from './pages/CommunitySetup'
+import ExamplesPage from './pages/ExamplesPage'
 
 export default function App() {
   const [communityId, setCommunityId] = useState<string>('')
@@ -24,8 +24,8 @@ export default function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard communityId={communityId} />} />
           <Route path="rules" element={<RuleEditor communityId={communityId} />} />
+          <Route path="examples" element={<ExamplesPage communityId={communityId} />} />
           <Route path="decisions" element={<DecisionQueue communityId={communityId} />} />
-          <Route path="alignment" element={<AlignmentDashboard communityId={communityId} />} />
           <Route path="settings" element={<CommunitySettings communityId={communityId} />} />
         </Route>
       </Routes>

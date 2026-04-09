@@ -6,7 +6,10 @@ export default defineConfig({
   server: {
     port: 7888,
     proxy: {
-      '/api': 'http://localhost:5173'
+      '/api': 'http://localhost:5173',
+      '/docs': 'http://localhost:5173',
+      '/redoc': 'http://localhost:5173',
+      '/openapi.json': 'http://localhost:5173',
     },
     allowedHosts: ['internal.kixlab.org']
   },

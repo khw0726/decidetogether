@@ -162,7 +162,7 @@ async def _compile_rule_background(
                     select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
                 )
                 item_desc_map = {i.description: i.id for i in items_result.scalars()}
-                await _persist_new_examples(db, example_dicts, rule_id, item_description_map=item_desc_map)
+                await _persist_new_examples(db, example_dicts, rule_id, item_description_map=item_desc_map, community_id=rule.community_id)
                 await db.flush()
                 await _fill_missing_examples(db, rule_id, compiler, rule, community)
             else:
@@ -219,6 +219,7 @@ async def _persist_new_examples(
     example_dicts: list,
     rule_id: str,
     item_description_map: dict[str, str] | None = None,
+    community_id: str | None = None,
 ) -> None:
     """Insert generated examples and link them to the rule.
 
@@ -245,6 +246,7 @@ async def _persist_new_examples(
             continue
 
         example = Example(
+            community_id=community_id,
             content=ex_dict.get("content", {}),
             label=label,
             source="generated",
@@ -313,7 +315,7 @@ async def _fill_missing_examples(db, rule_id: str, compiler, rule, community) ->
     )
 
     item_desc_map = {i.description: i.id for i in all_items}
-    await _persist_new_examples(db, new_examples, rule_id, item_description_map=item_desc_map)
+    await _persist_new_examples(db, new_examples, rule_id, item_description_map=item_desc_map, community_id=rule.community_id)
     logger.info(f"Filled {len(new_examples)} missing example(s) for rule {rule_id}")
 
 
@@ -398,10 +400,29 @@ async def _apply_diff_operations(
             await db.delete(item)
 
         elif kind == "add":
+            parent_id = op.get("parent_id")
+
+            # If adding under a parent, ensure parent action is "continue"
+            if parent_id:
+                parent_item = existing_by_id.get(parent_id)
+                if parent_item and parent_item.action != "continue":
+                    parent_item.action = "continue"
+
+            # Place after existing siblings
+            order = op.get("order", 0)
+            if parent_id:
+                sibling_result = await db.execute(
+                    select(ChecklistItem)
+                    .where(ChecklistItem.parent_id == parent_id, ChecklistItem.rule_id == rule_id)
+                )
+                siblings = list(sibling_result.scalars())
+                if siblings:
+                    order = max(s.order for s in siblings) + 1
+
             new_item = ChecklistItem(
                 rule_id=rule_id,
-                order=op.get("order", 0),
-                parent_id=None,
+                order=order,
+                parent_id=parent_id,
                 description=op.get("description", ""),
                 rule_text_anchor=op.get("rule_text_anchor"),
                 item_type=op.get("item_type", "subjective"),

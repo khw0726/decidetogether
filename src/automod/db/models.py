@@ -112,6 +112,7 @@ class Example(Base):
     __tablename__ = "examples"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    community_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("communities.id"), nullable=True)
     content: Mapped[dict] = mapped_column(JSON, nullable=False)
     label: Mapped[str] = mapped_column(String, nullable=False)  # compliant | violating | borderline
     source: Mapped[str] = mapped_column(String, nullable=False, default="manual")

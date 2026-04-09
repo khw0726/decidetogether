@@ -118,6 +118,7 @@ async def resolve_decision(
             example_label = "borderline"
 
         example = Example(
+            community_id=decision.community_id,
             content=decision.post_content,
             label=example_label,
             source="moderator_decision",
@@ -363,6 +364,7 @@ async def list_unlinked_overrides(
     query = (
         select(Example)
         .outerjoin(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
+        .where(Example.community_id == community_id)
         .where(Example.source == "moderator_decision")
         .where(Example.label.in_(["violating", "borderline"]))
         .where(ExampleRuleLink.example_id == None)  # noqa: E711

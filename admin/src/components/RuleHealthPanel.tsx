@@ -9,6 +9,7 @@ import {
   dismissSuggestion,
   ItemHealthMetrics,
   ExampleSummary,
+  ErrorCase,
   Suggestion,
 } from '../api/client'
 
@@ -69,6 +70,43 @@ function ExampleRow({ ex }: { ex: ExampleSummary }) {
         {ex.label}
       </span>
       <span className="text-xs text-gray-600 truncate">{ex.title}</span>
+    </div>
+  )
+}
+
+// ── ErrorCaseList ───────────────────────────────────────────────────────────────
+
+const ERROR_CASE_COLORS: Record<string, { border: string; bg: string; label: string; text: string }> = {
+  red:   { border: 'border-red-100', bg: 'bg-red-50', label: 'text-red-600', text: 'text-red-500' },
+  amber: { border: 'border-amber-100', bg: 'bg-amber-50', label: 'text-amber-600', text: 'text-amber-500' },
+}
+
+function ErrorCaseList({
+  label,
+  sublabel,
+  cases,
+  color,
+}: {
+  label: string
+  sublabel: string
+  cases: ErrorCase[]
+  color: 'red' | 'amber'
+}) {
+  const c = ERROR_CASE_COLORS[color]
+  return (
+    <div>
+      <p className={`text-xs font-medium mb-0.5 ${c.label}`}>{label}</p>
+      <p className={`text-[10px] mb-1 ${c.text}`}>{sublabel}</p>
+      <div className={`border ${c.border} rounded ${c.bg} px-2 py-1 max-h-28 overflow-y-auto`}>
+        {cases.map(cs => (
+          <div key={cs.decision_id} className="flex items-center gap-2 py-1 border-b border-gray-100/50 last:border-0">
+            <span className={`text-[10px] font-mono ${c.text} flex-shrink-0`}>
+              {(cs.confidence * 100).toFixed(0)}%
+            </span>
+            <span className="text-xs text-gray-700 truncate">{cs.title}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -197,7 +235,8 @@ function ItemHealthCard({
           {/* Metrics table */}
           <div className="grid grid-cols-3 gap-2 mt-3">
             <div className="bg-red-50 border border-red-100 rounded p-2 text-center">
-              <p className="text-xs text-red-500 font-semibold">False Positives</p>
+              <p className="text-xs text-red-500 font-semibold">Wrongly Flagged</p>
+              <p className="text-[10px] text-red-400">Triggered, but mod approved</p>
               <p className="text-base font-bold text-red-700">{pct(item.false_positive_rate)}</p>
               <p className="text-xs text-red-400">{item.false_positive_count}/{item.decision_count}</p>
               {item.avg_confidence_errors != null && (
@@ -205,7 +244,8 @@ function ItemHealthCard({
               )}
             </div>
             <div className="bg-amber-50 border border-amber-100 rounded p-2 text-center">
-              <p className="text-xs text-amber-600 font-semibold">False Negatives</p>
+              <p className="text-xs text-amber-600 font-semibold">Missed</p>
+              <p className="text-[10px] text-amber-500">Didn't trigger, but mod removed</p>
               <p className="text-base font-bold text-amber-700">{pct(item.false_negative_rate)}</p>
               <p className="text-xs text-amber-500">{item.false_negative_count}/{item.decision_count}</p>
             </div>
@@ -217,6 +257,26 @@ function ItemHealthCard({
               )}
             </div>
           </div>
+
+          {/* Wrongly flagged cases */}
+          {item.wrongly_flagged.length > 0 && (
+            <ErrorCaseList
+              label="Wrongly Flagged"
+              sublabel="Rule triggered but moderator approved these posts"
+              cases={item.wrongly_flagged}
+              color="red"
+            />
+          )}
+
+          {/* Missed violation cases */}
+          {item.missed_violations.length > 0 && (
+            <ErrorCaseList
+              label="Missed Violations"
+              sublabel="Rule didn't trigger but moderator removed these posts"
+              cases={item.missed_violations}
+              color="amber"
+            />
+          )}
 
           {/* Linked examples */}
           {totalExamples.length > 0 && (

@@ -78,12 +78,39 @@ async def suggest_from_examples(
     compiler = get_compiler()
     suggestion_dicts = await compiler.suggest_from_examples(rule, checklist, examples)
 
+    checklist_by_id = {i.id: i for i in checklist}
+
     created = []
     for sug in suggestion_dicts:
+        sug_type = sug.get("suggestion_type", "checklist")
+
+        if sug_type == "checklist":
+            target = sug.get("target")
+            parent_id = sug.get("parent_id")
+            proposed = sug.get("proposed_change") or {}
+
+            if target and target in checklist_by_id:
+                op = {"op": "update", "existing_id": target}
+                op.update({k: v for k, v in proposed.items() if k != "id"})
+            else:
+                op = {"op": "add", **proposed}
+                if parent_id and parent_id in checklist_by_id:
+                    op["parent_id"] = parent_id
+                if "children" not in op:
+                    op["children"] = []
+
+            content = {
+                "operations": [op],
+                "description": sug.get("description", ""),
+                "reasoning": sug.get("reasoning", ""),
+            }
+        else:
+            content = sug
+
         suggestion = Suggestion(
             rule_id=rule_id,
-            suggestion_type=sug.get("suggestion_type", "checklist"),
-            content=sug,
+            suggestion_type=sug_type,
+            content=content,
             status="pending",
         )
         db.add(suggestion)
@@ -198,6 +225,7 @@ async def accept_suggestion(
         relevance = suggestion.content.get("relevance_note", "")
         if ex_content:
             example = Example(
+                community_id=rule.community_id if rule else None,
                 content=ex_content,
                 label=ex_label,
                 source="generated",

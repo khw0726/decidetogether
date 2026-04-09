@@ -1,27 +1,19 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ChevronDown, ChevronUp, CheckCircle, XCircle, Filter, Inbox, Loader2, Sparkles,
+  ChevronDown, ChevronUp, CheckCircle, XCircle, Filter, Inbox, Loader2, Sparkles, Download, X,
 } from 'lucide-react'
 import {
   listDecisions, resolveDecision, Decision, listRules,
   suggestRuleFromDecisions, acceptSuggestion, dismissSuggestion, NewRuleSuggestion,
+  importRedditPosts, RedditImportResponse, getCommunity,
 } from '../api/client'
 import PostCard from '../components/PostCard'
-import UnlinkedOverridesPanel from '../components/UnlinkedOverridesPanel'
 import NewRuleSuggestionModal from '../components/NewRuleSuggestionModal'
 
 interface DecisionQueueProps {
   communityId: string
 }
-
-const REASONING_CATEGORIES = [
-  { value: 'agree', label: 'Agree with agent' },
-  { value: 'rule_doesnt_apply', label: 'Rule doesn\'t apply here' },
-  { value: 'edge_case_allow', label: 'Edge case — allowing' },
-  { value: 'rule_needs_update', label: 'Rule needs updating' },
-  { value: 'agent_wrong_interpretation', label: 'Agent misinterpreted' },
-]
 
 export default function DecisionQueue({ communityId }: DecisionQueueProps) {
   const [filter, setFilter] = useState<'pending' | 'resolved' | 'all'>('pending')
@@ -29,6 +21,7 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [suggesting, setSuggesting] = useState(false)
   const [suggestion, setSuggestion] = useState<NewRuleSuggestion | null>(null)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   const queryClient = useQueryClient()
 
@@ -63,6 +56,14 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
       setSuggesting(false)
     }
   }
+
+  const { data: community } = useQuery({
+    queryKey: ['community', communityId],
+    queryFn: () => getCommunity(communityId),
+    enabled: !!communityId,
+  })
+
+  const isReddit = community?.platform === 'reddit'
 
   const { data: decisions = [], isLoading } = useQuery({
     queryKey: ['decisions', communityId, filter, verdictFilter],
@@ -145,6 +146,15 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
               Suggest Rule ({selectedIds.size})
             </button>
           )}
+          {isReddit && (
+            <button
+              className="btn-secondary text-xs flex items-center gap-1.5"
+              onClick={() => setShowImportModal(true)}
+            >
+              <Download size={12} />
+              Import from Reddit
+            </button>
+          )}
           <Filter size={14} className="text-gray-400" />
           <select
             className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none"
@@ -157,9 +167,6 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
           </select>
         </div>
       </div>
-
-      {/* Unlinked overrides banner */}
-      <UnlinkedOverridesPanel communityId={communityId} />
 
       {/* Decision cards */}
       <div className="flex-1 overflow-auto p-6 space-y-4">
@@ -209,6 +216,164 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
           onClose={() => setSuggestion(null)}
         />
       )}
+      {showImportModal && community && (
+        <RedditImportModal
+          communityId={communityId}
+          communityName={community.name}
+          onClose={() => setShowImportModal(false)}
+          onImported={() => {
+            queryClient.invalidateQueries({ queryKey: ['decisions', communityId] })
+          }}
+        />
+      )}
+      </div>
+    </div>
+  )
+}
+
+function RedditImportModal({
+  communityId,
+  communityName,
+  onClose,
+  onImported,
+}: {
+  communityId: string
+  communityName: string
+  onClose: () => void
+  onImported: () => void
+}) {
+  // Derive subreddit name from community name (strip "r/" prefix if present)
+  const defaultSubreddit = communityName.replace(/^r\//i, '')
+  const [subreddit, setSubreddit] = useState(defaultSubreddit)
+  const [limit, setLimit] = useState(25)
+  const [timeFilter, setTimeFilter] = useState('month')
+  const [importing, setImporting] = useState(false)
+  const [result, setResult] = useState<RedditImportResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleImport = async () => {
+    if (!subreddit.trim()) return
+    setImporting(true)
+    setError(null)
+    try {
+      const res = await importRedditPosts(communityId, {
+        subreddit: subreddit.trim(),
+        limit,
+        time_filter: timeFilter,
+      })
+      setResult(res)
+      onImported()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Import failed'
+      const axiosMsg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(axiosMsg || msg)
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <h2 className="text-sm font-semibold text-gray-900">Import Posts from Reddit</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {!result ? (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Subreddit</label>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-gray-400">r/</span>
+                  <input
+                    className="flex-1 text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={subreddit}
+                    onChange={e => setSubreddit(e.target.value)}
+                    placeholder="subreddit name"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Posts to fetch</label>
+                  <input
+                    type="number"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={limit}
+                    onChange={e => setLimit(Math.max(1, Math.min(100, Number(e.target.value))))}
+                    min={1}
+                    max={100}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Time filter</label>
+                  <select
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={timeFilter}
+                    onChange={e => setTimeFilter(e.target.value)}
+                  >
+                    <option value="hour">Past hour</option>
+                    <option value="day">Past day</option>
+                    <option value="week">Past week</option>
+                    <option value="month">Past month</option>
+                    <option value="year">Past year</option>
+                    <option value="all">All time</option>
+                  </select>
+                </div>
+              </div>
+
+              {error && (
+                <div className="text-xs text-red-600 bg-red-50 rounded px-3 py-2">{error}</div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button className="btn-secondary text-xs" onClick={onClose}>Cancel</button>
+                <button
+                  className="btn-primary text-xs flex items-center gap-1.5"
+                  onClick={handleImport}
+                  disabled={importing || !subreddit.trim()}
+                >
+                  {importing ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                  {importing ? 'Importing...' : 'Import & Evaluate'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle size={16} className="text-green-500" />
+                  <span className="font-medium">Import complete</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="bg-gray-50 rounded p-2">
+                    <div className="text-lg font-semibold text-gray-900">{result.crawled_count}</div>
+                    <div className="text-xs text-gray-500">Crawled</div>
+                  </div>
+                  <div className="bg-green-50 rounded p-2">
+                    <div className="text-lg font-semibold text-green-700">{result.evaluated_count}</div>
+                    <div className="text-xs text-gray-500">Evaluated</div>
+                  </div>
+                  <div className="bg-amber-50 rounded p-2">
+                    <div className="text-lg font-semibold text-amber-700">{result.skipped_count}</div>
+                    <div className="text-xs text-gray-500">Skipped</div>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Skipped posts were already in the decision queue.
+                </p>
+              </div>
+              <div className="flex justify-end pt-2">
+                <button className="btn-primary text-xs" onClick={onClose}>Done</button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -254,13 +419,48 @@ function ItemReasoningTree({
   )
 }
 
-const UNLINKED_REMOVE_TAGS = [
-  { value: 'spam', label: 'Spam' },
-  { value: 'off-topic', label: 'Off-topic' },
-  { value: 'hostile_tone', label: 'Hostile tone' },
-  { value: 'low_quality', label: 'Low quality' },
-  { value: 'other', label: 'Other' },
-]
+function RuleReasoningBlock({
+  ruleId,
+  ruleTitle,
+  verdict,
+  confidence,
+  itemReasoning,
+  defaultOpen,
+}: {
+  ruleId: string
+  ruleTitle?: string
+  verdict: string
+  confidence?: number
+  itemReasoning?: Record<string, unknown>
+  defaultOpen: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  return (
+    <div className="rounded border border-gray-200 text-xs overflow-hidden">
+      <button
+        className={`w-full flex items-center gap-2 px-3 py-2 text-left ${open ? 'bg-gray-50' : 'bg-gray-50/50 hover:bg-gray-50'}`}
+        onClick={() => setOpen(!open)}
+      >
+        {open ? <ChevronUp size={12} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={12} className="text-gray-400 flex-shrink-0" />}
+        <span className="font-medium truncate">{ruleTitle || ruleId}</span>
+        <span className={`badge ${verdict === 'approve' ? 'badge-green' : verdict === 'remove' ? 'badge-red' : 'badge-yellow'}`}>
+          {verdict}
+        </span>
+        <span className="text-gray-400 ml-auto flex-shrink-0">{Math.round((confidence || 0) * 100)}%</span>
+      </button>
+      {open && itemReasoning && (
+        <div className="px-3 py-2 space-y-1 border-t border-gray-100">
+          <ItemReasoningTree
+            itemReasoning={itemReasoning}
+            parentId={null}
+            depth={0}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
 
 function DecisionCard({
   decision,
@@ -279,16 +479,13 @@ function DecisionCard({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [selectedVerdict, setSelectedVerdict] = useState<string | null>(null)
-  const [reasoningCategory, setReasoningCategory] = useState('')
   const [notes, setNotes] = useState('')
-  const [tag, setTag] = useState('')
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
 
   // Rule picker is needed when agent approved (no triggered rules) but moderator disagrees
   const agentApproved = decision.agent_verdict === 'approve'
   const needsRulePicker = agentApproved && selectedVerdict && selectedVerdict !== 'approve'
-  // Show memo+tag UI when moderator removes with no rule selected
-  const showUnlinkedMemo = needsRulePicker && selectedVerdict === 'remove' && selectedRuleIds.length === 0
+  const isOverride = selectedVerdict && selectedVerdict !== decision.agent_verdict
 
   const isPending = decision.moderator_verdict === 'pending'
 
@@ -310,14 +507,13 @@ function DecisionCard({
     if (!selectedVerdict) return
     onResolve(
       selectedVerdict,
-      reasoningCategory || undefined,
-      notes || undefined,
+      undefined,
+      isOverride ? (notes || undefined) : undefined,
       needsRulePicker ? selectedRuleIds : undefined,
-      showUnlinkedMemo ? (tag || undefined) : undefined,
     )
     setSelectedVerdict(null)
     setSelectedRuleIds([])
-    setTag('')
+    setNotes('')
   }
 
   return (
@@ -418,37 +614,14 @@ function DecisionCard({
                 </div>
               </div>
             )}
-            {showUnlinkedMemo && (
-              <div className="space-y-1.5 border-t border-dashed border-gray-200 pt-2">
-                <p className="text-xs text-gray-500">No rule selected — categorize why this was removed:</p>
-                <select
-                  className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none"
-                  value={tag}
-                  onChange={e => setTag(e.target.value)}
-                >
-                  <option value="">Select category (optional)</option>
-                  {UNLINKED_REMOVE_TAGS.map(t => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-              </div>
+            {isOverride && (
+              <input
+                className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none"
+                placeholder="Quick note on why you're overriding (optional)"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+              />
             )}
-            <select
-              className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none"
-              value={reasoningCategory}
-              onChange={e => setReasoningCategory(e.target.value)}
-            >
-              <option value="">Select reasoning category (optional)</option>
-              {REASONING_CATEGORIES.map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-            <input
-              className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none"
-              placeholder="Optional notes..."
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-            />
             <div className="flex gap-2">
               <button
                 className="btn-primary text-xs py-1"
@@ -470,28 +643,20 @@ function DecisionCard({
 
         {/* Expanded reasoning */}
         {expanded && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-3 space-y-1">
             {Object.entries(decision.agent_reasoning || {}).map(([ruleId, reasoning]) => {
               const r = reasoning as Record<string, unknown>
+              const verdict = r.verdict as string
               return (
-                <div key={ruleId} className="p-3 bg-gray-50 rounded border border-gray-200 text-xs">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">{r.rule_title as string || ruleId}</span>
-                    <span className={`badge ${(r.verdict as string) === 'approve' ? 'badge-green' : (r.verdict as string) === 'remove' ? 'badge-red' : 'badge-yellow'}`}>
-                      {r.verdict as string}
-                    </span>
-                    <span className="text-gray-400">{Math.round(((r.confidence as number) || 0) * 100)}%</span>
-                  </div>
-                  {!!r.item_reasoning && (
-                    <div className="space-y-1 mt-2">
-                      <ItemReasoningTree
-                        itemReasoning={r.item_reasoning as Record<string, unknown>}
-                        parentId={null}
-                        depth={0}
-                      />
-                    </div>
-                  )}
-                </div>
+                <RuleReasoningBlock
+                  key={ruleId}
+                  ruleId={ruleId}
+                  ruleTitle={r.rule_title as string}
+                  verdict={verdict}
+                  confidence={r.confidence as number}
+                  itemReasoning={r.item_reasoning as Record<string, unknown> | undefined}
+                  defaultOpen={verdict !== 'approve'}
+                />
               )
             })}
           </div>

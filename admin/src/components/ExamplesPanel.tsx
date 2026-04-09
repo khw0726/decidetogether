@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, ThumbsUp, ThumbsDown, Minus, Lightbulb } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Trash2, ThumbsUp, ThumbsDown, Minus, ExternalLink } from 'lucide-react'
 import { listExamples, addExample, deleteExample, updateExample, Example, DraftEvaluationResult } from '../api/client'
 
 interface ExamplesPanelProps {
   ruleId: string
   filterItemId?: string | null
   onItemHighlight?: (itemId: string | null) => void
-  onSuggest?: () => void
-  isSuggesting?: boolean
   previewVerdicts?: Array<{ example_id: string; may_change: boolean; affected_checklist_items: string[] }>
   draftEvalResults?: DraftEvaluationResult[]
 }
@@ -55,10 +54,11 @@ const VERDICT_LABEL: Record<string, string> = {
   error: 'error',
 }
 
-export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, onSuggest, isSuggesting, previewVerdicts, draftEvalResults }: ExamplesPanelProps) {
+export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, previewVerdicts, draftEvalResults }: ExamplesPanelProps) {
   const [activeTab, setActiveTab] = useState<Label>('compliant')
   const [showAdd, setShowAdd] = useState(false)
 
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const { data: examples = [], isLoading } = useQuery({
@@ -113,18 +113,15 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, o
         </div>
         {/* Actions row */}
         <div className="flex items-center gap-1">
-          {onSuggest && (
-            <button
-              className="btn-secondary text-xs"
-              onClick={onSuggest}
-              disabled={isSuggesting}
-              title="Generate checklist/rule suggestions from these examples"
-            >
-              <Lightbulb size={12} />
-              {isSuggesting ? 'Analyzing...' : 'Analyze'}
-            </button>
-          )}
           <div className="flex-1" />
+          <button
+            className="btn-secondary text-xs"
+            onClick={() => navigate(`/examples?rule_id=${ruleId}`)}
+            title="View all examples for this rule"
+          >
+            <ExternalLink size={12} />
+            View all
+          </button>
           <button className="btn-secondary text-xs" onClick={() => setShowAdd(true)}>
             <Plus size={12} />
             Add

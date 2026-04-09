@@ -1,6 +1,7 @@
 """Example management endpoints."""
 
 import logging
+from collections import defaultdict
 
 import anthropic
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -10,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
-from ..models.schemas import ExampleCreate, ExampleRead, ExampleUpdate
+from ..db.models import ChecklistItem, Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..models.schemas import CommunityExampleRead, ExampleCreate, ExampleRead, ExampleUpdate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["examples"])
@@ -71,11 +72,42 @@ async def _generate_suggestions_from_example(rule_id: str) -> None:
             compiler = get_compiler()
             suggestions = await compiler.suggest_from_examples(rule, checklist, examples, violating_counts)
 
+            checklist_by_id = {i.id: i for i in checklist}
+
             for sug in suggestions:
+                sug_type = sug.get("suggestion_type", "checklist")
+
+                if sug_type == "checklist":
+                    # Convert to operations format for accept_recompile
+                    target = sug.get("target")
+                    parent_id = sug.get("parent_id")
+                    proposed = sug.get("proposed_change") or {}
+
+                    if target and target in checklist_by_id:
+                        # Update existing item
+                        op = {"op": "update", "existing_id": target}
+                        op.update({k: v for k, v in proposed.items() if k != "id"})
+                    else:
+                        # Add new item (root or child)
+                        op = {"op": "add", **proposed}
+                        if parent_id and parent_id in checklist_by_id:
+                            op["parent_id"] = parent_id
+                        if "children" not in op:
+                            op["children"] = []
+
+                    content = {
+                        "operations": [op],
+                        "description": sug.get("description", ""),
+                        "reasoning": sug.get("reasoning", ""),
+                    }
+                else:
+                    # rule_text suggestions — store as-is
+                    content = sug
+
                 suggestion = Suggestion(
                     rule_id=rule_id,
-                    suggestion_type=sug.get("suggestion_type", "checklist"),
-                    content=sug,
+                    suggestion_type=sug_type,
+                    content=content,
                     status="pending",
                 )
                 db.add(suggestion)
@@ -86,6 +118,97 @@ async def _generate_suggestions_from_example(rule_id: str) -> None:
         except Exception as e:
             logger.error(f"Suggestion generation failed for rule {rule_id}: {e}")
             await db.rollback()
+
+
+@router.get("/communities/{community_id}/examples", response_model=list[CommunityExampleRead])
+async def list_community_examples(
+    community_id: str,
+    rule_id: str | None = None,  # "unlinked" | <uuid> | None (all)
+    label: str | None = None,
+    source: str | None = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[CommunityExampleRead]:
+    """Return all examples for a community, grouped by rule linkage."""
+    comm_result = await db.execute(select(Community).where(Community.id == community_id))
+    if not comm_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    # 1. Get all rule IDs + titles for this community
+    rule_result = await db.execute(
+        select(Rule.id, Rule.title).where(Rule.community_id == community_id)
+    )
+    community_rules: dict[str, str] = {row.id: row.title for row in rule_result}
+
+    # 2. Get all ExampleRuleLinks for community rules → build example → [(rule_id, title)] map
+    example_to_rules: dict[str, list[tuple[str, str]]] = defaultdict(list)
+    linked_example_ids: set[str] = set()
+    if community_rules:
+        link_result = await db.execute(
+            select(ExampleRuleLink).where(ExampleRuleLink.rule_id.in_(community_rules.keys()))
+        )
+        for link in link_result.scalars():
+            example_to_rules[link.example_id].append((link.rule_id, community_rules[link.rule_id]))
+            linked_example_ids.add(link.example_id)
+
+    # 3. Fetch examples based on rule_id filter
+    linked_examples: list[Example] = []
+    unlinked_examples: list[Example] = []
+
+    fetch_linked = rule_id != "unlinked"
+    fetch_unlinked = rule_id is None or rule_id == "unlinked"
+
+    if fetch_linked and linked_example_ids:
+        ids_to_fetch = linked_example_ids
+        if rule_id and rule_id != "unlinked":
+            # Filter to only examples linked to the specified rule
+            ids_to_fetch = {
+                eid for eid in linked_example_ids
+                if any(r[0] == rule_id for r in example_to_rules.get(eid, []))
+            }
+        if ids_to_fetch:
+            q = select(Example).where(Example.id.in_(ids_to_fetch))
+            if label:
+                q = q.where(Example.label == label)
+            if source:
+                q = q.where(Example.source == source)
+            q = q.order_by(Example.created_at.desc())
+            res = await db.execute(q)
+            linked_examples = list(res.scalars().all())
+
+    if fetch_unlinked:
+        # Unlinked = moderator_decision examples with no rule link, scoped to this community
+        q = (
+            select(Example)
+            .outerjoin(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
+            .where(Example.community_id == community_id)
+            .where(Example.source == "moderator_decision")
+            .where(Example.label.in_(["violating", "borderline"]))
+            .where(ExampleRuleLink.example_id.is_(None))
+        )
+        if label:
+            q = q.where(Example.label == label)
+        if source:
+            q = q.where(Example.source == source)
+        q = q.order_by(Example.created_at.desc())
+        res = await db.execute(q)
+        unlinked_examples = list(res.scalars().all())
+
+    all_examples = linked_examples + unlinked_examples
+
+    return [
+        CommunityExampleRead(
+            id=e.id,
+            content=e.content,
+            label=e.label,
+            source=e.source,
+            moderator_reasoning=e.moderator_reasoning,
+            created_at=e.created_at,
+            updated_at=e.updated_at,
+            rule_ids=[p[0] for p in example_to_rules.get(e.id, [])],
+            rule_titles=[p[1] for p in example_to_rules.get(e.id, [])],
+        )
+        for e in all_examples
+    ]
 
 
 @router.post("/rules/{rule_id}/examples", response_model=ExampleRead, status_code=201)
@@ -106,6 +229,7 @@ async def add_example(
 
     # Create example
     example = Example(
+        community_id=rule.community_id,
         content=body.content,
         label=body.label,
         source=body.source,

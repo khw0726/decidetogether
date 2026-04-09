@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Shield, LayoutDashboard, BookOpen, Inbox, BarChart2, Settings, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Shield, LayoutDashboard, BookOpen, BookMarked, Inbox, Settings, Plus, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { listCommunities, deleteCommunity, Community } from '../api/client'
 import { useState } from 'react'
 
@@ -29,10 +29,10 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/rules', icon: BookOpen, label: 'Rules' },
-    { to: '/decisions', icon: Inbox, label: 'Decisions' },
-    { to: '/alignment', icon: BarChart2, label: 'Alignment' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
+    { to: '/rules', icon: BookOpen, label: 'Rules Editor' },
+    { to: '/examples', icon: BookMarked, label: 'Revise Rules from Decisions' },
+    { to: '/decisions', icon: Inbox, label: 'Moderation Queue' },
+    { to: '/settings', icon: Settings, label: 'Community Profile' },
   ]
 
   return (

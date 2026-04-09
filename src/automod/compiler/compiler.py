@@ -148,7 +148,14 @@ _SUGGEST_FROM_EXAMPLES_TOOL = {
                             "type": "string",
                             "enum": ["checklist", "rule_text"],
                         },
-                        "target": {"type": ["string", "null"]},
+                        "target": {
+                            "type": ["string", "null"],
+                            "description": "Item ID to update, or null for new items / rule_text suggestions",
+                        },
+                        "parent_id": {
+                            "type": ["string", "null"],
+                            "description": "For new child items: the ID of the parent item to add under. Null for root-level items or updates.",
+                        },
                         "description": {"type": "string"},
                         "proposed_text": {
                             "type": "string",
@@ -156,7 +163,7 @@ _SUGGEST_FROM_EXAMPLES_TOOL = {
                         },
                         "proposed_change": {
                             "type": "object",
-                            "description": "For checklist suggestions: the updated checklist item object",
+                            "description": "For checklist suggestions: the updated or new checklist item object",
                         },
                         "reasoning": {"type": "string"},
                     },
@@ -276,6 +283,10 @@ _DIAGNOSE_TOOL = {
                         "reasoning": {"type": "string"},
                         "proposed_item": {"type": "object"},
                         "motivated_by": {"type": "array", "items": {"type": "string"}},
+                        "split_from": {
+                            "type": ["string", "null"],
+                            "description": "For split_item: the item_id this was split from, so both halves are applied together.",
+                        },
                     },
                     "required": ["action", "reasoning", "proposed_item"],
                 },
@@ -344,6 +355,43 @@ _SUGGEST_FROM_CHECKLIST_TOOL = {
 }
 
 
+_LINK_VIOLATIONS_TOOL = {
+    "name": "submit_violation_links",
+    "description": "Submit links between uncovered violations and checklist items",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "links": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "example_id": {
+                            "type": "string",
+                            "description": "ID of the violating example",
+                        },
+                        "checklist_item_id": {
+                            "type": "string",
+                            "description": "ID of the checklist item this violation matches",
+                        },
+                        "checklist_item_description": {
+                            "type": "string",
+                            "description": "Description of the checklist item (for stable re-linking)",
+                        },
+                        "reasoning": {
+                            "type": "string",
+                            "description": "Brief explanation of why this violation matches this item",
+                        },
+                    },
+                    "required": ["example_id", "checklist_item_id", "checklist_item_description", "reasoning"],
+                },
+            },
+        },
+        "required": ["links"],
+    },
+}
+
+
 class RuleCompiler:
     def __init__(self, client: anthropic.AsyncAnthropic, settings: Settings):
         self.client = client
@@ -388,7 +436,7 @@ class RuleCompiler:
         return "\n".join(lines)
 
     def _checklist_item_to_dict(self, item: ChecklistItem) -> dict:
-        return {
+        d: dict = {
             "id": item.id,
             "description": item.description,
             "rule_text_anchor": item.rule_text_anchor,
@@ -397,6 +445,9 @@ class RuleCompiler:
             "action": item.action,
             "order": item.order,
         }
+        if item.parent_id:
+            d["parent_id"] = item.parent_id
+        return d
 
     def _example_to_dict(self, example: Example) -> dict:
         return {
@@ -726,6 +777,46 @@ class RuleCompiler:
             "diagnoses": result.get("diagnoses", []),
             "new_items": result.get("new_items", []),
         }
+
+    async def link_violations_to_items(
+        self,
+        rule: Rule,
+        checklist: list[ChecklistItem],
+        violations: list[dict],
+    ) -> list[dict]:
+        """Match uncovered violations to checklist items via LLM.
+
+        Args:
+            rule: The rule these violations belong to.
+            checklist: Current checklist items for the rule.
+            violations: List of dicts with keys: example_id, label, title, content.
+
+        Returns:
+            List of dicts with keys: example_id, checklist_item_id,
+            checklist_item_description, reasoning.
+        """
+        if not violations or not checklist:
+            return []
+
+        logger.info(
+            f"Linking {len(violations)} uncovered violation(s) to checklist items "
+            f"for rule '{rule.title}'"
+        )
+
+        checklist_dicts = [self._checklist_item_to_dict(i) for i in checklist]
+        user_prompt = prompts.build_link_violations_prompt(
+            rule_text=rule.text,
+            checklist_items=checklist_dicts,
+            violations=violations,
+        )
+
+        result = await self._call_claude(
+            prompts.LINK_VIOLATIONS_SYSTEM,
+            user_prompt,
+            tool=_LINK_VIOLATIONS_TOOL,
+            model=self.settings.haiku_model,
+        )
+        return result.get("links", [])
 
     async def synthesize_rule_from_examples(
         self,

@@ -19,6 +19,9 @@ export default function PostCard({ post, compact = false }: PostCardProps) {
   const postType = context.post_type as string | undefined
   const channel = context.channel as string | undefined
   const timestamp = post.timestamp as string | undefined
+  const platformMeta = (context.platform_metadata as Record<string, unknown>) || {}
+  const permalink = platformMeta.permalink as string | undefined
+  const postUrl = permalink ? (permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`) : undefined
 
   return (
     <div className="space-y-2">
@@ -39,7 +42,12 @@ export default function PostCard({ post, compact = false }: PostCardProps) {
       {/* Title */}
       {title && (
         <h4 className={`font-medium text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}>
-          {title}
+          {postUrl ? (
+            <a href={postUrl} target="_blank" rel="noopener noreferrer" className="hover:text-indigo-600 inline-flex items-center gap-1">
+              {title}
+              <ExternalLink size={compact ? 12 : 14} className="text-gray-400 flex-shrink-0" />
+            </a>
+          ) : title}
         </h4>
       )}
 

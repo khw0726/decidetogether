@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 # ── Community ──────────────────────────────────────────────────────────────────
@@ -150,6 +150,20 @@ class ExampleUpdate(BaseModel):
     moderator_reasoning: Optional[str] = None
 
 
+class CommunityExampleRead(BaseModel):
+    id: str
+    content: dict[str, Any]
+    label: str
+    source: str
+    moderator_reasoning: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    rule_ids: list[str]    # empty = unlinked
+    rule_titles: list[str]  # parallel to rule_ids
+
+    model_config = {"from_attributes": True}
+
+
 # ── Decision ───────────────────────────────────────────────────────────────────
 
 class DecisionRead(BaseModel):
@@ -294,3 +308,33 @@ class DecisionStats(BaseModel):
 
 # Allow forward references in ChecklistItemRead
 ChecklistItemRead.model_rebuild()
+
+
+# ── Reddit Import ───────────────────────────────────────────────────────────────
+
+class RedditImportRequest(BaseModel):
+    subreddit: str
+    limit: int = 25
+    time_filter: str = "month"
+
+    @field_validator("time_filter")
+    @classmethod
+    def validate_time_filter(cls, v: str) -> str:
+        valid = {"hour", "day", "week", "month", "year", "all"}
+        if v not in valid:
+            raise ValueError(f"time_filter must be one of {valid}")
+        return v
+
+    @field_validator("limit")
+    @classmethod
+    def validate_limit(cls, v: int) -> int:
+        if not (1 <= v <= 100):
+            raise ValueError("limit must be between 1 and 100")
+        return v
+
+
+class RedditImportResponse(BaseModel):
+    decisions: list[DecisionRead]
+    crawled_count: int
+    evaluated_count: int
+    skipped_count: int
