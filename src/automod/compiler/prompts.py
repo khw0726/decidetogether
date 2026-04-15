@@ -388,7 +388,40 @@ SUBJECTIVE_EVAL_SYSTEM = """You are a content moderation agent. Evaluate posts a
 
 For each item, assess whether the post passes or fails the criterion. Be consistent and calibrated — reserve high confidence for clear-cut cases.
 
+When thread context is provided (the original post and/or parent comments), use it to understand the conversation flow. A comment may only make sense — or only violate a rule — in the context of what it's replying to. Evaluate the TARGET content, not the thread context itself.
+
 Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def _render_thread_context(post_content: dict) -> str:
+    """Render thread context (OP + parent comments) if present in the post."""
+    import json
+
+    thread_context = post_content.get("thread_context", [])
+    if not thread_context:
+        return ""
+
+    parts = ["\n\n--- THREAD CONTEXT (for understanding the conversation — evaluate only the TARGET content above) ---"]
+    for item in thread_context:
+        role = item.get("role", "unknown")
+        author = item.get("author", "unknown")
+        content = item.get("content", {})
+        title = content.get("title", "")
+        body = content.get("body", "")
+        depth = item.get("depth", 0)
+
+        indent = "  " * depth
+        label = {"op": "ORIGINAL POST", "parent_comment": "PARENT COMMENT", "ancestor_comment": "ANCESTOR COMMENT"}.get(role, role.upper())
+        parts.append(f"\n{indent}[{label}] by u/{author}:")
+        if title:
+            parts.append(f"{indent}  Title: {title}")
+        if body:
+            # Truncate very long context to keep prompts reasonable
+            display_body = body[:1500] + "..." if len(body) > 1500 else body
+            parts.append(f"{indent}  {display_body}")
+
+    parts.append("\n--- END THREAD CONTEXT ---")
+    return "\n".join(parts)
 
 
 def build_subjective_eval_prompt(
@@ -407,20 +440,30 @@ def build_subjective_eval_prompt(
         examples_str += f"\n\nBorderline calibration examples (reasonable moderators disagree on these — use to understand edge cases):\n{json.dumps(borderline_examples[:8], indent=2)}"
 
     items_str = json.dumps(items_with_rubrics, indent=2)
-    post_str = json.dumps(post_content, indent=2)
 
-    return f"""Evaluate this post for the "{community_name}" community.
+    # Render post without thread_context in the main JSON (it's shown separately for clarity)
+    display_post = {k: v for k, v in post_content.items() if k != "thread_context"}
+    post_str = json.dumps(display_post, indent=2)
 
-Post content:
+    thread_context_str = _render_thread_context(post_content)
+
+    is_comment = bool(post_content.get("thread_context"))
+    content_label = "Comment" if is_comment else "Post"
+
+    return f"""Evaluate this {content_label.lower()} for the "{community_name}" community.
+
+{content_label} to evaluate (TARGET):
 {post_str}
+{thread_context_str}
 {examples_str}
 
 Evaluate the following checklist items. Each item is a yes/no question where YES = violation detected.
 
 For each item:
 - triggered: true means YES, the violation described by the question IS present
-- triggered: false means NO, the post is fine for this criterion
+- triggered: false means NO, the {content_label.lower()} is fine for this criterion
 - confidence: 0.0 to 1.0 (how confident you are in this judgment)
+{"- IMPORTANT: Consider the thread context when evaluating. A comment's meaning, tone, and relevance depend on what it's replying to." if is_comment else ""}
 
 Return JSON in exactly this format:
 {{
@@ -499,9 +542,16 @@ def build_community_norms_prompt(
     if recent_decisions:
         decisions_str = f"\n\nRecent moderator decisions for context:\n{json.dumps(recent_decisions[:5], indent=2)}"
 
-    post_str = json.dumps(post_content, indent=2)
+    # Render post without thread_context in main JSON
+    display_post = {k: v for k, v in post_content.items() if k != "thread_context"}
+    post_str = json.dumps(display_post, indent=2)
 
-    return f"""Assess whether this post fits the culture and norms of the "{community_name}" community, even if it doesn't violate explicit rules.
+    thread_context_str = _render_thread_context(post_content)
+
+    is_comment = bool(post_content.get("thread_context"))
+    content_label = "comment" if is_comment else "post"
+
+    return f"""Assess whether this {content_label} fits the culture and norms of the "{community_name}" community, even if it doesn't violate explicit rules.
 
 Community rules summary:
 {rules_summary}
@@ -510,20 +560,22 @@ Community rules summary:
 {"Community atmosphere:" if community_atmosphere else ""}
 {json.dumps(community_atmosphere, indent=2) if community_atmosphere else ""}
 
-Post:
+{content_label.capitalize()} to evaluate:
 {post_str}
+{thread_context_str}
 
 Consider:
-1. Does this post fit the type of content this community normally discusses?
+1. Does this {content_label} fit the type of content this community normally discusses?
 2. Does the tone match what's expected here?
 3. Even if technically rule-compliant, does it feel like an attempt to game the rules?
-4. Would long-time community members likely be bothered by this post?
+4. Would long-time community members likely be bothered by this {content_label}?
+{"5. In the context of the thread, is this comment derailing, trolling, or responding in bad faith?" if is_comment else ""}
 
 Return JSON in exactly this format:
 {{
   "violates_norms": true | false,
   "confidence": 0.0-1.0,
-  "reasoning": "Explanation of why this post does or doesn't fit community norms"
+  "reasoning": "Explanation of why this {content_label} does or doesn't fit community norms"
 }}"""
 
 

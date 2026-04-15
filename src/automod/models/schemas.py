@@ -222,12 +222,22 @@ class PostContext(BaseModel):
     platform_metadata: dict[str, Any] = {}
 
 
+class ThreadContextItem(BaseModel):
+    """A single item in the discussion thread (OP or parent comment)."""
+    role: str  # "op" | "parent_comment" | "ancestor_comment"
+    author: str = ""
+    content: PostContentBody = PostContentBody()
+    depth: int = 0  # 0 = OP, 1 = top-level comment, 2+ = nested reply
+    platform_id: Optional[str] = None
+
+
 class PostContent(BaseModel):
     id: str = ""
     platform: str = ""
     author: PostAuthor = PostAuthor()
     content: PostContentBody = PostContentBody()
     context: PostContext = PostContext()
+    thread_context: list[ThreadContextItem] = []
     timestamp: Optional[str] = None
 
 

@@ -17,8 +17,6 @@ interface CommunitySettingsProps {
 
 export default function CommunitySettings({ communityId }: CommunitySettingsProps) {
   const queryClient = useQueryClient()
-  const [crawledCount, setCrawledCount] = useState<number | null>(null)
-
   const { data: community } = useQuery({
     queryKey: ['community', communityId],
     queryFn: () => getCommunity(communityId),
@@ -33,8 +31,7 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
 
   const generateMutation = useMutation({
     mutationFn: () => generateAtmosphere(communityId),
-    onSuccess: (data) => {
-      setCrawledCount(data.crawled_count)
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['community', communityId] })
     },
   })
@@ -112,13 +109,6 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
               <AtmosphereRow label="What doesn't belong" value={atm.what_doesnt_belong} />
               <AtmosphereRow label="Moderation style" value={atm.moderation_style} />
             </div>
-            {crawledCount !== null && (
-              <p className="text-xs text-gray-400 mt-2">
-                {crawledCount > 0
-                  ? `Atmosphere includes ${crawledCount} posts crawled from ${community?.name}.`
-                  : 'Generated from sample posts and moderation history only.'}
-              </p>
-            )}
           </>
         ) : (
           <div className="card p-6 text-center text-gray-400 text-sm">

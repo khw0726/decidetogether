@@ -2,10 +2,13 @@
 
 import asyncio
 import logging
+import re
 from typing import Optional
 
 import anthropic
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -540,14 +543,22 @@ async def batch_import_rules(
     for rule in rules:
         await db.refresh(rule)
 
-    # Schedule background compilation for actionable rules
+    # Schedule background compilation for actionable rules (concurrently)
     results: list[RuleBatchImportResult] = []
-    actionable_count = 0
+    actionable_ids: list[int] = []
     for rule, triage_error in triage_results:
         if rule.rule_type == "actionable":
-            background_tasks.add_task(_compile_rule_background, rule.id, community_id)
-            actionable_count += 1
+            actionable_ids.append(rule.id)
         results.append(RuleBatchImportResult(rule=RuleRead.model_validate(rule), triage_error=triage_error))
+
+    async def _compile_all_concurrent() -> None:
+        await asyncio.gather(
+            *[_compile_rule_background(rid, community_id) for rid in actionable_ids]
+        )
+
+    if actionable_ids:
+        background_tasks.add_task(_compile_all_concurrent)
+    actionable_count = len(actionable_ids)
 
     return RuleBatchImportResponse(
         imported=results,
@@ -555,6 +566,55 @@ async def batch_import_rules(
         actionable_count=actionable_count,
         skipped_count=len(results) - actionable_count,
     )
+
+
+_REDDIT_HEADERS = {
+    "User-Agent": "automod-agent/2.0 (community moderation tool)",
+}
+
+
+class RedditRuleItem(BaseModel):
+    title: str
+    text: str
+
+
+class RedditRulesResponse(BaseModel):
+    rules: list[RedditRuleItem]
+    subreddit: str
+
+
+@router.get("/reddit-rules/{subreddit}", response_model=RedditRulesResponse)
+async def fetch_reddit_rules(subreddit: str) -> RedditRulesResponse:
+    """Fetch rules from a subreddit's rules.json endpoint."""
+    # Sanitize subreddit name
+    sub = re.sub(r"^r/", "", subreddit.strip(), flags=re.IGNORECASE)
+    if not re.match(r"^[A-Za-z0-9_]+$", sub):
+        raise HTTPException(status_code=422, detail="Invalid subreddit name")
+
+    url = f"https://www.reddit.com/r/{sub}/about/rules.json"
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
+            resp = await client.get(url, headers=_REDDIT_HEADERS)
+            resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Reddit returned {e.response.status_code} for r/{sub}",
+        )
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Failed to reach Reddit: {e}")
+
+    data = resp.json()
+    raw_rules = data.get("rules", [])
+
+    rules = []
+    for r in raw_rules:
+        title = r.get("short_name", "").strip()
+        text = r.get("description", "").strip()
+        if title:
+            rules.append(RedditRuleItem(title=title, text=text or title))
+
+    return RedditRulesResponse(rules=rules, subreddit=sub)
 
 
 @router.get("/communities/{community_id}/rules", response_model=list[RuleRead])

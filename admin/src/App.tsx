@@ -9,16 +9,27 @@ import CommunitySetup from './pages/CommunitySetup'
 import ExamplesPage from './pages/ExamplesPage'
 
 export default function App() {
-  const [communityId, setCommunityId] = useState<string>('')
+  const [communityId, setCommunityId] = useState<string>(
+    () => localStorage.getItem('activeCommunityId') ?? ''
+  )
+
+  const handleCommunityChange = (id: string) => {
+    setCommunityId(id)
+    if (id) {
+      localStorage.setItem('activeCommunityId', id)
+    } else {
+      localStorage.removeItem('activeCommunityId')
+    }
+  }
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/setup" element={<CommunitySetup onCommunityChange={setCommunityId} />} />
+        <Route path="/setup" element={<CommunitySetup onCommunityChange={handleCommunityChange} />} />
         <Route
           path="/"
           element={
-            <Layout communityId={communityId} onCommunityChange={setCommunityId} />
+            <Layout communityId={communityId} onCommunityChange={handleCommunityChange} />
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />

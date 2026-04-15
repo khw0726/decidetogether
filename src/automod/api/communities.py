@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import anthropic
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,7 +50,6 @@ def _get_engine(db: AsyncSession = Depends(get_db)) -> EvaluationEngine:
 
 class AtmosphereGenerateResponse(BaseModel):
     community: CommunityRead
-    crawled_count: int
 
 
 def get_compiler() -> RuleCompiler:
@@ -137,6 +136,86 @@ async def delete_community(
     await db.commit()
 
 
+# ── Setup Status ──────────────────────────────────────────────────────────────
+
+
+class BorderlineItem(BaseModel):
+    suggestion_id: str
+    rule_id: str
+    rule_title: str
+    content: dict
+    relevance_note: str
+
+
+class SetupStatusResponse(BaseModel):
+    actionable_total: int
+    compiled_count: int
+    borderline_examples: list[BorderlineItem]
+
+
+@router.get(
+    "/communities/{community_id}/setup-status",
+    response_model=SetupStatusResponse,
+)
+async def get_setup_status(
+    community_id: str, db: AsyncSession = Depends(get_db)
+) -> SetupStatusResponse:
+    """Return compilation progress and pending borderline examples for the setup wizard."""
+    # Get all actionable rules
+    rules_result = await db.execute(
+        select(Rule).where(
+            Rule.community_id == community_id,
+            Rule.is_active == True,  # noqa: E712
+            Rule.rule_type == "actionable",
+        )
+    )
+    actionable_rules = list(rules_result.scalars().all())
+    rule_map = {r.id: r.title for r in actionable_rules}
+
+    # Count how many have at least one checklist item (= compiled)
+    if actionable_rules:
+        from sqlalchemy import func
+        compiled_result = await db.execute(
+            select(func.count(func.distinct(ChecklistItem.rule_id)))
+            .where(ChecklistItem.rule_id.in_([r.id for r in actionable_rules]))
+        )
+        compiled = compiled_result.scalar() or 0
+    else:
+        compiled = 0
+
+    # Fetch pending borderline example suggestions across all rules
+    if rule_map:
+        suggestions_result = await db.execute(
+            select(Suggestion).where(
+                Suggestion.rule_id.in_(rule_map.keys()),
+                Suggestion.suggestion_type == "example",
+                Suggestion.status == "pending",
+            )
+        )
+        suggestions = list(suggestions_result.scalars().all())
+    else:
+        suggestions = []
+
+    borderline_items = []
+    for s in suggestions:
+        label = s.content.get("label", "")
+        if label != "borderline":
+            continue
+        borderline_items.append(BorderlineItem(
+            suggestion_id=s.id,
+            rule_id=s.rule_id,
+            rule_title=rule_map.get(s.rule_id, ""),
+            content=s.content.get("content", {}),
+            relevance_note=s.content.get("relevance_note", ""),
+        ))
+
+    return SetupStatusResponse(
+        actionable_total=len(actionable_rules),
+        compiled_count=compiled,
+        borderline_examples=borderline_items,
+    )
+
+
 # ── Sample Posts ───────────────────────────────────────────────────────────────
 
 @router.get("/communities/{community_id}/sample-posts", response_model=list[CommunitySamplePostRead])
@@ -176,6 +255,67 @@ async def add_sample_post(
     await db.commit()
     await db.refresh(post)
     return CommunitySamplePostRead.model_validate(post)
+
+
+class CrawlSamplePostsResponse(BaseModel):
+    posts: list[CommunitySamplePostRead]
+    crawled_count: int
+
+
+@router.post(
+    "/communities/{community_id}/sample-posts/crawl",
+    response_model=CrawlSamplePostsResponse,
+    status_code=201,
+)
+async def crawl_sample_posts(
+    community_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> CrawlSamplePostsResponse:
+    """Auto-crawl top posts from a Reddit community and save them as sample posts."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    if community.platform != "reddit":
+        raise HTTPException(status_code=422, detail="Auto-crawl is only available for Reddit communities")
+
+    if not settings.reddit_client_id:
+        raise HTTPException(status_code=422, detail="Reddit credentials are not configured")
+
+    m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
+    if not m:
+        raise HTTPException(status_code=422, detail="Community name must be in r/subreddit format for auto-crawl")
+
+    crawled_posts = await crawl_subreddit_top_posts(
+        m.group(1),
+        client_id=settings.reddit_client_id,
+        client_secret=settings.reddit_client_secret,
+        user_agent=settings.reddit_user_agent,
+        username=settings.reddit_username,
+        password=settings.reddit_password,
+        limit=15,
+        time_filter="month",
+    )
+
+    saved_posts = []
+    for post_data in crawled_posts:
+        post = CommunitySamplePost(
+            community_id=community_id,
+            content=post_data,
+            label="acceptable",
+            note="Auto-crawled from subreddit",
+        )
+        db.add(post)
+        await db.flush()
+        await db.refresh(post)
+        saved_posts.append(CommunitySamplePostRead.model_validate(post))
+
+    await db.commit()
+    return CrawlSamplePostsResponse(
+        posts=saved_posts,
+        crawled_count=len(crawled_posts),
+    )
 
 
 @router.delete("/communities/{community_id}/sample-posts/{post_id}", status_code=204)
@@ -371,42 +511,28 @@ async def generate_atmosphere(
     )
     removed_decisions = removed_result.scalars().all()
 
-    # Collect user-supplied sample posts
+    # Collect sample posts — user-added first (higher priority), then auto-crawled
     sample_result = await db.execute(
         select(CommunitySamplePost)
         .where(CommunitySamplePost.community_id == community_id)
-        .order_by(CommunitySamplePost.created_at.desc())
-        .limit(20)
+        .order_by(
+            # User-added posts first (note != auto-crawl marker), then crawled
+            (CommunitySamplePost.note == "Auto-crawled from subreddit").asc(),
+            CommunitySamplePost.created_at.desc(),
+        )
+        .limit(30)
     )
     sample_posts = sample_result.scalars().all()
 
-    # Crawl top posts from Reddit if credentials are configured
-    crawled_posts: list[dict] = []
-    if community.platform == "reddit" and settings.reddit_client_id:
-        m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
-        if m:
-            crawled_posts = await crawl_subreddit_top_posts(
-                m.group(1),
-                client_id=settings.reddit_client_id,
-                client_secret=settings.reddit_client_secret,
-                user_agent=settings.reddit_user_agent,
-                username=settings.reddit_username,
-                password=settings.reddit_password,
-            )
-
     acceptable_posts = (
-        [{"content": p["content"], "label": "acceptable"} for p in crawled_posts]
+        [{"content": p.content, "label": "acceptable", "note": p.note} for p in sample_posts if p.label == "acceptable"]
         + [{"content": d.post_content, "label": "acceptable"} for d in approved_decisions]
-        + [{"content": p.content, "label": "acceptable", "note": p.note} for p in sample_posts if p.label == "acceptable"]
     )
 
-    unacceptable_posts = [
-        {"content": d.post_content, "label": "unacceptable"}
-        for d in removed_decisions
-    ] + [
-        {"content": p.content, "label": "unacceptable", "note": p.note}
-        for p in sample_posts if p.label == "unacceptable"
-    ]
+    unacceptable_posts = (
+        [{"content": p.content, "label": "unacceptable", "note": p.note} for p in sample_posts if p.label == "unacceptable"]
+        + [{"content": d.post_content, "label": "unacceptable"} for d in removed_decisions]
+    )
 
     if not acceptable_posts and not unacceptable_posts:
         raise HTTPException(
@@ -433,8 +559,95 @@ async def generate_atmosphere(
     await db.refresh(community)
     return AtmosphereGenerateResponse(
         community=CommunityRead.model_validate(community),
-        crawled_count=len(crawled_posts),
     )
+
+
+class PopulateQueueResponse(BaseModel):
+    message: str
+    task_started: bool
+
+
+@router.post(
+    "/communities/{community_id}/populate-queue",
+    response_model=PopulateQueueResponse,
+)
+async def populate_decision_queue(
+    community_id: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+) -> PopulateQueueResponse:
+    """Crawl recent Reddit posts and evaluate them to populate the decision queue (runs in background)."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    if community.platform != "reddit":
+        return PopulateQueueResponse(message="Auto-populate only available for Reddit communities", task_started=False)
+
+    if not settings.reddit_client_id:
+        return PopulateQueueResponse(message="Reddit credentials not configured", task_started=False)
+
+    m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
+    if not m:
+        return PopulateQueueResponse(message="Community name must be in r/subreddit format", task_started=False)
+
+    subreddit = m.group(1)
+    background_tasks.add_task(_populate_queue_background, community_id, subreddit)
+    return PopulateQueueResponse(message="Decision queue population started", task_started=True)
+
+
+async def _populate_queue_background(community_id: str, subreddit: str) -> None:
+    """Background task: crawl recent posts and evaluate them."""
+    from ..db.database import AsyncSessionLocal
+
+    try:
+        raw_posts = await crawl_subreddit_top_posts(
+            subreddit=subreddit,
+            client_id=settings.reddit_client_id,
+            client_secret=settings.reddit_client_secret,
+            user_agent=settings.reddit_user_agent,
+            username=settings.reddit_username,
+            password=settings.reddit_password,
+            limit=25,
+            time_filter="week",
+        )
+
+        async with AsyncSessionLocal() as db:
+            platform_ids = [p["id"] for p in raw_posts]
+            if platform_ids:
+                existing = set(
+                    (await db.execute(
+                        select(Decision.post_platform_id).where(
+                            Decision.community_id == community_id,
+                            Decision.post_platform_id.in_(platform_ids),
+                        )
+                    )).scalars().all()
+                )
+            else:
+                existing = set()
+
+        new_posts = [p for p in raw_posts if p["id"] not in existing]
+
+        sem = asyncio.Semaphore(5)
+
+        async def _eval_one(post: dict) -> None:
+            async with sem, AsyncSessionLocal() as session:
+                eng = EvaluationEngine(
+                    db=session,
+                    client=anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key),
+                    settings=settings,
+                )
+                await eng.evaluate_post(community_id=community_id, post=post)
+
+        await asyncio.gather(
+            *[_eval_one(p) for p in new_posts],
+            return_exceptions=True,
+        )
+        logger.info(f"Populated queue for community {community_id}: {len(new_posts)} posts evaluated")
+
+    except Exception as e:
+        logger.error(f"Failed to populate queue for community {community_id}: {e}")
 
 
 @router.post("/communities/{community_id}/import-reddit", response_model=RedditImportResponse)

@@ -49,7 +49,7 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
         {sidebarOpen && (
           <div className="px-3 py-3 border-b border-gray-700">
             <div className="text-xs uppercase tracking-wider text-gray-400 mb-2">Community</div>
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 max-h-48 overflow-y-auto">
               {communities.length === 0 && (
                 <p className="text-xs text-gray-500 py-1">No communities yet.</p>
               )}

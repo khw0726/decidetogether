@@ -219,6 +219,8 @@ async def accept_suggestion(
 
     # Apply if it's an example suggestion
     if suggestion.suggestion_type == "example" and suggestion.rule_id:
+        rule_result = await db.execute(select(Rule).where(Rule.id == suggestion.rule_id))
+        rule = rule_result.scalar_one_or_none()
         ex_content = suggestion.content.get("content", {})
         # Use label_override if provided (moderator decision on borderline examples)
         ex_label = body.label_override or suggestion.content.get("label", "compliant")

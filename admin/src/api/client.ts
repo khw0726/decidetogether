@@ -28,7 +28,6 @@ export interface Community {
 
 export interface AtmosphereGenerateResponse {
   community: Community
-  crawled_count: number
 }
 
 export interface CommunitySamplePost {
@@ -217,6 +216,25 @@ export const importSamplePostFromUrl = (
     .post<CommunitySamplePost>(`/communities/${communityId}/sample-posts/import-url`, data)
     .then(r => r.data)
 
+// ── Setup Status ──────────────────────────────────────────────────────────────
+
+export interface BorderlineItem {
+  suggestion_id: string
+  rule_id: string
+  rule_title: string
+  content: Record<string, unknown>
+  relevance_note: string
+}
+
+export interface SetupStatus {
+  actionable_total: number
+  compiled_count: number
+  borderline_examples: BorderlineItem[]
+}
+
+export const getSetupStatus = (communityId: string) =>
+  api.get<SetupStatus>(`/communities/${communityId}/setup-status`).then(r => r.data)
+
 // ── Rules ──────────────────────────────────────────────────────────────────────
 
 export const listRules = (communityId: string) =>
@@ -257,6 +275,14 @@ export interface BatchImportResponse {
 
 export const batchImportRules = (communityId: string, rules: BatchImportRuleItem[]) =>
   api.post<BatchImportResponse>(`/communities/${communityId}/rules/batch`, { rules }).then(r => r.data)
+
+export interface RedditRulesResponse {
+  rules: { title: string; text: string }[]
+  subreddit: string
+}
+
+export const fetchRedditRules = (subreddit: string) =>
+  api.get<RedditRulesResponse>(`/reddit-rules/${encodeURIComponent(subreddit)}`).then(r => r.data)
 
 // ── Checklist ──────────────────────────────────────────────────────────────────
 
@@ -425,6 +451,26 @@ export const evaluatePost = (communityId: string, post_content: PostContent) =>
 
 export const evaluateBatch = (communityId: string, posts: PostContent[]) =>
   api.post<{ decisions: Decision[] }>(`/communities/${communityId}/evaluate/batch`, { posts }).then(r => r.data)
+
+// ── Sample Post Crawl ─────────────────────────────────────────────────────────
+
+export interface CrawlSamplePostsResponse {
+  posts: CommunitySamplePost[]
+  crawled_count: number
+}
+
+export const crawlSamplePosts = (communityId: string) =>
+  api.post<CrawlSamplePostsResponse>(`/communities/${communityId}/sample-posts/crawl`).then(r => r.data)
+
+// ── Populate Queue ────────────────────────────────────────────────────────────
+
+export interface PopulateQueueResponse {
+  message: string
+  task_started: boolean
+}
+
+export const populateQueue = (communityId: string) =>
+  api.post<PopulateQueueResponse>(`/communities/${communityId}/populate-queue`).then(r => r.data)
 
 // ── Reddit Import ─────────────────────────────────────────────────────────────
 
