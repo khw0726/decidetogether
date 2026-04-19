@@ -37,7 +37,7 @@ _EVAL_TOOL = {
 
 
 class SubjectiveEvaluator:
-    def __init__(self, client: anthropic.AsyncAnthropic, settings: Settings):
+    def __init__(self, client: anthropic.AsyncAnthropicBedrock, settings: Settings):
         self.client = client
         self.settings = settings
 

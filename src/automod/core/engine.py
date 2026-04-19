@@ -27,7 +27,7 @@ class EvaluationEngine:
     def __init__(
         self,
         db: AsyncSession,
-        client: anthropic.AsyncAnthropic,
+        client: anthropic.AsyncAnthropicBedrock,
         settings: Settings,
     ):
         self.db = db
@@ -59,6 +59,15 @@ class EvaluationEngine:
         )
         all_rules = list(rules_result.scalars().all())
         actionable_rules = [r for r in all_rules if r.rule_type == "actionable"]
+
+        # Filter by applies_to based on content type
+        post_type = post.get("context", {}).get("post_type", "")
+        actionable_rules = [
+            r for r in actionable_rules
+            if r.applies_to == "both"
+            or (r.applies_to == "posts" and post_type in ("self", "link", ""))
+            or (r.applies_to == "comments" and post_type == "comment")
+        ]
 
         # 3. Build rules summary for context
         non_actionable_rules = [r for r in all_rules if r.rule_type != "actionable"]

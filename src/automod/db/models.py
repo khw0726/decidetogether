@@ -50,6 +50,8 @@ class Rule(Base):
     rule_type: Mapped[str] = mapped_column(String, nullable=False, default="actionable")
     # actionable | procedural | meta | informational
     rule_type_reasoning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    applies_to: Mapped[str] = mapped_column(String, nullable=False, default="both")
+    # posts | comments | both
     override_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())

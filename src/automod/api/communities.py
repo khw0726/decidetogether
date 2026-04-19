@@ -5,7 +5,6 @@ import logging
 import re
 from datetime import datetime, timezone
 
-import anthropic
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -13,7 +12,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..compiler.compiler import RuleCompiler
-from ..config import settings
+from ..config import get_anthropic_client, settings
 from ..core.engine import EvaluationEngine
 from ..core.reddit_crawler import crawl_subreddit_top_posts
 from ..db.database import AsyncSessionLocal, get_db
@@ -44,7 +43,7 @@ router = APIRouter(tags=["communities"])
 
 
 def _get_engine(db: AsyncSession = Depends(get_db)) -> EvaluationEngine:
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = get_anthropic_client()
     return EvaluationEngine(db=db, client=client, settings=settings)
 
 
@@ -53,7 +52,7 @@ class AtmosphereGenerateResponse(BaseModel):
 
 
 def get_compiler() -> RuleCompiler:
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = get_anthropic_client()
     return RuleCompiler(client, settings)
 
 
@@ -635,7 +634,7 @@ async def _populate_queue_background(community_id: str, subreddit: str) -> None:
             async with sem, AsyncSessionLocal() as session:
                 eng = EvaluationEngine(
                     db=session,
-                    client=anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key),
+                    client=get_anthropic_client(),
                     settings=settings,
                 )
                 await eng.evaluate_post(community_id=community_id, post=post)
@@ -698,7 +697,7 @@ async def import_reddit_posts(
         async with sem, AsyncSessionLocal() as session:
             eng = EvaluationEngine(
                 db=session,
-                client=anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key),
+                client=get_anthropic_client(),
                 settings=settings,
             )
             return await eng.evaluate_post(community_id=community_id, post=post)

@@ -23,6 +23,7 @@ import logging
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
 import anthropic
 
@@ -37,7 +38,49 @@ DEFAULT_INPUT = Path(__file__).parent / "compiler_test_output.json"
 DEFAULT_OUTPUT = Path(__file__).parent / "eval_results.csv"
 DESCRIPTIONS_PATH = Path(__file__).parent / "rule_descriptions.json"
 
-MAX_CONCURRENT = 10
+MAX_CONCURRENT = 20
+
+
+def _make_anthropic_client() -> tuple[anthropic.AsyncAnthropic, str]:
+    """Create an Anthropic client, preferring Bedrock if available.
+
+    Returns (client, model_id) tuple. Falls back to direct API if Bedrock
+    credentials are not set.
+    """
+    import os
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(Path(__file__).parent.parent / ".env")
+    except ImportError:
+        pass
+
+    aws_key = os.environ.get("AWS_ACCESS_KEY_ID") or os.environ.get("AWS_ACCESS_KEY")
+    if aws_key:
+        aws_secret = os.environ.get("AWS_SECRET_ACCESS_KEY") or os.environ.get("AWS_SECRET_KEY")
+        aws_region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
+        client = anthropic.AsyncAnthropicBedrock(
+            aws_access_key=aws_key,
+            aws_secret_key=aws_secret,
+            aws_region=aws_region,
+        )
+        model = "global.anthropic.claude-sonnet-4-6"
+        logger.info("Using Bedrock client")
+        return client, model
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        try:
+            api_key = Settings().anthropic_api_key
+        except Exception:
+            pass
+    if not api_key:
+        raise ValueError(
+            "No Anthropic credentials found. Set ANTHROPIC_API_KEY or "
+            "AWS_BEARER_TOKEN_BEDROCK in .env"
+        )
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    model = "claude-sonnet-4-6"
+    return client, model
 
 _JUDGE_TOOL = {
     "name": "submit_rule_scores",
@@ -45,34 +88,67 @@ _JUDGE_TOOL = {
     "input_schema": {
         "type": "object",
         "properties": {
+            "coverage_reasoning": {
+                "type": "string",
+                "description": "List every distinct requirement in the rule text, then state which checklist item(s) address each. Note any requirements with no corresponding item.",
+            },
             "coverage": {
                 "type": "integer",
-                "description": "1-5: Do checklist items cover all distinct requirements in the rule?",
+                "description": "1-5: Coverage score (see rubric in system prompt).",
             },
-            "logic_specificity": {
-                "type": "integer",
-                "description": "1-5: Are patterns/rubrics specific enough to avoid false positives?",
+            "logical_correctness_reasoning": {
+                "type": "string",
+                "description": "For each checklist item, verify: (a) the condition correctly implements the rule's intent, (b) the parent-child hierarchy correctly reflects the rule's logical structure, (c) item type (deterministic/structural/subjective) fits the nature of the check. Note any contradictions or misinterpretations.",
             },
-            "item_type_fit": {
+            "logical_correctness": {
                 "type": "integer",
-                "description": "1-5: Is det/str/sub classification appropriate for each item?",
+                "description": "1-5: Logical correctness score (see rubric in system prompt).",
             },
-            "example_quality": {
+            "minimality_reasoning": {
+                "type": "string",
+                "description": "Identify any checklist items that are redundant (checking the same thing as another item), unnecessary (not traceable to any rule requirement), or could be merged without loss of fidelity.",
+            },
+            "minimality": {
                 "type": "integer",
-                "description": "1-5: Are examples realistic, diverse, and near the decision boundary?",
+                "description": "1-5: Minimality score (see rubric in system prompt).",
+            },
+            "clarity_reasoning": {
+                "type": "string",
+                "description": "For each checklist item, assess whether the question/rubric is phrased so that a moderator could answer it without needing to guess the compiler's intent. Note any vague, ambiguous, or jargon-heavy items.",
+            },
+            "clarity": {
+                "type": "integer",
+                "description": "1-5: Clarity score (see rubric in system prompt).",
+            },
+            "anchor_accuracy_reasoning": {
+                "type": "string",
+                "description": "For each item's rule_text_anchor, check whether it is a verbatim substring of the rule text. Note any paraphrases, invented phrases, or missing anchors.",
             },
             "anchor_accuracy": {
                 "type": "integer",
-                "description": "1-5: Do rule_text_anchor values quote the rule precisely?",
+                "description": "1-5: Anchor accuracy score (see rubric in system prompt).",
+            },
+            "example_quality_reasoning": {
+                "type": "string",
+                "description": "Assess whether examples include positive, negative, and borderline cases. Check if they are realistic for the subreddit context and test boundary conditions rather than only obvious cases.",
+            },
+            "example_quality": {
+                "type": "integer",
+                "description": "1-5: Example quality score (see rubric in system prompt).",
             },
             "notes": {
                 "type": "string",
-                "description": "Required if any score <= 3: explain what's missing or weak.",
+                "description": "Any additional observations not captured by the dimension-specific reasoning fields.",
             },
         },
         "required": [
-            "coverage", "logic_specificity", "item_type_fit",
-            "example_quality", "anchor_accuracy", "notes",
+            "coverage_reasoning", "coverage",
+            "logical_correctness_reasoning", "logical_correctness",
+            "minimality_reasoning", "minimality",
+            "clarity_reasoning", "clarity",
+            "anchor_accuracy_reasoning", "anchor_accuracy",
+            "example_quality_reasoning", "example_quality",
+            "notes",
         ],
     },
 }
@@ -83,26 +159,252 @@ You will be given a rule text (as seen by the compiler), its compiled checklist 
 and generated examples. Optionally you will also see the moderator's full description
 of the rule — when present, use it as the authoritative ground truth for coverage.
 
-Score each dimension 1–5:
-  5 = excellent, no issues
-  4 = good, minor issues
-  3 = adequate but notable gaps
-  2 = significant problems
-  1 = fails the dimension entirely
+For each dimension, FIRST write your reasoning in the corresponding reasoning field \
+(following the verification procedure described), THEN assign your integer score.
 
-Dimensions:
-- coverage: Do checklist items collectively address all distinct criteria in the rule?
-  (If a moderator description is provided, every criterion mentioned there should be covered.)
-- logic_specificity: Are regex patterns, structural checks, and LLM rubrics specific enough
-  to distinguish true violations from edge cases without over-triggering?
-- item_type_fit: Is the det/str/sub classification appropriate? (deterministic = pure pattern
-  matching; structural = metadata fields; subjective = requires judgment)
-- example_quality: Are examples realistic, diverse, and near the decision boundary — not all
-  obvious clear-cut cases?
-- anchor_accuracy: Do rule_text_anchor values quote exact phrases from the rule text (not
-  paraphrases or invented phrases)?
+## Scoring scale
 
-If any score <= 3, explain what specifically is missing or wrong in the notes field.
+  5 = Excellent — no issues found; the tree is production-ready on this dimension.
+  4 = Good — one minor issue that would not affect moderation outcomes.
+  3 = Adequate — one or two notable gaps that could lead to occasional wrong verdicts.
+  2 = Poor — multiple issues or one major flaw that would regularly cause wrong verdicts.
+  1 = Failing — the dimension is fundamentally broken; the tree is unusable in this regard.
+
+## Dimensions and level-anchored rubrics
+
+### Coverage
+Does the checklist collectively address every distinct requirement in the rule?
+
+Verification procedure: Enumerate each distinct requirement or clause in the rule text. \
+For each, identify whether at least one checklist item addresses it.
+
+  5 = Every requirement in the rule maps to at least one checklist item; no gaps.
+  4 = All major requirements covered; one minor sub-clause is implicit rather than explicit.
+  3 = One distinct requirement has no corresponding item, or a requirement is only \
+partially covered (e.g., the rule says "links or images" but only links are checked).
+  2 = Two or more requirements are missing from the checklist.
+  1 = The checklist addresses fewer than half of the rule's requirements.
+
+### Logical correctness
+Does the tree faithfully represent the original rule without contradictions or \
+misinterpretations? This includes whether the parent-child hierarchy correctly \
+reflects the rule's logical structure, and whether item type classification \
+(deterministic / structural / subjective) matches the nature of each condition.
+
+Verification procedure: (a) For each checklist item, verify the condition implements \
+the rule's intent — not a looser or stricter version. (b) Check that the parent-child \
+hierarchy reflects the rule's logical grouping: related conditions should share a \
+parent, independent conditions should be siblings at the top level. (c) Verify item \
+types: deterministic items should be decidable by pattern/keyword matching alone; \
+structural items by post metadata; subjective items require human or LLM judgment.
+
+  5 = All conditions, hierarchy, and item types are correct.
+  4 = One item type is debatable (e.g., a borderline det/sub classification) but \
+the condition itself is correct.
+  3 = One condition is stricter or looser than the rule states, OR the hierarchy \
+misgroups logically related items.
+  2 = Multiple conditions diverge from the rule's intent, or hierarchy errors \
+would cause systematic wrong verdicts.
+  1 = The tree's logic contradicts the rule (e.g., approving what the rule removes).
+
+### Minimality
+Is the tree free of unnecessary or duplicate conditions?
+
+Verification procedure: For each checklist item, check whether another item already \
+covers the same condition. Check whether any item is not traceable to a specific \
+requirement in the rule text. Consider whether items could be merged without loss.
+
+  5 = Every item is necessary and distinct; no redundancy.
+  4 = One item is marginally redundant but does not add confusion or evaluation cost.
+  3 = Two items check effectively the same condition, or one item checks something \
+not in the rule at all.
+  2 = Multiple redundant items or items unrelated to the rule inflate the tree.
+  1 = The tree is heavily bloated — more than half the items are redundant or irrelevant.
+
+### Clarity
+Are the yes/no questions and rubrics phrased so that a human moderator (or LLM) \
+could answer them without ambiguity?
+
+Verification procedure: Read each item's question or rubric as if you were a moderator \
+seeing it for the first time. Flag any that use undefined jargon, double negatives, \
+vague quantifiers ("excessive", "inappropriate" without criteria), or compound questions \
+that ask two things at once.
+
+  5 = All items are clear, specific, and unambiguous; a moderator could answer each \
+without needing to interpret the compiler's intent.
+  4 = One item uses a slightly vague term but the intent is recoverable from context.
+  3 = One or two items are ambiguous enough that two reasonable moderators might \
+interpret them differently.
+  2 = Multiple items are vague or use undefined terms; consistent application would \
+be difficult.
+  1 = Most items are incomprehensible or so vague as to be unanswerable.
+
+### Anchor accuracy
+Do rule_text_anchor values quote exact phrases from the rule text?
+
+Verification procedure: For each item's rule_text_anchor, search for it as a verbatim \
+substring in the rule text. Flag any that are paraphrases, invented phrases, or missing.
+
+  5 = Every anchor is a verbatim substring of the rule text.
+  4 = One anchor has trivial differences (e.g., whitespace or capitalization) but is \
+clearly the right phrase.
+  3 = One anchor is a paraphrase rather than a quote, or one item is missing an anchor.
+  2 = Multiple anchors are paraphrased or missing.
+  1 = Most anchors do not correspond to any phrase in the rule text.
+
+### Example quality
+Are the generated examples realistic, diverse, and near the decision boundary?
+
+Verification procedure: Check that examples include at least one positive (violating), \
+one negative (non-violating), and ideally one borderline case. Assess whether they are \
+realistic for the subreddit context. Check whether borderline examples test specific \
+edge cases of the rule rather than being trivially obvious.
+
+  5 = Examples include positive, negative, and borderline cases; they are realistic, \
+diverse, and test boundary conditions.
+  4 = Good variety but one category (e.g., borderline) is slightly weak or obvious.
+  3 = Examples exist for all labels but are all obvious/clear-cut, or borderline cases \
+are missing entirely.
+  2 = Only one or two labels represented, or examples are unrealistic for the subreddit.
+  1 = Fewer than 3 examples total, or examples are unrelated to the rule.
+"""
+
+JUDGE_DIMS = ["coverage", "logical_correctness", "minimality", "clarity", "anchor_accuracy", "example_quality"]
+
+# ---------------------------------------------------------------------------
+# Layer 2b: Pairwise LLM-as-judge (for comparative evaluation)
+# ---------------------------------------------------------------------------
+
+_PAIRWISE_JUDGE_TOOL = {
+    "name": "submit_pairwise_scores",
+    "description": "Submit pairwise comparison results for two compiled trees",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "coverage_reasoning": {
+                "type": "string",
+                "description": "Enumerate the rule's requirements. For each, state which tree (Tree 1, Tree 2, or both) addresses it. Then decide which tree has better overall coverage.",
+            },
+            "coverage_winner": {
+                "type": "string",
+                "enum": ["tree_1", "tree_2", "tie"],
+                "description": "Which tree has better coverage?",
+            },
+            "logical_correctness_reasoning": {
+                "type": "string",
+                "description": "Compare how faithfully each tree represents the rule's logic. Check parent-child hierarchy and item type classifications in both. Note errors in either.",
+            },
+            "logical_correctness_winner": {
+                "type": "string",
+                "enum": ["tree_1", "tree_2", "tie"],
+                "description": "Which tree has better logical correctness?",
+            },
+            "minimality_reasoning": {
+                "type": "string",
+                "description": "Compare redundancy in both trees. Which has more unnecessary or duplicate items?",
+            },
+            "minimality_winner": {
+                "type": "string",
+                "enum": ["tree_1", "tree_2", "tie"],
+                "description": "Which tree is more minimal?",
+            },
+            "clarity_reasoning": {
+                "type": "string",
+                "description": "Compare the clarity of questions/rubrics in both trees. Which has more ambiguous or vague items?",
+            },
+            "clarity_winner": {
+                "type": "string",
+                "enum": ["tree_1", "tree_2", "tie"],
+                "description": "Which tree has clearer items?",
+            },
+            "anchor_accuracy_reasoning": {
+                "type": "string",
+                "description": "Check rule_text_anchor values in both trees against the rule text. Which tree quotes more accurately?",
+            },
+            "anchor_accuracy_winner": {
+                "type": "string",
+                "enum": ["tree_1", "tree_2", "tie"],
+                "description": "Which tree has better anchor accuracy?",
+            },
+            "example_quality_reasoning": {
+                "type": "string",
+                "description": "Compare examples from both trees on realism, diversity, and boundary coverage.",
+            },
+            "example_quality_winner": {
+                "type": "string",
+                "enum": ["tree_1", "tree_2", "tie"],
+                "description": "Which tree has better examples?",
+            },
+            "overall_winner": {
+                "type": "string",
+                "enum": ["tree_1", "tree_2", "tie"],
+                "description": "Overall, which tree better operationalizes the rule?",
+            },
+            "overall_reasoning": {
+                "type": "string",
+                "description": "Brief justification for the overall winner choice.",
+            },
+        },
+        "required": [
+            "coverage_reasoning", "coverage_winner",
+            "logical_correctness_reasoning", "logical_correctness_winner",
+            "minimality_reasoning", "minimality_winner",
+            "clarity_reasoning", "clarity_winner",
+            "anchor_accuracy_reasoning", "anchor_accuracy_winner",
+            "example_quality_reasoning", "example_quality_winner",
+            "overall_winner", "overall_reasoning",
+        ],
+    },
+}
+
+_PAIRWISE_JUDGE_SYSTEM = """\
+You are an expert evaluator comparing two compiled checklist trees for the same \
+content moderation rule. You will be given the original rule text and two compiled \
+outputs (Tree 1 and Tree 2), each containing a checklist tree and generated examples.
+
+For each dimension, reason about BOTH trees, then declare a winner: tree_1, tree_2, \
+or tie. A "tie" means the trees are roughly equivalent on that dimension — not that \
+you cannot decide.
+
+IMPORTANT: The labels "Tree 1" and "Tree 2" are arbitrary. Do NOT let the ordering \
+influence your judgment. Evaluate each tree on its own merits.
+
+## Dimensions
+
+### Coverage
+Which tree's checklist items more completely cover the rule's requirements?
+Procedure: List each distinct requirement in the rule. For each, check which tree \
+addresses it. The tree that covers more requirements wins.
+
+### Logical correctness
+Which tree more faithfully represents the rule's logic?
+Procedure: Check parent-child hierarchy and item type classifications \
+(deterministic/structural/subjective) in both trees. The tree with fewer logical errors wins.
+
+### Minimality
+Which tree is leaner without sacrificing coverage?
+Procedure: Count redundant or unnecessary items in each tree. The tree with less \
+bloat wins. Note: fewer items is not automatically better — only if coverage is equal.
+
+### Clarity
+Which tree's questions and rubrics are easier to answer without ambiguity?
+Procedure: Read each item as a first-time moderator. The tree with fewer vague, \
+jargon-heavy, or compound questions wins.
+
+### Anchor accuracy
+Which tree's rule_text_anchor values more accurately quote the rule text?
+Procedure: For each anchor, check if it appears verbatim in the rule text. The tree \
+with more exact quotes wins.
+
+### Example quality
+Which tree's examples are more realistic, diverse, and boundary-testing?
+Procedure: Compare example sets on label diversity (positive/negative/borderline), \
+realism, and whether they test genuine edge cases.
+
+### Overall
+Considering all dimensions together, which tree better operationalizes the rule? \
+This is a holistic judgment — not a simple majority vote across dimensions. Some \
+dimensions may matter more for a given rule.
 """
 
 
@@ -205,7 +507,7 @@ async def llm_judge(
         try:
             response = await client.messages.create(
                 model=model,
-                max_tokens=1024,
+                max_tokens=4096,
                 system=_JUDGE_SYSTEM,
                 messages=[{"role": "user", "content": user_prompt}],
                 tools=[_JUDGE_TOOL],
@@ -215,8 +517,9 @@ async def llm_judge(
         except Exception as e:
             logger.error(f"LLM judge failed: {e}")
             return {
-                "coverage": 0, "logic_specificity": 0, "item_type_fit": 0,
-                "example_quality": 0, "anchor_accuracy": 0, "notes": f"ERROR: {e}",
+                "coverage": 0, "logical_correctness": 0, "minimality": 0,
+                "clarity": 0, "anchor_accuracy": 0, "example_quality": 0,
+                "notes": f"ERROR: {e}",
             }
 
 
@@ -265,7 +568,10 @@ async def evaluate_file(
     with open(input_path) as f:
         compiler_output = json.load(f)
 
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key) if use_llm else None
+    if use_llm:
+        client, judge_model = _make_anthropic_client()
+    else:
+        client, judge_model = None, None
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
     rows = []
@@ -291,7 +597,7 @@ async def evaluate_file(
 
         if use_llm:
             task = asyncio.create_task(
-                llm_judge(client, settings.compiler_model, rule_text, checklist, examples, description, semaphore)
+                llm_judge(client, judge_model, rule_text, checklist, examples, description, semaphore)
             )
             judge_tasks.append(task)
         else:
@@ -304,7 +610,7 @@ async def evaluate_file(
     else:
         judge_results = [None] * len(judge_tasks)
 
-    llm_cols = ["coverage", "logic_specificity", "item_type_fit", "example_quality", "anchor_accuracy", "notes"]
+    llm_cols = ["coverage", "logical_correctness", "minimality", "clarity", "anchor_accuracy", "example_quality", "notes"]
 
     for meta, judge in zip(rule_meta, judge_results):
         row = dict(meta)
@@ -354,8 +660,8 @@ async def evaluate_file(
                 rate = sum(1 for r in group_rows if r.get(col)) / n
                 summary[col] = f"{rate:.2f}"
             if use_llm:
-                for col in ["coverage", "logic_specificity", "item_type_fit",
-                             "example_quality", "anchor_accuracy"]:
+                for col in ["coverage", "logical_correctness", "minimality",
+                             "clarity", "anchor_accuracy", "example_quality"]:
                     vals = [r[col] for r in group_rows if isinstance(r.get(col), int)]
                     summary[col] = f"{sum(vals)/len(vals):.2f}" if vals else ""
             writer.writerow(summary)
@@ -379,7 +685,7 @@ async def compare_files(
     rows_b = await evaluate_file(path_b, output_b, True, settings)
 
     # Print summary diff
-    llm_dims = ["coverage", "logic_specificity", "item_type_fit", "example_quality", "anchor_accuracy"]
+    llm_dims = ["coverage", "logical_correctness", "minimality", "clarity", "anchor_accuracy", "example_quality"]
     print(f"\n{'Dimension':<22} {'File A':>8} {'File B':>8} {'Delta':>8}")
     print("-" * 50)
     for dim in llm_dims:
@@ -394,6 +700,94 @@ async def compare_files(
     print(f"\nDetailed results: {output_a}, {output_b}")
 
 
+async def judge_compiled_rules(
+    compiled_by_sub: dict[str, list[dict]],
+    settings: Settings,
+    descriptions: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Run LLM-as-a-judge on compiled rules and return per-rule and aggregate scores.
+
+    Args:
+        compiled_by_sub: {subreddit: [compiled_rule_dicts]} where each rule has
+            rule_text, checklist, examples, subreddit keys.
+        settings: Settings with anthropic_api_key and compiler_model.
+        descriptions: Optional {rule_text_prefix: moderator_description} for grounding.
+
+    Returns:
+        {
+            "per_rule": [{subreddit, rule_text_short, structural: {}, llm_scores: {}}, ...],
+            "aggregate": {
+                "structural": {check_name: pass_rate, ...},
+                "llm_scores": {dimension: mean_score, ...},
+            },
+        }
+    """
+    client, judge_model = _make_anthropic_client()
+    semaphore = asyncio.Semaphore(MAX_CONCURRENT)
+
+    per_rule = []
+    judge_tasks = []
+
+    for sub, rules in compiled_by_sub.items():
+        for rule_dict in rules:
+            checklist = rule_dict.get("checklist", [])
+            examples = rule_dict.get("examples", [])
+            rule_text = rule_dict.get("rule_text", "")
+
+            if not checklist:
+                continue
+
+            checks = structural_checks(rule_text, checklist, examples)
+
+            # Try to find a moderator description
+            desc = None
+            if descriptions:
+                for key, val in descriptions.items():
+                    if rule_text.startswith(key):
+                        desc = val
+                        break
+
+            meta = {
+                "subreddit": sub,
+                "rule_text_short": rule_text[:80].replace("\n", " "),
+                "structural": checks,
+            }
+            per_rule.append(meta)
+
+            task = asyncio.create_task(
+                llm_judge(client, judge_model, rule_text, checklist, examples, desc, semaphore)
+            )
+            judge_tasks.append((len(per_rule) - 1, task))
+
+    if judge_tasks:
+        results = await asyncio.gather(*[t for _, t in judge_tasks])
+        for (idx, _), scores in zip(judge_tasks, results):
+            per_rule[idx]["llm_scores"] = scores
+
+    # Aggregate
+    dims = ["coverage", "logical_correctness", "minimality", "clarity", "anchor_accuracy", "example_quality"]
+    struct_keys = ["anchor_in_rule", "non_leaf_action", "regex_compiles", "tree_depth_ok", "example_count_ok", "rubric_nonempty"]
+
+    agg_structural = {}
+    for k in struct_keys:
+        vals = [r["structural"].get(k, False) for r in per_rule]
+        agg_structural[k] = round(sum(vals) / len(vals), 4) if vals else 0
+
+    agg_llm = {}
+    for d in dims:
+        vals = [r["llm_scores"].get(d, 0) for r in per_rule if "llm_scores" in r and isinstance(r["llm_scores"].get(d), (int, float)) and r["llm_scores"].get(d) > 0]
+        agg_llm[d] = round(sum(vals) / len(vals), 4) if vals else 0
+    agg_llm["mean"] = round(sum(agg_llm[d] for d in dims) / len(dims), 4) if agg_llm else 0
+
+    return {
+        "per_rule": per_rule,
+        "aggregate": {
+            "structural": agg_structural,
+            "llm_scores": agg_llm,
+        },
+    }
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Evaluate compiler output quality")
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
@@ -404,9 +798,12 @@ async def main():
     args = parser.parse_args()
 
     settings = Settings()
-    if not args.no_llm and not settings.anthropic_api_key:
-        logger.error("ANTHROPIC_API_KEY not set. Use --no-llm for structural checks only.")
-        sys.exit(1)
+    if not args.no_llm:
+        try:
+            _make_anthropic_client()
+        except ValueError as e:
+            logger.error(f"{e}. Use --no-llm for structural checks only.")
+            sys.exit(1)
 
     if args.compare:
         await compare_files(args.compare[0], args.compare[1], settings)

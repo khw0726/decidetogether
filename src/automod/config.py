@@ -1,13 +1,16 @@
+import anthropic
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    anthropic_api_key: str = ""
-    compiler_model: str = "claude-sonnet-4-6"
-    sonnet_model: str = "claude-sonnet-4-6"
-    haiku_model: str = "claude-haiku-4-5-20251001"
+    aws_access_key: str = ""
+    aws_secret_key: str = ""
+    aws_region: str = "ap-northeast-2"
+    compiler_model: str = "global.anthropic.claude-sonnet-4-6"
+    sonnet_model: str = "global.anthropic.claude-sonnet-4-6"
+    haiku_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     escalation_confidence_threshold: float = 0.75
     database_url: str = "sqlite+aiosqlite:///./automod.db"
 
@@ -19,3 +22,11 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def get_anthropic_client() -> anthropic.AsyncAnthropicBedrock:
+    return anthropic.AsyncAnthropicBedrock(
+        aws_access_key=settings.aws_access_key,
+        aws_secret_key=settings.aws_secret_key,
+        aws_region=settings.aws_region,
+    )

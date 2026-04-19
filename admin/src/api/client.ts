@@ -48,6 +48,7 @@ export interface Rule {
   is_active: boolean
   rule_type: string
   rule_type_reasoning: string | null
+  applies_to: string  // "posts" | "comments" | "both"
   override_count: number
   created_at: string
   updated_at: string

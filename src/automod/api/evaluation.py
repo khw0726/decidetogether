@@ -2,11 +2,10 @@
 
 import logging
 
-import anthropic
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import settings
+from ..config import get_anthropic_client, settings
 from ..core.engine import EvaluationEngine
 from ..db.database import get_db
 from ..models.schemas import (
@@ -22,7 +21,7 @@ router = APIRouter(tags=["evaluation"])
 
 
 def get_engine(db: AsyncSession = Depends(get_db)) -> EvaluationEngine:
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = get_anthropic_client()
     return EvaluationEngine(db=db, client=client, settings=settings)
 
 

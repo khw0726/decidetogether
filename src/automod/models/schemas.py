@@ -47,6 +47,7 @@ class RuleCreate(BaseModel):
     title: str
     text: str
     priority: int = 0
+    applies_to: str = "both"
 
 
 class RuleUpdate(BaseModel):
@@ -54,6 +55,7 @@ class RuleUpdate(BaseModel):
     text: Optional[str] = None
     priority: Optional[int] = None
     is_active: Optional[bool] = None
+    applies_to: Optional[str] = None
 
 
 class RuleRead(BaseModel):
@@ -65,6 +67,7 @@ class RuleRead(BaseModel):
     is_active: bool
     rule_type: str
     rule_type_reasoning: Optional[str] = None
+    applies_to: str = "both"
     override_count: int = 0
     created_at: datetime
     updated_at: datetime

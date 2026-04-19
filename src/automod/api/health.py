@@ -3,12 +3,11 @@
 from collections import defaultdict
 from typing import Any
 
-import anthropic
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import settings
+from ..config import get_anthropic_client, settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
 from ..db.models import (
@@ -25,7 +24,7 @@ router = APIRouter(tags=["health"])
 
 
 def get_compiler() -> RuleCompiler:
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = get_anthropic_client()
     return RuleCompiler(client, settings)
 
 

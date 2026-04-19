@@ -5,14 +5,13 @@ import logging
 import re
 from typing import Optional
 
-import anthropic
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import settings
+from ..config import get_anthropic_client, settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
 from ..db.models import ChecklistItem, CommunitySamplePost, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
@@ -32,7 +31,7 @@ router = APIRouter(tags=["rules"])
 
 
 def get_compiler() -> RuleCompiler:
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    client = get_anthropic_client()
     return RuleCompiler(client, settings)
 
 
@@ -191,30 +190,14 @@ async def _compile_rule_background(
 
 
 async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
-    """Insert a fresh set of checklist items, handling parent_id linking for children."""
-    added_items = []
+    """Insert a fresh set of checklist items.
+
+    Items arrive as a flat list with parent_id already set by the compiler's
+    _parse_items_recursive. Just add them all.
+    """
     for item in checklist_items:
         db.add(item)
-        added_items.append(item)
-
     await db.flush()
-
-    for parent_item in added_items:
-        children_data = getattr(parent_item, "_children_data", [])
-        for i, child_data in enumerate(children_data):
-            child = ChecklistItem(
-                rule_id=rule_id,
-                order=i,
-                parent_id=parent_item.id,
-                description=child_data.get("description", ""),
-                rule_text_anchor=child_data.get("rule_text_anchor"),
-                item_type=child_data.get("item_type", "subjective"),
-                logic=child_data.get("logic", {}),
-                action=child_data.get("action", "flag"),
-                atmosphere_influenced=child_data.get("atmosphere_influenced", False),
-                atmosphere_note=child_data.get("atmosphere_note"),
-            )
-            db.add(child)
 
 
 async def _persist_new_examples(
@@ -484,6 +467,7 @@ async def create_rule(
         triage = await compiler.triage_rule(rule.text, community.name, community.platform)
         rule.rule_type = triage["rule_type"]
         rule.rule_type_reasoning = triage["reasoning"]
+        rule.applies_to = triage.get("applies_to", "both")
         await db.commit()
         await db.refresh(rule)
     except Exception as e:
@@ -533,6 +517,7 @@ async def batch_import_rules(
             result = await compiler.triage_rule(rule.text, community.name, community.platform)
             rule.rule_type = result["rule_type"]
             rule.rule_type_reasoning = result["reasoning"]
+            rule.applies_to = result.get("applies_to", "both")
             return rule, None
         except Exception as e:
             logger.error(f"Triage failed for rule {rule.id}: {e}")
@@ -652,6 +637,8 @@ async def update_rule(
         rule.priority = body.priority
     if body.is_active is not None:
         rule.is_active = body.is_active
+    if body.applies_to is not None:
+        rule.applies_to = body.applies_to
 
     # If text changed, re-triage and queue recompile
     if body.text is not None:
@@ -665,6 +652,7 @@ async def update_rule(
                 triage = await compiler.triage_rule(rule.text, community.name, community.platform)
                 rule.rule_type = triage["rule_type"]
                 rule.rule_type_reasoning = triage["reasoning"]
+                rule.applies_to = triage.get("applies_to", "both")
             except Exception as e:
                 logger.error(f"Re-triage failed: {e}")
 

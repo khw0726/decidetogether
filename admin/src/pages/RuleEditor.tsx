@@ -256,6 +256,11 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                       <span className={`badge ${RULE_TYPE_COLORS[rule.rule_type] || 'badge-gray'} mt-0.5`}>
                         {rule.rule_type}
                       </span>
+                      {rule.applies_to && rule.applies_to !== 'both' && (
+                        <span className="badge badge-gray mt-0.5 ml-1">
+                          {rule.applies_to}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity ml-1">
                       <button
@@ -420,6 +425,26 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                       }}
                     >
                       {type}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Applies to (content scope) */}
+                <div className="px-4 pb-3 flex items-center gap-2 flex-shrink-0">
+                  <span className="text-xs text-gray-500">Applies to:</span>
+                  {(['posts', 'comments', 'both'] as const).map(target => (
+                    <button
+                      key={target}
+                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${(selectedRule.applies_to || 'both') === target
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      onClick={async () => {
+                        await updateRule(selectedRule.id, { applies_to: target })
+                        queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+                      }}
+                    >
+                      {target}
                     </button>
                   ))}
                 </div>

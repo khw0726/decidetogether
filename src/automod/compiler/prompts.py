@@ -7,10 +7,16 @@ from typing import Any, Optional
 
 TRIAGE_SYSTEM = """You are a moderation rule classifier. Your task is to classify community rules into one of four categories:
 
-- **actionable**: Describes a content standard that can be evaluated against a specific post. The agent can look at a post and determine if it violates this rule. Examples: "No self-promotion or spam", "Be respectful to other members", "No NSFW content".
-- **procedural**: Describes moderator procedures, escalation paths, or enforcement discretion. Not evaluable per-post. Examples: "Moderators may act with discretion", "Repeated offenses will result in a permanent ban".
+- **actionable**: Describes a SPECIFIC content standard that an automated system can evaluate against a post or comment. The system must be able to look at the content and decide "violates" or "does not violate". Examples: "No self-promotion or spam", "Be respectful to other members", "No NSFW content", "Include your age and gender in the title".
+  NOT actionable: rules about what happens after a violation ("Repeat offenders will be banned"), tips for users ("Consider posting to another subreddit"), guidance that can't be checked per-post ("Use the report button"), or rules about moderator behavior.
+- **procedural**: Describes moderator procedures, enforcement consequences, escalation paths, or user instructions that cannot be checked by looking at content. Examples: "Moderators may act with discretion", "Repeated offenses will result in a permanent ban", "Use the report button instead of engaging trolls", "Message the mods if your post gets caught in the spam filter".
 - **meta**: Describes rule governance, scope, or applicability. Examples: "Rules are subject to change without notice", "These rules apply to all posts and comments".
-- **informational**: Provides community context but no enforceable standard. Examples: "This is a community for Python developers", "We welcome beginners and experts alike".
+- **informational**: Provides community context, tips, or encouragement but no enforceable standard. Examples: "This is a community for Python developers", "We welcome beginners", "Consider posting to /r/LegalAdviceUK for UK questions", "It's nice to say thank you to people who help you".
+
+Additionally, classify what type of content the rule applies to:
+- **posts**: Rule only applies to top-level submissions (e.g. title format, flair, link requirements)
+- **comments**: Rule only applies to comments/replies (e.g. answer quality, reply etiquette)
+- **both**: Rule applies to all content (e.g. civility, no personal info, no spam)
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -23,6 +29,7 @@ Rule text: {rule_text}
 Return JSON in exactly this format:
 {{
   "rule_type": "actionable" | "procedural" | "meta" | "informational",
+  "applies_to": "posts" | "comments" | "both",
   "reasoning": "One sentence explaining why this classification was chosen."
 }}"""
 

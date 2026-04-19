@@ -18,7 +18,7 @@ uvicorn src.automod.main:app --reload --port 7888 --host 0.0.0.0
 - Admin UI: `http://localhost:7888/admin`
 - API docs: `http://localhost:7888/docs`
 
-Requires `ANTHROPIC_API_KEY` in `.env`.
+Requires `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, and `AWS_REGION` in `.env` (uses Amazon Bedrock).
 
 ## Implementation Architecture (`src/automod/`)
 
@@ -52,8 +52,6 @@ admin/           JS frontend with React + Vite
 - `structural` — metadata field checks (account age, post type, etc.), executed locally
 - `subjective` — LLM evaluation with a rubric; batched to minimize API calls
 
-**Decision tree combining logic:** `all_must_pass` | `any_must_pass`
-
 **Bidirectional alignment (Phase 3, planned):** Changes to rule text, checklist items, or examples propagate as *suggestions* to the others — never auto-applied. Key design decision: moderator trust over convenience.
 
 ## Implementation Phases (from spec)
@@ -71,10 +69,10 @@ admin/           JS frontend with React + Vite
 - Decision queue sorted by agent confidence ascending — lowest confidence gets human attention first
 - Moderator overrides automatically create labeled examples for the relevant rules
 
-## Claude API Configuration
+## Claude API Configuration (Amazon Bedrock)
 
-Configured via environment variables / `config.py`:
-- `COMPILER_MODEL` — rule compilation (default: `claude-sonnet-4-6`)
-- `SONNET_MODEL` — borderline case re-evaluation (default: `claude-sonnet-4-6`)
-- `HAIKU_MODEL` — initial subjective evaluation (default: `claude-haiku-4-5-20251001`)
+Uses `anthropic.AsyncAnthropicBedrock` via AWS credentials in `.env`. Configured via `config.py`:
+- `COMPILER_MODEL` — rule compilation (default: `global.anthropic.claude-sonnet-4-6`)
+- `SONNET_MODEL` — borderline case re-evaluation (default: `global.anthropic.claude-sonnet-4-6`)
+- `HAIKU_MODEL` — initial subjective evaluation (default: `global.anthropic.claude-haiku-4-5-20251001-v1:0`)
 - `ESCALATION_CONFIDENCE_THRESHOLD` — when to escalate Haiku → Sonnet (default: 0.75)

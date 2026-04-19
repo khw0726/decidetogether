@@ -21,9 +21,14 @@ _TRIAGE_TOOL = {
                 "type": "string",
                 "enum": ["actionable", "procedural", "meta", "informational"],
             },
+            "applies_to": {
+                "type": "string",
+                "enum": ["posts", "comments", "both"],
+                "description": "What content type this rule applies to: posts (submissions only), comments (replies only), or both",
+            },
             "reasoning": {"type": "string"},
         },
-        "required": ["rule_type", "reasoning"],
+        "required": ["rule_type", "applies_to", "reasoning"],
     },
 }
 
@@ -393,7 +398,7 @@ _LINK_VIOLATIONS_TOOL = {
 
 
 class RuleCompiler:
-    def __init__(self, client: anthropic.AsyncAnthropic, settings: Settings):
+    def __init__(self, client: anthropic.AsyncAnthropicBedrock, settings: Settings):
         self.client = client
         self.settings = settings
 
@@ -424,6 +429,7 @@ class RuleCompiler:
         result = await self._call_claude(prompts.TRIAGE_SYSTEM, user_prompt, tool=_TRIAGE_TOOL)
         return {
             "rule_type": result.get("rule_type", "informational"),
+            "applies_to": result.get("applies_to", "both"),
             "reasoning": result.get("reasoning", ""),
         }
 
@@ -460,9 +466,11 @@ class RuleCompiler:
         self, items_data: list[dict], rule_id: str, parent_id: Optional[str] = None, order_offset: int = 0
     ) -> list[ChecklistItem]:
         """Recursively parse checklist items from compiler output."""
+        import uuid
         result = []
         for i, item_data in enumerate(items_data):
             item = ChecklistItem(
+                id=str(uuid.uuid4()),
                 rule_id=rule_id,
                 order=order_offset + i,
                 parent_id=parent_id,
@@ -474,12 +482,11 @@ class RuleCompiler:
             )
             result.append(item)
 
-            # Process children - they'll be linked after IDs are assigned
             children_data = item_data.get("children", [])
             if children_data:
-                item._pending_children = children_data  # type: ignore
-            else:
-                item._pending_children = []  # type: ignore
+                result.extend(self._parse_checklist_items(
+                    children_data, rule_id, parent_id=item.id, order_offset=0
+                ))
 
         return result
 
@@ -581,8 +588,10 @@ class RuleCompiler:
         result: list[ChecklistItem],
         order: int,
     ) -> int:
+        import uuid
         for item_data in items_data:
             item = ChecklistItem(
+                id=str(uuid.uuid4()),  # set explicitly so parent_id links work in memory (before DB flush)
                 rule_id=rule_id,
                 order=order,
                 parent_id=parent_id,
@@ -599,10 +608,9 @@ class RuleCompiler:
 
             children_data = item_data.get("children", [])
             if children_data:
-                # Store reference so caller can link parent_id after DB flush
-                item._children_data = children_data  # type: ignore
-            else:
-                item._children_data = []  # type: ignore
+                order = self._parse_items_recursive(
+                    children_data, rule_id, item.id, result, order
+                )
 
         return order
 
