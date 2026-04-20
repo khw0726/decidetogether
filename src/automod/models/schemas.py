@@ -11,12 +11,38 @@ class CommunityCreate(BaseModel):
     platform_config: Optional[dict[str, Any]] = None
 
 
+# ── Community Context ─────────────────────────────────────────────────────────
+
+class CommunityContextDimension(BaseModel):
+    """A single context dimension (purpose, participants, stakes, or tone)."""
+    prose: str = ""
+    tags: list[str] = []
+
+
+class CommunityContextData(BaseModel):
+    """Full community context with four dimensions."""
+    purpose: CommunityContextDimension = CommunityContextDimension()
+    participants: CommunityContextDimension = CommunityContextDimension()
+    stakes: CommunityContextDimension = CommunityContextDimension()
+    tone: CommunityContextDimension = CommunityContextDimension()
+
+
+class CommunityContextUpdate(BaseModel):
+    """Partial update to community context — any field can be omitted."""
+    purpose: Optional[CommunityContextDimension] = None
+    participants: Optional[CommunityContextDimension] = None
+    stakes: Optional[CommunityContextDimension] = None
+    tone: Optional[CommunityContextDimension] = None
+
+
 class CommunityRead(BaseModel):
     id: str
     name: str
     platform: str
     platform_config: Optional[dict[str, Any]] = None
     atmosphere: Optional[dict[str, Any]] = None
+    community_context: Optional[dict[str, Any]] = None
+    context_samples: Optional[dict[str, Any]] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -96,8 +122,8 @@ class ChecklistItemRead(BaseModel):
     item_type: str
     logic: dict[str, Any]
     action: str
-    atmosphere_influenced: bool = False
-    atmosphere_note: Optional[str] = None
+    context_influenced: bool = False
+    context_note: Optional[str] = None
     updated_at: datetime
     children: list["ChecklistItemRead"] = []
 

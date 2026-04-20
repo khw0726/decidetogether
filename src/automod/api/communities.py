@@ -27,7 +27,10 @@ from ..db.models import (
     Rule,
     Suggestion,
 )
+from ..core.reddit_crawler import sample_subreddit_for_context
 from ..models.schemas import (
+    CommunityContextData,
+    CommunityContextUpdate,
     CommunityCreate,
     CommunityRead,
     CommunitySamplePostCreate,
@@ -559,6 +562,209 @@ async def generate_atmosphere(
     return AtmosphereGenerateResponse(
         community=CommunityRead.model_validate(community),
     )
+
+
+# ── Context Samples ───────────────────────────────────────────────────────────
+
+
+class ContextSamplesResponse(BaseModel):
+    context_samples: dict
+
+
+@router.get("/communities/{community_id}/context-samples", response_model=ContextSamplesResponse)
+async def get_context_samples(
+    community_id: str, db: AsyncSession = Depends(get_db)
+) -> ContextSamplesResponse:
+    """Return stored context samples."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+    return ContextSamplesResponse(context_samples=community.context_samples or {})
+
+
+@router.post(
+    "/communities/{community_id}/context-samples/crawl",
+    response_model=ContextSamplesResponse,
+    status_code=201,
+)
+async def crawl_context_samples(
+    community_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ContextSamplesResponse:
+    """Crawl activity-based post samples (hot/top/controversial/ignored/comments) for context generation."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    if community.platform != "reddit":
+        raise HTTPException(status_code=422, detail="Context sampling is only available for Reddit communities")
+
+    if not settings.reddit_client_id:
+        raise HTTPException(status_code=422, detail="Reddit credentials are not configured")
+
+    m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
+    if not m:
+        raise HTTPException(status_code=422, detail="Community name must be in r/subreddit format")
+
+    sampled = await sample_subreddit_for_context(
+        subreddit=m.group(1),
+        client_id=settings.reddit_client_id,
+        client_secret=settings.reddit_client_secret,
+        user_agent=settings.reddit_user_agent,
+        username=settings.reddit_username,
+        password=settings.reddit_password,
+    )
+
+    community.context_samples = sampled
+    await db.commit()
+    await db.refresh(community)
+    return ContextSamplesResponse(context_samples=community.context_samples)
+
+
+# ── Community Context ─────────────────────────────────────────────────────────
+
+
+class ContextGenerateResponse(BaseModel):
+    community_context: dict
+
+
+@router.get("/communities/{community_id}/context", response_model=dict)
+async def get_community_context(
+    community_id: str, db: AsyncSession = Depends(get_db)
+) -> dict:
+    """Return the full community context."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+    return community.community_context or {}
+
+
+@router.put("/communities/{community_id}/context", response_model=dict)
+async def update_community_context(
+    community_id: str,
+    body: CommunityContextUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Update community context (partial — only provided dimensions are updated)."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    existing = community.community_context or {}
+    for dim in ["purpose", "participants", "stakes", "tone"]:
+        update_val = getattr(body, dim, None)
+        if update_val is not None:
+            existing[dim] = update_val.model_dump()
+
+    community.community_context = existing
+    await db.commit()
+    await db.refresh(community)
+    return community.community_context or {}
+
+
+@router.post(
+    "/communities/{community_id}/context/generate",
+    response_model=ContextGenerateResponse,
+)
+async def generate_community_context(
+    community_id: str,
+    db: AsyncSession = Depends(get_db),
+    compiler: RuleCompiler = Depends(get_compiler),
+) -> ContextGenerateResponse:
+    """Auto-generate community context using metadata + activity-sampled posts from Reddit."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    # Gather community description from platform config or name
+    description = ""
+    if community.platform_config:
+        description = community.platform_config.get("public_description", "")
+        if not description:
+            description = community.platform_config.get("description", "")
+
+    # Gather rules summary
+    rules_result = await db.execute(
+        select(Rule)
+        .where(Rule.community_id == community_id, Rule.is_active == True)  # noqa: E712
+        .order_by(Rule.priority.asc())
+    )
+    active_rules = list(rules_result.scalars().all())
+    rules_summary = "\n".join(f"- {r.title}: {r.text[:150]}" for r in active_rules) if active_rules else ""
+
+    # Get subscriber count
+    subscribers = None
+    if community.platform_config:
+        subscribers = community.platform_config.get("subscribers")
+
+    # Use stored context samples if available, otherwise sample live
+    sampled_posts = community.context_samples
+    if not sampled_posts and community.platform == "reddit":
+        m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
+        if m and settings.reddit_client_id:
+            sampled_posts = await sample_subreddit_for_context(
+                subreddit=m.group(1),
+                client_id=settings.reddit_client_id,
+                client_secret=settings.reddit_client_secret,
+                user_agent=settings.reddit_user_agent,
+                username=settings.reddit_username,
+                password=settings.reddit_password,
+            )
+            # Store for future use
+            community.context_samples = sampled_posts
+
+    # Load taxonomy for tag constraint
+    taxonomy = _load_taxonomy()
+
+    # Generate context via LLM
+    context = await compiler.generate_community_context(
+        community_name=community.name,
+        platform=community.platform,
+        description=description,
+        rules_summary=rules_summary,
+        subscribers=subscribers,
+        sampled_posts=sampled_posts,
+        taxonomy=taxonomy,
+    )
+
+    # Merge with existing context (preserve manually-edited fields if present)
+    existing = community.community_context or {}
+    for dim in ["purpose", "participants", "stakes", "tone"]:
+        if dim not in existing:
+            existing[dim] = context[dim]
+        else:
+            # Overwrite prose and tags from generation
+            existing[dim] = context[dim]
+
+    community.community_context = existing
+    await db.commit()
+    await db.refresh(community)
+    return ContextGenerateResponse(community_context=community.community_context)
+
+
+def _load_taxonomy() -> dict | None:
+    """Load the context taxonomy from scripts/context_taxonomy.json if available."""
+    import json
+    from pathlib import Path
+
+    taxonomy_path = Path(__file__).parent.parent.parent.parent / "scripts" / "context_taxonomy.json"
+    if taxonomy_path.exists():
+        try:
+            data = json.loads(taxonomy_path.read_text())
+            # Simplify to just {dim: {tag: description}}
+            simplified = {}
+            for dim in ["purpose", "participants", "stakes", "tone"]:
+                cats = data.get(dim, {})
+                simplified[dim] = {name: info.get("description", "") for name, info in cats.items()}
+            return simplified
+        except Exception:
+            pass
+    return None
 
 
 class PopulateQueueResponse(BaseModel):

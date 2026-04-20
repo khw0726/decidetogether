@@ -32,6 +32,8 @@ class Community(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     atmosphere: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    community_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    context_samples: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     rules: Mapped[list["Rule"]] = relationship("Rule", back_populates="community", cascade="all, delete-orphan")
     decisions: Mapped[list["Decision"]] = relationship("Decision", back_populates="community", cascade="all, delete-orphan")
@@ -84,8 +86,8 @@ class ChecklistItem(Base):
     logic: Mapped[dict] = mapped_column(JSON, nullable=False)
     action: Mapped[str] = mapped_column(String, nullable=False, default="flag")
     # remove | flag | continue
-    atmosphere_influenced: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    atmosphere_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    context_influenced: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    context_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     rule: Mapped["Rule"] = relationship("Rule", back_populates="checklist_items", foreign_keys=[rule_id])

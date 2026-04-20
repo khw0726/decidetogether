@@ -71,112 +71,150 @@ async def _re_resolve_checklist_links(db, rule_id: str) -> None:
         logger.info(f"Re-resolved {resolved} checklist item link(s) for rule {rule_id}")
 
 
-async def _compile_rule_background(
+async def _compile_rule_read_and_llm(
     rule_id: str,
     community_id: str,
-) -> None:
-    """Background task to compile (or recompile) a rule.
+) -> dict | None:
+    """Phase 1: Read DB context and run LLM compilation (parallelizable).
 
-    First compile: runs compile_rule() and inserts all items fresh.
-    Recompile: runs recompile_with_diff() and applies keep/update/add/delete ops
-    against the existing checklist rows, preserving as much as possible.
+    Returns a dict with compilation results, or None if the rule should be skipped.
+    ORM objects remain usable after session close thanks to expire_on_commit=False.
     """
     from ..db.database import AsyncSessionLocal
 
+    # ── Read phase (short-lived session) ────────────────────────────────
+    async with AsyncSessionLocal() as db:
+        rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+        rule = rule_result.scalar_one_or_none()
+        if not rule or rule.rule_type != "actionable":
+            return None
+
+        community_result = await db.execute(
+            select(Community).where(Community.id == community_id)
+        )
+        community = community_result.scalar_one_or_none()
+        if not community:
+            return None
+
+        other_rules_result = await db.execute(
+            select(Rule).where(
+                Rule.community_id == community_id,
+                Rule.is_active == True,
+                Rule.id != rule_id,
+            )
+        )
+        other_rules = list(other_rules_result.scalars().all())
+
+        existing_result = await db.execute(
+            select(ChecklistItem).where(
+                ChecklistItem.rule_id == rule_id,
+                ChecklistItem.parent_id == None,  # noqa: E711
+            )
+        )
+        existing_items = list(existing_result.scalars().all())
+
+        community_atmosphere = community.atmosphere
+        community_context = community.community_context
+
+        approved_result = await db.execute(
+            select(Decision)
+            .where(Decision.community_id == community_id, Decision.moderator_verdict == "approve")
+            .order_by(Decision.created_at.desc())
+            .limit(5)
+        )
+        removed_result = await db.execute(
+            select(Decision)
+            .where(Decision.community_id == community_id, Decision.moderator_verdict == "remove")
+            .order_by(Decision.created_at.desc())
+            .limit(5)
+        )
+        sample_result = await db.execute(
+            select(CommunitySamplePost)
+            .where(CommunitySamplePost.community_id == community_id)
+            .order_by(CommunitySamplePost.created_at.desc())
+            .limit(20)
+        )
+        community_posts_sample = [
+            {"content": d.post_content, "label": "acceptable"}
+            for d in approved_result.scalars().all()
+        ] + [
+            {"content": d.post_content, "label": "unacceptable"}
+            for d in removed_result.scalars().all()
+        ] + [
+            {"content": p.content, "label": p.label, "note": p.note}
+            for p in sample_result.scalars().all()
+        ]
+
+    # ── LLM phase (no session held) ────────────────────────────────────
+    compiler = get_compiler()
+
+    if not existing_items:
+        checklist_items, example_dicts = await compiler.compile_rule(
+            rule=rule,
+            community=community,
+            other_rules=other_rules,
+            community_atmosphere=community_atmosphere,
+            community_context=community_context,
+            community_posts_sample=community_posts_sample or None,
+        )
+        return {
+            "mode": "compile",
+            "rule_id": rule_id,
+            "community_id": community_id,
+            "rule": rule,
+            "community": community,
+            "checklist_items": checklist_items,
+            "example_dicts": example_dicts,
+        }
+    else:
+        operations = await compiler.recompile_with_diff(
+            rule=rule,
+            community=community,
+            other_rules=other_rules,
+            existing_items=existing_items,
+        )
+        return {
+            "mode": "recompile",
+            "rule_id": rule_id,
+            "community_id": community_id,
+            "rule": rule,
+            "community": community,
+            "operations": operations,
+            "existing_items": existing_items,
+        }
+
+
+async def _compile_rule_persist(result: dict) -> None:
+    """Phase 2: Persist compilation results to DB (must be serialized for SQLite)."""
+    from ..db.database import AsyncSessionLocal
+
+    rule_id = result["rule_id"]
+    rule = result["rule"]
+    community = result["community"]
+    compiler = get_compiler()
+
     async with AsyncSessionLocal() as db:
         try:
-            rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-            rule = rule_result.scalar_one_or_none()
-            if not rule or rule.rule_type != "actionable":
-                return
-
-            community_result = await db.execute(
-                select(Community).where(Community.id == community_id)
-            )
-            community = community_result.scalar_one_or_none()
-            if not community:
-                return
-
-            other_rules_result = await db.execute(
-                select(Rule).where(
-                    Rule.community_id == community_id,
-                    Rule.is_active == True,
-                    Rule.id != rule_id,
-                )
-            )
-            other_rules = list(other_rules_result.scalars().all())
-
-            # Load existing top-level checklist items (parent_id IS NULL)
-            existing_result = await db.execute(
-                select(ChecklistItem).where(
-                    ChecklistItem.rule_id == rule_id,
-                    ChecklistItem.parent_id == None,  # noqa: E711
-                )
-            )
-            existing_items = list(existing_result.scalars().all())
-
-            # Fetch community atmosphere and representative posts for compilation context
-            community_atmosphere = community.atmosphere
-
-            approved_result = await db.execute(
-                select(Decision)
-                .where(Decision.community_id == community_id, Decision.moderator_verdict == "approve")
-                .order_by(Decision.created_at.desc())
-                .limit(5)
-            )
-            removed_result = await db.execute(
-                select(Decision)
-                .where(Decision.community_id == community_id, Decision.moderator_verdict == "remove")
-                .order_by(Decision.created_at.desc())
-                .limit(5)
-            )
-            sample_result = await db.execute(
-                select(CommunitySamplePost)
-                .where(CommunitySamplePost.community_id == community_id)
-                .order_by(CommunitySamplePost.created_at.desc())
-                .limit(20)
-            )
-            community_posts_sample = [
-                {"content": d.post_content, "label": "acceptable"}
-                for d in approved_result.scalars().all()
-            ] + [
-                {"content": d.post_content, "label": "unacceptable"}
-                for d in removed_result.scalars().all()
-            ] + [
-                {"content": p.content, "label": p.label, "note": p.note}
-                for p in sample_result.scalars().all()
-            ]
-
-            compiler = get_compiler()
-
-            if not existing_items:
-                # ── First compile ────────────────────────────────────────────
-                checklist_items, example_dicts = await compiler.compile_rule(
-                    rule=rule,
-                    community=community,
-                    other_rules=other_rules,
-                    community_atmosphere=community_atmosphere,
-                    community_posts_sample=community_posts_sample or None,
-                )
-                await _persist_new_items(db, checklist_items, rule_id)
+            if result["mode"] == "compile":
+                await _persist_new_items(db, result["checklist_items"], rule_id)
                 await db.flush()
                 items_result = await db.execute(
                     select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
                 )
                 item_desc_map = {i.description: i.id for i in items_result.scalars()}
-                await _persist_new_examples(db, example_dicts, rule_id, item_description_map=item_desc_map, community_id=rule.community_id)
+                await _persist_new_examples(
+                    db, result["example_dicts"], rule_id,
+                    item_description_map=item_desc_map, community_id=result["community_id"],
+                )
                 await db.flush()
                 await _fill_missing_examples(db, rule_id, compiler, rule, community)
             else:
-                # ── Recompile with diff ──────────────────────────────────────
-                operations = await compiler.recompile_with_diff(
-                    rule=rule,
-                    community=community,
-                    other_rules=other_rules,
-                    existing_items=existing_items,
-                )
-                existing_by_id = {item.id: item for item in existing_items}
-                await _apply_diff_operations(db, operations, existing_by_id, rule_id)
+                # Re-attach existing items to this session (merge returns new tracked instances)
+                existing_by_id = {}
+                for item in result["existing_items"]:
+                    merged = await db.merge(item)
+                    existing_by_id[merged.id] = merged
+                await _apply_diff_operations(db, result["operations"], existing_by_id, rule_id)
                 await db.flush()
                 await _re_resolve_checklist_links(db, rule_id)
                 await _fill_missing_examples(db, rule_id, compiler, rule, community)
@@ -187,6 +225,19 @@ async def _compile_rule_background(
         except Exception as e:
             logger.error(f"Compilation failed for rule {rule_id}: {e}")
             await db.rollback()
+
+
+async def _compile_rule_background(
+    rule_id: str,
+    community_id: str,
+) -> None:
+    """Background task to compile (or recompile) a single rule."""
+    try:
+        result = await _compile_rule_read_and_llm(rule_id, community_id)
+        if result:
+            await _compile_rule_persist(result)
+    except Exception as e:
+        logger.error(f"Compilation failed for rule {rule_id}: {e}")
 
 
 async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
@@ -360,8 +411,8 @@ async def _apply_diff_operations(
                         item_type=child_data.get("item_type", "subjective"),
                         logic=child_data.get("logic", {}),
                         action=child_data.get("action", "flag"),
-                        atmosphere_influenced=child_data.get("atmosphere_influenced", False),
-                        atmosphere_note=child_data.get("atmosphere_note"),
+                        context_influenced=child_data.get("context_influenced", child_data.get("atmosphere_influenced", False)),
+                        context_note=child_data.get("context_note", child_data.get("atmosphere_note")),
                     ))
 
         elif kind == "delete":
@@ -414,8 +465,8 @@ async def _apply_diff_operations(
                 item_type=op.get("item_type", "subjective"),
                 logic=op.get("logic", {}),
                 action=op.get("action", "flag"),
-                atmosphere_influenced=op.get("atmosphere_influenced", False),
-                atmosphere_note=op.get("atmosphere_note"),
+                context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", False)),
+                context_note=op.get("context_note", op.get("atmosphere_note")),
             )
             db.add(new_item)
             await db.flush()
@@ -429,8 +480,8 @@ async def _apply_diff_operations(
                     item_type=child_data.get("item_type", "subjective"),
                     logic=child_data.get("logic", {}),
                     action=child_data.get("action", "flag"),
-                    atmosphere_influenced=child_data.get("atmosphere_influenced", False),
-                    atmosphere_note=child_data.get("atmosphere_note"),
+                    context_influenced=child_data.get("context_influenced", child_data.get("atmosphere_influenced", False)),
+                    context_note=child_data.get("context_note", child_data.get("atmosphere_note")),
                 ))
 
         else:
@@ -536,13 +587,23 @@ async def batch_import_rules(
             actionable_ids.append(rule.id)
         results.append(RuleBatchImportResult(rule=RuleRead.model_validate(rule), triage_error=triage_error))
 
-    async def _compile_all_concurrent() -> None:
-        await asyncio.gather(
-            *[_compile_rule_background(rid, community_id) for rid in actionable_ids]
+    async def _compile_batch() -> None:
+        # Phase 1: Run all LLM compilations in parallel
+        llm_results = await asyncio.gather(
+            *[_compile_rule_read_and_llm(rid, community_id) for rid in actionable_ids],
+            return_exceptions=True,
         )
+        # Phase 2: Persist results sequentially (SQLite single-writer)
+        for rid, result in zip(actionable_ids, llm_results):
+            if isinstance(result, Exception):
+                logger.error(f"Compilation LLM phase failed for rule {rid}: {result}")
+                continue
+            if result is None:
+                continue
+            await _compile_rule_persist(result)
 
     if actionable_ids:
-        background_tasks.add_task(_compile_all_concurrent)
+        background_tasks.add_task(_compile_batch)
     actionable_count = len(actionable_ids)
 
     return RuleBatchImportResponse(

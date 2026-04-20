@@ -50,8 +50,17 @@ Each checklist item must have:
   - Leaf nodes (no children): use "remove" or "flag" to set the consequence. "continue" is not allowed for leaf nodes.
   - Non-leaf nodes (has children): MUST always be "continue". The verdict comes entirely from the children.
 - children: Sub-items evaluated when this item says YES (empty list for leaf nodes)
-- atmosphere_influenced: true if the community atmosphere profile shaped how this item was framed, calibrated, or phrased (e.g. threshold adjusted based on the community's known leniency, rubric reworded to match the community's tone). Set false when the item derives purely from the rule text.
-- atmosphere_note: If atmosphere_influenced is true, a one-sentence explanation of how the atmosphere influenced this item (e.g. "Threshold lowered to 0.6 because community atmosphere indicates strict enforcement of tone"). Set null otherwise.
+- context_influenced: true if the community context (purpose, participants, stakes, tone) shaped how this item was framed, calibrated, or phrased. Set false when the item derives purely from the rule text.
+- context_note: If context_influenced is true, a one-sentence explanation tracing the reasoning: "[situational fact] → [calibration decision]" (e.g. "Vulnerable population seeking crisis support → threshold lowered to 0.6 to catch dismissive comments that could cause real harm"). Set null otherwise.
+
+COMMUNITY CONTEXT CALIBRATION:
+When community context is provided, reason from the situation to your calibration choices:
+- Read the PURPOSE to understand what "off-topic" or "low quality" means for this specific community.
+- Read the PARTICIPANTS to understand who might be harmed and how — but also who might be discouraged by over-moderation.
+- Read the STAKES to calibrate how aggressive vs. conservative your thresholds should be.
+- Read the TONE to match rubric language and example tone to the community's actual communication style.
+For every item where context shaped your choice, set context_influenced=true and write a context_note
+that traces your reasoning: "[situational fact] → [calibration decision]".
 
 Tree evaluation semantics:
 - If an item says NO: no action, children are skipped.
@@ -64,7 +73,8 @@ Tree evaluation semantics:
   (confirms it's a real violation, not a false positive). Parent action = "continue" always.
 
 Logic schemas:
-- deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any"|"all", "negate": false}
+- deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any"|"all", "negate": false, "field": "all"|"title"|"body"}
+  - field: which part of the post to match against. "title" = title only, "body" = body/selftext only, "all" = title + body (default). Use "body" or "title" when the check is specifically about one field (e.g. "Is the body non-empty?").
   - negate=false: triggered when pattern IS found (e.g. spam keywords present)
   - negate=true: triggered when pattern is NOT found (e.g. required tag missing)
 - structural: {"type": "structural", "checks": [{"field": "account_age_days"|"post_type"|"flair"|"karma", "operator": "<"|">"|"<="|">="|"=="|"!="|"in", "value": ...}], "match_mode": "all"|"any"}
@@ -100,8 +110,8 @@ Output:
       },
       "action": "flag",
       "children": [],
-      "atmosphere_influenced": false,
-      "atmosphere_note": null
+      "context_influenced": false,
+      "context_note": null
     },
     {
       "description": "Does the content contain known spam domains or URL shorteners?",
@@ -117,8 +127,8 @@ Output:
       },
       "action": "flag",
       "children": [],
-      "atmosphere_influenced": false,
-      "atmosphere_note": null
+      "context_influenced": false,
+      "context_note": null
     },
     {
       "description": "Is this content primarily self-promotional, even without explicit keywords?",
@@ -133,8 +143,8 @@ Output:
       },
       "action": "remove",
       "children": [],
-      "atmosphere_influenced": false,
-      "atmosphere_note": null
+      "context_influenced": false,
+      "context_note": null
     },
     {
       "description": "Is the account new, which is a spam signal?",
@@ -149,8 +159,8 @@ Output:
       },
       "action": "flag",
       "children": [],
-      "atmosphere_influenced": false,
-      "atmosphere_note": null
+      "context_influenced": false,
+      "context_note": null
     }
   ],
   "examples": [
@@ -214,8 +224,8 @@ Output:
       },
       "action": "remove",
       "children": [],
-      "atmosphere_influenced": true,
-      "atmosphere_note": "Threshold lowered to 0.55 because the community atmosphere emphasizes keeping content light and fun, so even mild soap-boxing warrants removal."
+      "context_influenced": true,
+      "context_note": "Community purpose is casual mobile gaming fun → threshold lowered to 0.55 because even mild soap-boxing undermines the lighthearted atmosphere."
     },
     {
       "description": "Is the post or comment irrelevant to the Pikmin Bloom game?",
@@ -230,8 +240,8 @@ Output:
       },
       "action": "remove",
       "children": [],
-      "atmosphere_influenced": false,
-      "atmosphere_note": null
+      "context_influenced": false,
+      "context_note": null
     }
   ],
   "examples": [
@@ -288,6 +298,7 @@ def build_compile_prompt(
     existing_checklist: Optional[list] = None,
     existing_examples: Optional[list] = None,
     community_atmosphere: Optional[dict] = None,
+    community_context: Optional[dict] = None,
     community_posts_sample: Optional[list] = None,
 ) -> str:
     import json
@@ -297,6 +308,22 @@ def build_compile_prompt(
         existing_context += f"\n\nExisting checklist (preserve user customizations where rule intent unchanged):\n{json.dumps(existing_checklist, indent=2)}"
     if existing_examples:
         existing_context += f"\n\nExisting examples:\n{json.dumps(existing_examples, indent=2)}"
+
+    context_section = ""
+    if community_context:
+        ctx_lines = []
+        for dim, label in [("purpose", "PURPOSE"), ("participants", "PARTICIPANTS"),
+                           ("stakes", "STAKES"), ("tone", "TONE")]:
+            d = community_context.get(dim, {})
+            prose = d.get("prose", "")
+            tags = d.get("tags", [])
+            if prose:
+                ctx_lines.append(f"  {label}:")
+                ctx_lines.append(f"    {prose}")
+                if tags:
+                    ctx_lines.append(f"    [Tags: {', '.join(tags)}]")
+        if ctx_lines:
+            context_section = "\n\nCommunity context for calibration:\n" + "\n".join(ctx_lines)
 
     atmosphere_section = ""
     if community_atmosphere:
@@ -312,7 +339,7 @@ def build_compile_prompt(
             lines.append(f"  What doesn't belong: {atm['what_doesnt_belong']}")
         if atm.get("moderation_style"):
             lines.append(f"  Moderation style: {atm['moderation_style']}")
-        atmosphere_section = "\n\nCommunity atmosphere:\n" + "\n".join(lines)
+        atmosphere_section = "\n\nCommunication patterns (auto-inferred):\n" + "\n".join(lines)
 
     posts_section = ""
     if community_posts_sample:
@@ -349,7 +376,7 @@ def build_compile_prompt(
 Now compile the following rule for the "{community_name}" community on {platform}.
 
 Community context (other rules, for background):
-{other_rules_summary if other_rules_summary else "No other rules yet."}{atmosphere_section}{posts_section}
+{other_rules_summary if other_rules_summary else "No other rules yet."}{context_section}{atmosphere_section}{posts_section}
 {existing_context}
 
 Rule to compile:
@@ -367,8 +394,8 @@ Return JSON in exactly this format:
       "logic": {{}},
       "action": "...",
       "children": [],
-      "atmosphere_influenced": true | false,
-      "atmosphere_note": "explanation if atmosphere_influenced is true, else null"
+      "context_influenced": true | false,
+      "context_note": "[situational fact] → [calibration decision], or null"
     }}
   ],
   "examples": [
@@ -498,7 +525,8 @@ Item types:
 - **subjective**: Requires LLM judgment. Use when detecting the violation requires understanding context, intent, or nuance that patterns can't capture.
 
 Logic schemas:
-- deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any", "negate": false}
+- deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any", "negate": false, "field": "all"|"title"|"body"}
+  - field: "title" = title only, "body" = body only, "all" = title + body (default). Use "body" or "title" when the check targets a specific field.
 - structural: {"type": "structural", "checks": [{"field": "...", "operator": "<|>|==|!=|<=|>=", "value": ...}], "match_mode": "all"}
 - subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
 
@@ -542,12 +570,26 @@ def build_community_norms_prompt(
     rules_summary: str,
     recent_decisions: list[dict],
     community_atmosphere: Optional[dict] = None,
+    community_context: Optional[dict] = None,
 ) -> str:
     import json
 
     decisions_str = ""
     if recent_decisions:
         decisions_str = f"\n\nRecent moderator decisions for context:\n{json.dumps(recent_decisions[:5], indent=2)}"
+
+    # Render community context if available
+    context_str = ""
+    if community_context:
+        ctx_lines = []
+        for dim, label in [("purpose", "Purpose"), ("participants", "Participants"),
+                           ("stakes", "Stakes"), ("tone", "Tone")]:
+            d = community_context.get(dim, {})
+            prose = d.get("prose", "")
+            if prose:
+                ctx_lines.append(f"  {label}: {prose}")
+        if ctx_lines:
+            context_str = "\n\nCommunity context:\n" + "\n".join(ctx_lines)
 
     # Render post without thread_context in main JSON
     display_post = {k: v for k, v in post_content.items() if k != "thread_context"}
@@ -563,6 +605,7 @@ def build_community_norms_prompt(
 Community rules summary:
 {rules_summary}
 {decisions_str}
+{context_str}
 
 {"Community atmosphere:" if community_atmosphere else ""}
 {json.dumps(community_atmosphere, indent=2) if community_atmosphere else ""}
@@ -623,6 +666,120 @@ Return JSON in exactly this format:
   "what_belongs": "A sentence describing what content fits this community",
   "what_doesnt_belong": "A sentence describing what content doesn't fit, even if not explicitly rule-violating",
   "moderation_style": "How strict or lenient moderators tend to be, and what they prioritize"
+}}"""
+
+
+# ── Community Context Generation ─────────────────────────────────────────────
+
+GENERATE_CONTEXT_SYSTEM = """You are a community culture analyst. Given a community's metadata and \
+a representative sample of its actual posts and comments, generate a structured community context profile.
+
+Your analysis should reflect OBSERVED BEHAVIOR — what the community actually does — not just what its \
+sidebar says. Use the sampled posts and comments as primary evidence for tone and stakes.
+
+For each of the four dimensions (purpose, participants, stakes, tone), produce:
+1. A prose description (2-3 sentences) grounded in evidence from the posts
+2. Categorical tags from the provided taxonomy (3-5 per dimension)
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_generate_context_prompt(
+    community_name: str,
+    platform: str,
+    description: str,
+    rules_summary: str,
+    subscribers: Optional[int] = None,
+    sampled_posts: Optional[dict[str, list[dict]]] = None,
+    taxonomy: Optional[dict] = None,
+) -> str:
+    import json
+
+    meta_parts = [f"Name: r/{community_name}" if platform == "reddit" else f"Name: {community_name}",
+                  f"Platform: {platform}"]
+    if subscribers:
+        meta_parts.append(f"Subscribers: {subscribers:,}")
+    meta_section = " | ".join(meta_parts)
+
+    posts_section = ""
+    if sampled_posts:
+        parts = []
+        for category, label in [
+            ("hot", "Hot posts (current front page — typical day-to-day content)"),
+            ("top", "Celebrated posts (top of last month — what gets especially rewarded)"),
+            ("controversial", "Controversial posts (last month — where norms are contested)"),
+            ("ignored", "Ignored posts (score ≤ 1, at least 12h old — unwelcome but not rule-breaking)"),
+            ("comments", "Top comments (from popular threads — actual language and tone)"),
+        ]:
+            items = sampled_posts.get(category, [])
+            if not items:
+                continue
+            snippets = []
+            for p in items:
+                if category == "comments":
+                    body = p.get("body", "")[:300]
+                    score = p.get("score", "?")
+                    snippets.append(f"    [{score} pts] {body}")
+                else:
+                    title = p.get("title", "")
+                    body = (p.get("body", "") or "")[:200]
+                    score = p.get("score", "?")
+                    comments = p.get("num_comments", "?")
+                    ratio = p.get("upvote_ratio")
+                    ratio_str = f", {ratio:.0%} upvoted" if ratio is not None else ""
+                    snippet = f"    [{score} pts, {comments} comments{ratio_str}] {title}"
+                    if body:
+                        snippet += f" — {body}"
+                    snippets.append(snippet)
+            parts.append(f"  {label}:\n" + "\n".join(snippets))
+        if parts:
+            posts_section = "\n\nSAMPLED POSTS — What the community actually does:\n\n" + "\n\n".join(parts)
+
+    taxonomy_section = ""
+    if taxonomy:
+        parts = []
+        for dim in ["purpose", "participants", "stakes", "tone"]:
+            cats = taxonomy.get(dim, {})
+            tag_list = ", ".join(cats.keys())
+            parts.append(f"  {dim.upper()}: {tag_list}")
+        taxonomy_section = "\n\nAVAILABLE TAXONOMY TAGS (pick 3-5 per dimension from these):\n" + "\n".join(parts)
+
+    return f"""Analyze the community "{community_name}" on {platform} and generate a structured context profile.
+
+COMMUNITY METADATA:
+  {meta_section}
+  Description: {description or '(none)'}
+  Rules: {rules_summary or '(none)'}
+{posts_section}
+{taxonomy_section}
+
+Based on ALL of the above, generate community context.
+For each dimension, write prose that reflects observed behavior (not just stated rules),
+then assign tags from the taxonomy.
+
+Pay special attention to:
+- TONE: Use the actual comments from hot posts to characterize everyday language, humor, formality — not the sidebar's aspirations
+- STAKES: Use the contrast between hot/celebrated and ignored posts to identify what actually matters here
+- The gap between stated rules and actual behavior (e.g. rules say "be civil" but hot post comments are savage)
+
+Return JSON in exactly this format:
+{{
+  "purpose": {{
+    "prose": "2-3 sentences describing what this community is for, grounded in observed post content",
+    "tags": ["tag1", "tag2", "tag3"]
+  }},
+  "participants": {{
+    "prose": "2-3 sentences describing who participates and their characteristics",
+    "tags": ["tag1", "tag2", "tag3"]
+  }},
+  "stakes": {{
+    "prose": "2-3 sentences describing what could go wrong with harmful content OR over-moderation",
+    "tags": ["tag1", "tag2", "tag3"]
+  }},
+  "tone": {{
+    "prose": "2-3 sentences describing actual communication style based on observed posts/comments",
+    "tags": ["tag1", "tag2", "tag3"]
+  }}
 }}"""
 
 
@@ -995,8 +1152,8 @@ Return JSON in exactly this format:
         "logic": {{}},
         "action": "remove | flag | continue",
         "rule_text_anchor": null,
-        "atmosphere_influenced": false,
-        "atmosphere_note": null,
+        "context_influenced": false,
+        "context_note": null,
         "children": []
       }},
       "motivated_by": ["<example_id>"]

@@ -1,15 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Shield, Check, Trash2, Plus, Loader2, AlertTriangle, ThumbsUp, ThumbsDown, SkipForward } from 'lucide-react'
+import { Shield, Check, Plus, Loader2, AlertTriangle, ThumbsUp, ThumbsDown, SkipForward } from 'lucide-react'
 import {
   createCommunity,
-  generateAtmosphere,
-  listSamplePosts,
-  addSamplePost,
-  deleteSamplePost,
-  importSamplePostFromUrl,
-  crawlSamplePosts,
+  generateCommunityContext,
+  crawlContextSamples,
   listRules,
   createRule,
   batchImportRules,
@@ -18,8 +14,8 @@ import {
   acceptSuggestionWithLabel,
   dismissSuggestion,
   populateQueue,
-  CommunityAtmosphere,
-  CommunitySamplePost,
+  CommunityContext,
+  ContextSamples,
   Rule,
   BorderlineItem,
 } from '../api/client'
@@ -31,7 +27,7 @@ interface CommunitySetupProps {
 const STEPS = [
   { n: 1, label: 'Community' },
   { n: 2, label: 'Sample Posts' },
-  { n: 3, label: 'Atmosphere' },
+  { n: 3, label: 'Context' },
   { n: 4, label: 'Rules' },
   { n: 5, label: 'Calibrate' },
 ]
@@ -42,7 +38,6 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
 
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [communityId, setCommunityId] = useState('')
-  const [atmosphere, setAtmosphere] = useState<CommunityAtmosphere | null>(null)
 
   // ── Step 1 ────────────────────────────────────────────────────────────────
   const [name, setName] = useState('')
@@ -59,94 +54,42 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
   })
 
   // ── Step 2 ────────────────────────────────────────────────────────────────
-  const { data: samplePosts = [], refetch: refetchPosts } = useQuery({
-    queryKey: ['sample-posts', communityId],
-    queryFn: () => listSamplePosts(communityId),
-    enabled: !!communityId,
-  })
-
-  // Auto-crawl on entering step 2
   const crawlTriggered = useRef(false)
-  const crawlMutation = useMutation({
-    mutationFn: () => crawlSamplePosts(communityId),
-    onSuccess: () => {
-      refetchPosts()
+  const [contextSamples, setContextSamples] = useState<ContextSamples | null>(null)
+
+  const contextSamplesMutation = useMutation({
+    mutationFn: () => crawlContextSamples(communityId),
+    onSuccess: (data) => {
+      setContextSamples(data.context_samples)
     },
   })
 
   useEffect(() => {
     if (step === 2 && communityId && platform === 'reddit' && !crawlTriggered.current) {
       crawlTriggered.current = true
-      crawlMutation.mutate()
+      contextSamplesMutation.mutate()
     }
   }, [step, communityId, platform])
 
-  const [showManualAdd, setShowManualAdd] = useState(false)
-  const [postMode, setPostMode] = useState<'manual' | 'url'>('manual')
-  // Manual form
-  const [postLabel, setPostLabel] = useState<'acceptable' | 'unacceptable'>('acceptable')
-  const [postTitle, setPostTitle] = useState('')
-  const [postBody, setPostBody] = useState('')
-  const [postNote, setPostNote] = useState('')
-  const [postError, setPostError] = useState('')
-
-  const addPostMutation = useMutation({
-    mutationFn: () =>
-      addSamplePost(communityId, {
-        content: { content: { title: postTitle.trim(), body: postBody.trim() }, author: {}, context: {} },
-        label: postLabel,
-        note: postNote.trim() || undefined,
-      }),
-    onSuccess: () => {
-      refetchPosts()
-      setPostTitle('')
-      setPostBody('')
-      setPostNote('')
-      setPostError('')
-    },
-    onError: () => setPostError('Failed to add post.'),
-  })
-
-  // URL form
-  const [urlValue, setUrlValue] = useState('')
-  const [urlLabel, setUrlLabel] = useState<'acceptable' | 'unacceptable'>('acceptable')
-  const [urlNote, setUrlNote] = useState('')
-  const [urlError, setUrlError] = useState('')
-
-  const importUrlMutation = useMutation({
-    mutationFn: () =>
-      importSamplePostFromUrl(communityId, { url: urlValue.trim(), label: urlLabel, note: urlNote.trim() || undefined }),
-    onSuccess: () => {
-      refetchPosts()
-      setUrlValue('')
-      setUrlNote('')
-      setUrlError('')
-    },
-    onError: () => setUrlError('Failed to import post. Check the URL and try again.'),
-  })
-
-  const deletePostMutation = useMutation({
-    mutationFn: (postId: string) => deleteSamplePost(communityId, postId),
-    onSuccess: () => refetchPosts(),
-  })
-
   // ── Step 3 ────────────────────────────────────────────────────────────────
-  const [atmosphereError, setAtmosphereError] = useState('')
-  const atmosphereTriggered = useRef(false)
-  const generateMutation = useMutation({
-    mutationFn: () => generateAtmosphere(communityId),
+  const [communityContext, setCommunityContext] = useState<CommunityContext | null>(null)
+  const [contextError, setContextError] = useState('')
+  const contextTriggered = useRef(false)
+
+  const contextMutation = useMutation({
+    mutationFn: () => generateCommunityContext(communityId),
     onSuccess: (data) => {
-      setAtmosphere(data.community.atmosphere)
-      setAtmosphereError('')
+      setCommunityContext(data.community_context)
+      setContextError('')
     },
-    onError: () => setAtmosphereError('Failed to generate atmosphere. Make sure you have sample posts added.'),
+    onError: () => setContextError('Failed to generate community context.'),
   })
 
-  // Auto-trigger atmosphere generation on entering step 3
+  // Auto-trigger context generation on entering step 3
   useEffect(() => {
-    if (step === 3 && communityId && !atmosphereTriggered.current && !atmosphere) {
-      atmosphereTriggered.current = true
-      generateMutation.mutate()
+    if (step === 3 && communityId && !contextTriggered.current && !communityContext) {
+      contextTriggered.current = true
+      contextMutation.mutate()
     }
   }, [step, communityId])
 
@@ -397,174 +340,34 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
           {step === 2 && (
             <div className="space-y-4">
               <div className="card p-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Sample posts for Inferring Community Atmosphere</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Sample posts</h2>
                 <p className="text-sm text-gray-500 mb-6">
                   {platform === 'reddit'
-                    ? 'To understand the community atmosphere, the system is fetching top posts from the subreddit automatically. You can also add additional posts that are encouraged or not accepted in the community manually if needed.'
-                    : 'Add representative posts - a mix of acceptable and unacceptable examples - to calibrate the community atmosphere.'}
+                    ? 'The system samples posts across different activity categories — hot, top, controversial, ignored, and comments — to build a well-rounded picture of the community. Review the results below before proceeding to context generation.'
+                    : 'Context sampling is only available for Reddit communities. You can proceed to add rules directly.'}
                 </p>
 
-                {/* Auto-crawl status */}
-                {crawlMutation.isPending && (
-                  <div className="flex items-center gap-3 text-sm text-gray-600 bg-indigo-50 rounded-lg px-4 py-3 mb-4">
+                {contextSamplesMutation.isPending && (
+                  <div className="flex items-center gap-3 text-sm text-gray-600 bg-indigo-50 rounded-lg px-4 py-3">
                     <Loader2 size={16} className="animate-spin text-indigo-500 flex-shrink-0" />
-                    <span>Fetching posts from the subreddit...</span>
+                    <span>Sampling posts from the subreddit (hot, top, controversial, ignored, comments)...</span>
                   </div>
                 )}
-                {crawlMutation.isError && (
-                  <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 rounded-md px-3 py-2 mb-4">
+                {contextSamplesMutation.isError && (
+                  <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 rounded-md px-3 py-2">
                     <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-                    <span>Could not auto-fetch posts. You can add posts manually below.</span>
+                    <span>Could not sample posts from the subreddit. You can retry or skip this step.</span>
                   </div>
-                )}
-                {crawlMutation.isSuccess && (
-                  <div className="text-sm text-green-700 bg-green-50 rounded-md px-3 py-2 mb-4">
-                    Fetched {crawlMutation.data.crawled_count} posts from the subreddit.
-                  </div>
-                )}
-
-                {/* Add more posts toggle */}
-                {!showManualAdd ? (
-                  <button
-                    className="btn-secondary flex items-center gap-1.5 text-sm"
-                    onClick={() => setShowManualAdd(true)}
-                  >
-                    <Plus size={13} />
-                    Add posts manually
-                  </button>
-                ) : (
-                  <>
-                    {/* Mode toggle */}
-                    <div className="flex gap-2 mb-4">
-                      {(['manual', 'url'] as const).map(m => (
-                        <button
-                          key={m}
-                          className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${postMode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 text-gray-600 hover:border-indigo-400'}`}
-                          onClick={() => setPostMode(m)}
-                        >
-                          {m === 'manual' ? 'Manual' : 'Import with Reddit Post URL'}
-                        </button>
-                      ))}
-                    </div>
-
-                    {postMode === 'manual' ? (
-                      <div className="space-y-3">
-                        <div className="flex gap-2">
-                          {(['acceptable', 'unacceptable'] as const).map(l => (
-                            <button
-                              key={l}
-                              onClick={() => setPostLabel(l)}
-                              className={`flex-1 py-1.5 rounded border text-xs font-medium transition-colors ${postLabel === l ? (l === 'acceptable' ? 'bg-green-600 text-white border-green-600' : 'bg-red-600 text-white border-red-600') : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-                            >
-                              {l.charAt(0).toUpperCase() + l.slice(1)}
-                            </button>
-                          ))}
-                        </div>
-                        <input
-                          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          placeholder="Post title"
-                          value={postTitle}
-                          onChange={e => setPostTitle(e.target.value)}
-                        />
-                        <textarea
-                          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
-                          placeholder="Post body"
-                          rows={3}
-                          value={postBody}
-                          onChange={e => setPostBody(e.target.value)}
-                        />
-                        <input
-                          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          placeholder="Note (optional): why is this acceptable/unacceptable?"
-                          value={postNote}
-                          onChange={e => setPostNote(e.target.value)}
-                        />
-                        {postError && <p className="text-sm text-red-600">{postError}</p>}
-                        <button
-                          className="btn-secondary flex items-center gap-1.5 text-sm"
-                          disabled={!postTitle.trim() || addPostMutation.isPending}
-                          onClick={() => addPostMutation.mutate()}
-                        >
-                          {addPostMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-                          Add post
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="flex gap-2">
-                          {(['acceptable', 'unacceptable'] as const).map(l => (
-                            <button
-                              key={l}
-                              onClick={() => setUrlLabel(l)}
-                              className={`flex-1 py-1.5 rounded border text-xs font-medium transition-colors ${urlLabel === l ? (l === 'acceptable' ? 'bg-green-600 text-white border-green-600' : 'bg-red-600 text-white border-red-600') : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}
-                            >
-                              {l.charAt(0).toUpperCase() + l.slice(1)}
-                            </button>
-                          ))}
-                        </div>
-                        <input
-                          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          placeholder="Reddit post URL"
-                          value={urlValue}
-                          onChange={e => setUrlValue(e.target.value)}
-                        />
-                        <input
-                          className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          placeholder="Note (optional)"
-                          value={urlNote}
-                          onChange={e => setUrlNote(e.target.value)}
-                        />
-                        {urlError && <p className="text-sm text-red-600">{urlError}</p>}
-                        <button
-                          className="btn-secondary flex items-center gap-1.5 text-sm"
-                          disabled={!urlValue.trim() || importUrlMutation.isPending}
-                          onClick={() => importUrlMutation.mutate()}
-                        >
-                          {importUrlMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-                          Import post
-                        </button>
-                      </div>
-                    )}
-                  </>
                 )}
               </div>
 
-              {/* Sample posts list */}
-              {samplePosts.length > 0 && (
-                <div className="card p-4">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-                    Posts ({samplePosts.length})
-                  </h3>
-                  <div className="space-y-2 max-h-80 overflow-y-auto">
-                    {samplePosts.map((post: CommunitySamplePost) => {
-                      const content = (post.content as any)?.content
-                      const title = content?.title || '(untitled)'
-                      return (
-                        <div key={post.id} className="flex items-start gap-3 py-1.5">
-                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 mt-0.5 ${post.label === 'acceptable' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {post.label}
-                          </span>
-                          <span className="text-sm text-gray-800 flex-1 truncate">{title}</span>
-                          <button
-                            onClick={() => deletePostMutation.mutate(post.id)}
-                            disabled={deletePostMutation.isPending}
-                            className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
+              {contextSamples && <ContextSamplesPreview samples={contextSamples} onRecrawl={() => contextSamplesMutation.mutate()} isRecrawling={contextSamplesMutation.isPending} />}
 
               <StepNav
                 onBack={() => setStep(1)}
                 onContinue={() => setStep(3)}
                 continueLabel="Continue →"
-                continueDisabled={crawlMutation.isPending}
-                skipWarning={samplePosts.length === 0 && !crawlMutation.isPending ? 'No sample posts added - atmosphere generation could be limited.' : undefined}
+                continueDisabled={contextSamplesMutation.isPending}
               />
             </div>
           )}
@@ -573,64 +376,35 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
           {step === 3 && (
             <div className="card p-8 space-y-5">
               <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Community atmosphere</h2>
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Community context</h2>
                 <p className="text-sm text-gray-500">
-                  The atmosphere profile captures the tone, typical content, and moderation style of your community. It is used to calibrate subjective rubrics when compiling rules.
+                  The community context captures what this community is about across four dimensions — purpose, participants, stakes, and tone — generated from the sampled posts.
                 </p>
               </div>
 
-              {/* Auto-generating indicator */}
-              {generateMutation.isPending && (
+              {contextMutation.isPending && (
                 <div className="flex items-center gap-3 text-sm text-gray-600 bg-indigo-50 rounded-lg px-4 py-3">
                   <Loader2 size={16} className="animate-spin text-indigo-500 flex-shrink-0" />
-                  <span>Generating atmosphere profile...</span>
+                  <span>Generating community context...</span>
                 </div>
               )}
 
-              {atmosphereError && (
+              {contextError && (
                 <div className="flex items-start gap-2 text-sm text-red-600 bg-red-50 rounded-md px-3 py-2">
                   <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-                  {atmosphereError}
+                  {contextError}
                 </div>
               )}
 
-              {atmosphere && (
-                <>
-                  <div className="rounded-lg bg-gray-50 border border-gray-200 divide-y divide-gray-200">
-                    {(
-                      [
-                        ['Tone', atmosphere.tone],
-                        ['Typical content', atmosphere.typical_content],
-                        ['What belongs', atmosphere.what_belongs],
-                        ["What doesn't belong", atmosphere.what_doesnt_belong],
-                        ['Moderation style', atmosphere.moderation_style],
-                      ] as [string, string][]
-                    ).map(([label, value]) => (
-                      <div key={label} className="px-4 py-3">
-                        <div className="text-xs font-semibold text-gray-500 mb-0.5">{label}</div>
-                        <div className="text-sm text-gray-800">{value}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <button
-                    className="btn-secondary flex items-center gap-2 text-sm"
-                    onClick={() => {
-                      atmosphereTriggered.current = false
-                      generateMutation.mutate()
-                    }}
-                    disabled={generateMutation.isPending}
-                  >
-                    {generateMutation.isPending && <Loader2 size={14} className="animate-spin" />}
-                    Regenerate
-                  </button>
-                </>
+              {communityContext && (
+                <ContextDimensionsView context={communityContext} onRegenerate={() => { contextTriggered.current = false; contextMutation.mutate() }} isRegenerating={contextMutation.isPending} />
               )}
 
               <StepNav
                 onBack={() => setStep(2)}
                 onContinue={() => setStep(4)}
                 continueLabel="Continue →"
-                continueDisabled={generateMutation.isPending}
+                continueDisabled={contextMutation.isPending}
               />
             </div>
           )}
@@ -1060,6 +834,162 @@ function CalibrateStep({
             {allResolved || borderlineItems.length === 0 ? 'Finish Setup →' : 'Skip & Finish →'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+
+const DIMENSION_META: [string, keyof CommunityContext][] = [
+  ['Purpose', 'purpose'],
+  ['Participants', 'participants'],
+  ['Stakes', 'stakes'],
+  ['Tone', 'tone'],
+]
+
+function ContextDimensionsView({
+  context,
+  onRegenerate,
+  isRegenerating,
+}: {
+  context: CommunityContext
+  onRegenerate: () => void
+  isRegenerating: boolean
+}) {
+  const [expandedDim, setExpandedDim] = useState<string | null>(null)
+
+  return (
+    <>
+      <div className="space-y-2">
+        {DIMENSION_META.map(([label, key]) => {
+          const dim = context[key]
+          if (!dim) return null
+          const isOpen = expandedDim === key
+          return (
+            <div key={key} className="rounded-lg bg-gray-50 border border-gray-200">
+              <button
+                className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-gray-100 transition-colors rounded-lg"
+                onClick={() => setExpandedDim(isOpen ? null : key)}
+              >
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider w-24 flex-shrink-0">{label}</span>
+                <div className="flex flex-wrap gap-1.5 flex-1">
+                  {dim.tags.map(tag => (
+                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-xs text-gray-300 flex-shrink-0">{isOpen ? '▾' : '▸'}</span>
+              </button>
+              {isOpen && (
+                <div className="px-4 pb-3 pt-0">
+                  <p className="text-sm text-gray-600 border-t border-gray-200 pt-2">{dim.prose}</p>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <button
+        className="btn-secondary flex items-center gap-2 text-sm"
+        onClick={onRegenerate}
+        disabled={isRegenerating}
+      >
+        {isRegenerating && <Loader2 size={14} className="animate-spin" />}
+        Regenerate
+      </button>
+    </>
+  )
+}
+
+
+const CATEGORY_META: Record<string, { label: string; color: string; description: string }> = {
+  hot: { label: 'Hot', color: 'text-orange-700 bg-orange-100', description: 'Current front page — typical day-to-day content' },
+  top: { label: 'Top (month)', color: 'text-amber-700 bg-amber-100', description: 'What the community celebrates and upvotes' },
+  controversial: { label: 'Controversial', color: 'text-purple-700 bg-purple-100', description: 'Where norms are contested' },
+  ignored: { label: 'Ignored', color: 'text-gray-600 bg-gray-200', description: 'Low-score posts — content the community doesn\'t engage with' },
+  comments: { label: 'Comments', color: 'text-blue-700 bg-blue-100', description: 'Top comments showing actual language and tone' },
+}
+
+function ContextSamplesPreview({
+  samples,
+  onRecrawl,
+  isRecrawling,
+}: {
+  samples: ContextSamples
+  onRecrawl: () => void
+  isRecrawling: boolean
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const totalPosts = samples.hot.length + samples.top.length + samples.controversial.length + samples.ignored.length
+  const totalComments = samples.comments.length
+
+  return (
+    <div className="card p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          Context samples ({totalPosts} posts, {totalComments} comments)
+        </h3>
+        <button
+          className="btn-secondary flex items-center gap-1.5 text-xs py-1"
+          onClick={onRecrawl}
+          disabled={isRecrawling}
+        >
+          {isRecrawling && <Loader2 size={12} className="animate-spin" />}
+          Re-sample
+        </button>
+      </div>
+      <p className="text-xs text-gray-400">
+        These posts are sampled across different activity categories to build a well-rounded community context. Click a category to preview.
+      </p>
+      <div className="space-y-1">
+        {(['hot', 'top', 'controversial', 'ignored', 'comments'] as const).map(cat => {
+          const meta = CATEGORY_META[cat]
+          const items = samples[cat]
+          const isOpen = expanded === cat
+          return (
+            <div key={cat}>
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors text-left"
+                onClick={() => setExpanded(isOpen ? null : cat)}
+              >
+                <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${meta.color}`}>
+                  {meta.label}
+                </span>
+                <span className="text-xs text-gray-400 flex-1">{meta.description}</span>
+                <span className="text-xs text-gray-400 font-mono">{items.length}</span>
+                <span className="text-xs text-gray-300">{isOpen ? '▾' : '▸'}</span>
+              </button>
+              {isOpen && items.length > 0 && (
+                <div className="ml-3 border-l-2 border-gray-100 pl-3 pb-2 space-y-1.5 max-h-60 overflow-y-auto">
+                  {items.map((item, i) => (
+                    <div key={i} className="text-xs text-gray-600 py-1">
+                      {cat === 'comments' ? (
+                        <div className="flex gap-2">
+                          <span className="text-gray-400 flex-shrink-0">▪ score {(item as any).score}</span>
+                          <span className="line-clamp-2">{(item as any).body}</span>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex gap-2">
+                            <span className="text-gray-400 flex-shrink-0">↑{(item as any).score}</span>
+                            <span className="font-medium text-gray-700">{(item as any).title}</span>
+                          </div>
+                          {(item as any).body && (
+                            <p className="text-gray-400 line-clamp-1 ml-8 mt-0.5">{(item as any).body}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {isOpen && items.length === 0 && (
+                <p className="ml-3 text-xs text-gray-400 italic py-1 pl-3">No posts in this category</p>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

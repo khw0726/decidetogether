@@ -316,11 +316,11 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
                     Anchor: &ldquo;{item.rule_text_anchor}&rdquo;
                   </p>
                 )} */}
-                {item.atmosphere_influenced && (
-                  <div className="flex items-start gap-1 mt-1" title={item.atmosphere_note ?? 'Shaped by community atmosphere'}>
+                {item.context_influenced && (
+                  <div className="flex items-start gap-1 mt-1" title={item.context_note ?? 'Shaped by community context'}>
                     <Sparkles size={11} className="text-teal-500 mt-0.5 flex-shrink-0" />
                     <span className="text-xs text-teal-700">
-                      {item.atmosphere_note ?? 'Influenced by community atmosphere'}
+                      {item.context_note ?? 'Influenced by community context'}
                     </span>
                   </div>
                 )}

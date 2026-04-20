@@ -58,18 +58,18 @@ _COMPILE_TOOL = {
                             "enum": ["remove", "flag", "continue"],
                         },
                         "children": {"type": "array", "items": {"type": "object"}},
-                        "atmosphere_influenced": {
+                        "context_influenced": {
                             "type": "boolean",
-                            "description": "True if community atmosphere shaped how this item was framed or calibrated",
+                            "description": "True if community context shaped how this item was framed or calibrated",
                         },
-                        "atmosphere_note": {
+                        "context_note": {
                             "type": ["string", "null"],
-                            "description": "Brief explanation of how community atmosphere influenced this item",
+                            "description": "Brief explanation of how community context influenced this item. Trace the reasoning: '[situational fact] → [calibration decision]'",
                         },
                     },
                     "required": [
                         "description", "item_type", "logic",
-                        "action", "children", "atmosphere_influenced",
+                        "action", "children", "context_influenced",
                     ],
                 },
             },
@@ -317,6 +317,49 @@ _GENERATE_ATMOSPHERE_TOOL = {
     },
 }
 
+_GENERATE_CONTEXT_TOOL = {
+    "name": "submit_community_context",
+    "description": "Submit a structured community context profile with four dimensions",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "purpose": {
+                "type": "object",
+                "properties": {
+                    "prose": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["prose", "tags"],
+            },
+            "participants": {
+                "type": "object",
+                "properties": {
+                    "prose": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["prose", "tags"],
+            },
+            "stakes": {
+                "type": "object",
+                "properties": {
+                    "prose": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["prose", "tags"],
+            },
+            "tone": {
+                "type": "object",
+                "properties": {
+                    "prose": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["prose", "tags"],
+            },
+        },
+        "required": ["purpose", "participants", "stakes", "tone"],
+    },
+}
+
 _SUGGEST_FROM_CHECKLIST_TOOL = {
     "name": "submit_checklist_suggestions",
     "description": "Submit suggested examples and optional rule text updates",
@@ -498,6 +541,7 @@ class RuleCompiler:
         existing_items: Optional[list[ChecklistItem]] = None,
         existing_examples: Optional[list[Example]] = None,
         community_atmosphere: Optional[dict] = None,
+        community_context: Optional[dict] = None,
         community_posts_sample: Optional[list[dict]] = None,
     ) -> tuple[list[ChecklistItem], list[dict]]:
         """Compile actionable rule into checklist tree + examples.
@@ -527,6 +571,7 @@ class RuleCompiler:
             existing_checklist=existing_checklist_dicts,
             existing_examples=existing_example_dicts,
             community_atmosphere=community_atmosphere,
+            community_context=community_context,
             community_posts_sample=community_posts_sample,
         )
 
@@ -572,6 +617,42 @@ class RuleCompiler:
             "moderation_style": result.get("moderation_style", ""),
         }
 
+    async def generate_community_context(
+        self,
+        community_name: str,
+        platform: str,
+        description: str,
+        rules_summary: str,
+        subscribers: Optional[int] = None,
+        sampled_posts: Optional[dict[str, list[dict]]] = None,
+        taxonomy: Optional[dict] = None,
+    ) -> dict:
+        """Generate structured community context (purpose/participants/stakes/tone) from metadata + sampled posts."""
+        logger.info(f"Generating community context for '{community_name}'")
+        user_prompt = prompts.build_generate_context_prompt(
+            community_name=community_name,
+            platform=platform,
+            description=description,
+            rules_summary=rules_summary,
+            subscribers=subscribers,
+            sampled_posts=sampled_posts,
+            taxonomy=taxonomy,
+        )
+        result = await self._call_claude(
+            prompts.GENERATE_CONTEXT_SYSTEM,
+            user_prompt,
+            tool=_GENERATE_CONTEXT_TOOL,
+        )
+        # Normalize output
+        context = {}
+        for dim in ["purpose", "participants", "stakes", "tone"]:
+            d = result.get(dim, {})
+            context[dim] = {
+                "prose": d.get("prose", ""),
+                "tags": d.get("tags", []),
+            }
+        return context
+
     def _parse_flat_items(
         self, items_data: list[dict], rule_id: str
     ) -> list[ChecklistItem]:
@@ -600,8 +681,8 @@ class RuleCompiler:
                 item_type=item_data.get("item_type", "subjective"),
                 logic=item_data.get("logic", {}),
                 action=item_data.get("action", "flag"),
-                atmosphere_influenced=item_data.get("atmosphere_influenced", False),
-                atmosphere_note=item_data.get("atmosphere_note"),
+                context_influenced=item_data.get("context_influenced", item_data.get("atmosphere_influenced", False)),
+                context_note=item_data.get("context_note", item_data.get("atmosphere_note")),
             )
             result.append(item)
             order += 1

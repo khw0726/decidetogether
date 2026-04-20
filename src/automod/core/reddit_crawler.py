@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime, timezone
 
 import asyncpraw
@@ -244,3 +245,129 @@ async def crawl_subreddit_top_posts(
     except Exception as exc:
         logger.warning("Failed to crawl r/%s: %s", subreddit, exc)
         return []
+
+
+async def sample_subreddit_for_context(
+    subreddit: str,
+    client_id: str,
+    client_secret: str,
+    user_agent: str,
+    username: str = "",
+    password: str = "",
+) -> dict[str, list[dict]]:
+    """Sample posts from a subreddit using activity-based strategy for context generation.
+
+    Returns a dict with keys: hot, top, controversial, ignored, comments.
+    Each value is a list of lightweight dicts (title, body, score, num_comments).
+    """
+    result: dict[str, list[dict]] = {
+        "hot": [],
+        "top": [],
+        "controversial": [],
+        "ignored": [],
+        "comments": [],
+    }
+
+    try:
+        async with asyncpraw.Reddit(
+            client_id=client_id,
+            client_secret=client_secret,
+            user_agent=user_agent,
+            username=username or None,
+            password=password or None,
+        ) as reddit:
+            sub = await reddit.subreddit(subreddit)
+
+            # Hot posts — typical day-to-day content (primary sample)
+            hot_posts = []
+            async for post in sub.hot(limit=25):
+                if post.stickied:
+                    continue
+                hot_posts.append(post)
+                result["hot"].append({
+                    "title": post.title.strip(),
+                    "body": (post.selftext or "")[:300].strip(),
+                    "score": post.score,
+                    "num_comments": post.num_comments,
+                    "upvote_ratio": post.upvote_ratio,
+                })
+
+            # Top posts — what the community celebrates (secondary)
+            async for post in sub.top(time_filter="month", limit=10):
+                if post.stickied:
+                    continue
+                result["top"].append({
+                    "title": post.title.strip(),
+                    "body": (post.selftext or "")[:300].strip(),
+                    "score": post.score,
+                    "num_comments": post.num_comments,
+                    "upvote_ratio": post.upvote_ratio,
+                })
+
+            # Controversial — where norms are contested
+            async for post in sub.controversial(time_filter="month", limit=10):
+                result["controversial"].append({
+                    "title": post.title.strip(),
+                    "body": (post.selftext or "")[:300].strip(),
+                    "score": post.score,
+                    "num_comments": post.num_comments,
+                    "upvote_ratio": post.upvote_ratio,
+                })
+
+            # Ignored posts — low-engagement posts that the community didn't
+            # interact with.  Try the past week first; if too few results
+            # (common on low-volume subs), widen to a month.
+            ignored_count = 0
+            for tf in ("week", "month"):
+                async for post in sub.new(limit=200 if tf == "week" else 500):
+                    # new() doesn't support time_filter; skip posts outside window
+                    age_days = (time.time() - post.created_utc) / 86400
+                    if tf == "week" and age_days > 7:
+                        break
+                    if tf == "month" and age_days > 30:
+                        break
+                    if post.stickied:
+                        continue
+                    if post.score <= 1 and post.num_comments <= 2:
+                        result["ignored"].append({
+                            "title": post.title.strip(),
+                            "body": (post.selftext or "")[:300].strip(),
+                            "score": post.score,
+                            "num_comments": post.num_comments,
+                            "upvote_ratio": post.upvote_ratio,
+                        })
+                        ignored_count += 1
+                        if ignored_count >= 20:
+                            break
+                if ignored_count >= 5:
+                    break
+
+            # Top comments from hot posts — actual language and tone
+            for post in hot_posts[:10]:
+                try:
+                    post.comment_sort = "top"
+                    await post.load()
+                    await post.comments.replace_more(limit=0)
+                    for comment in post.comments[:5]:
+                        body = (comment.body or "").strip()
+                        if body and body not in ("[removed]", "[deleted]"):
+                            result["comments"].append({
+                                "body": body[:300],
+                                "score": comment.score,
+                            })
+                except Exception:
+                    continue
+
+        logger.info(
+            "Sampled r/%s: %d hot, %d top, %d controversial, %d ignored, %d comments",
+            subreddit,
+            len(result["hot"]),
+            len(result["top"]),
+            len(result["controversial"]),
+            len(result["ignored"]),
+            len(result["comments"]),
+        )
+    except Exception as exc:
+        logger.warning("Failed to sample r/%s for context: %s", subreddit, exc)
+
+    return result

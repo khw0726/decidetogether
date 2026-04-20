@@ -17,12 +17,41 @@ export interface CommunityAtmosphere {
   moderation_style: string
 }
 
+export interface CommunityContextDimension {
+  prose: string
+  tags: string[]
+}
+
+export interface CommunityContext {
+  purpose?: CommunityContextDimension
+  participants?: CommunityContextDimension
+  stakes?: CommunityContextDimension
+  tone?: CommunityContextDimension
+}
+
+export interface ContextSamplePost {
+  title?: string
+  body?: string
+  score?: number
+  num_comments?: number
+}
+
+export interface ContextSamples {
+  hot: ContextSamplePost[]
+  top: ContextSamplePost[]
+  controversial: ContextSamplePost[]
+  ignored: ContextSamplePost[]
+  comments: { body: string; score: number }[]
+}
+
 export interface Community {
   id: string
   name: string
   platform: string
   platform_config: Record<string, unknown> | null
   atmosphere: CommunityAtmosphere | null
+  community_context: CommunityContext | null
+  context_samples: ContextSamples | null
   created_at: string
 }
 
@@ -64,8 +93,8 @@ export interface ChecklistItem {
   item_type: 'deterministic' | 'structural' | 'subjective'
   logic: Record<string, unknown>
   action: string
-  atmosphere_influenced: boolean
-  atmosphere_note: string | null
+  context_influenced: boolean
+  context_note: string | null
   updated_at: string
   children: ChecklistItem[]
 }
@@ -108,8 +137,8 @@ export interface PreviewRecompileResult {
     rule_text_anchor?: string | null
     item_type?: string
     action?: string
-    atmosphere_influenced?: boolean
-    atmosphere_note?: string | null
+    context_influenced?: boolean
+    context_note?: string | null
   }>
   example_verdicts: Array<{
     example_id: string
@@ -197,6 +226,21 @@ export const deleteCommunity = (id: string) =>
 
 export const generateAtmosphere = (communityId: string) =>
   api.post<AtmosphereGenerateResponse>(`/communities/${communityId}/atmosphere/generate`).then(r => r.data)
+
+export const getCommunityContext = (communityId: string) =>
+  api.get<CommunityContext>(`/communities/${communityId}/context`).then(r => r.data)
+
+export const updateCommunityContext = (communityId: string, data: Partial<CommunityContext>) =>
+  api.put<CommunityContext>(`/communities/${communityId}/context`, data).then(r => r.data)
+
+export const generateCommunityContext = (communityId: string) =>
+  api.post<{ community_context: CommunityContext }>(`/communities/${communityId}/context/generate`).then(r => r.data)
+
+export const getContextSamples = (communityId: string) =>
+  api.get<{ context_samples: ContextSamples }>(`/communities/${communityId}/context-samples`).then(r => r.data)
+
+export const crawlContextSamples = (communityId: string) =>
+  api.post<{ context_samples: ContextSamples }>(`/communities/${communityId}/context-samples/crawl`).then(r => r.data)
 
 export const listSamplePosts = (communityId: string) =>
   api.get<CommunitySamplePost[]>(`/communities/${communityId}/sample-posts`).then(r => r.data)

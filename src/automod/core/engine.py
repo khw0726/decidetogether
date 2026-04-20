@@ -135,7 +135,8 @@ class EvaluationEngine:
                 post=post,
                 community_name=community.name,
                 rules_summary=rules_summary,
-                community_atmosphere = community.atmosphere,
+                community_atmosphere=community.atmosphere,
+                community_context=community.community_context,
             )
             if norms_result.get("violates_norms"):
                 norms_confidence = norms_result.get("confidence", 0.5)
@@ -199,6 +200,7 @@ class EvaluationEngine:
         community_name: str,
         rules_summary: str,
         community_atmosphere: dict[str, Any],
+        community_context: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
         """Run the community norms check."""
         _norms_tool = {
@@ -221,6 +223,7 @@ class EvaluationEngine:
                 rules_summary=rules_summary,
                 recent_decisions=[],
                 community_atmosphere=community_atmosphere,
+                community_context=community_context,
             )
             response = await self.client.messages.create(
                 model=self.settings.haiku_model,

@@ -484,8 +484,8 @@ def _apply_diff_to_checklist(
                 item_type=op.get("item_type") or item.item_type,
                 logic=op.get("logic") or item.logic,
                 action=op.get("action") or item.action,
-                atmosphere_influenced=op.get("atmosphere_influenced", item.atmosphere_influenced),
-                atmosphere_note=op.get("atmosphere_note", item.atmosphere_note),
+                context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", item.context_influenced)),
+                context_note=op.get("context_note", op.get("atmosphere_note", item.context_note)),
             ))
         else:
             hypothetical.append(item)
@@ -503,8 +503,8 @@ def _apply_diff_to_checklist(
                 item_type=op.get("item_type", "subjective"),
                 logic=op.get("logic") or {},
                 action=op.get("action", "flag"),
-                atmosphere_influenced=op.get("atmosphere_influenced", False),
-                atmosphere_note=op.get("atmosphere_note"),
+                context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", False)),
+                context_note=op.get("context_note", op.get("atmosphere_note")),
             ))
 
     return hypothetical

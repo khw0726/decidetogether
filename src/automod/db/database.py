@@ -101,6 +101,39 @@ async def _migrate_checklist_atmosphere_fields(conn) -> None:
         ))
 
 
+async def _migrate_community_context_field(conn) -> None:
+    """Add community_context column to communities table if missing."""
+    cols_result = await conn.execute(text("PRAGMA table_info(communities)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if not col_names:
+        return
+    if "community_context" not in col_names:
+        await conn.execute(text("ALTER TABLE communities ADD COLUMN community_context JSON"))
+
+
+async def _migrate_checklist_context_rename(conn) -> None:
+    """Rename atmosphere_influenced→context_influenced, atmosphere_note→context_note on checklist_items."""
+    cols_result = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if not col_names:
+        return
+    # Add new columns if they don't exist
+    if "context_influenced" not in col_names and "atmosphere_influenced" in col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN context_influenced BOOLEAN NOT NULL DEFAULT 0"
+        ))
+        await conn.execute(text(
+            "UPDATE checklist_items SET context_influenced = atmosphere_influenced"
+        ))
+    if "context_note" not in col_names and "atmosphere_note" in col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN context_note TEXT"
+        ))
+        await conn.execute(text(
+            "UPDATE checklist_items SET context_note = atmosphere_note"
+        ))
+
+
 async def _migrate_decision_tag_field(conn) -> None:
     """Add moderator_tag to decisions if missing."""
     cols_result = await conn.execute(text("PRAGMA table_info(decisions)"))
@@ -125,6 +158,16 @@ async def _migrate_rule_override_count(conn) -> None:
         ))
 
 
+async def _migrate_community_context_samples(conn) -> None:
+    """Add context_samples column to communities table if missing."""
+    cols_result = await conn.execute(text("PRAGMA table_info(communities)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if not col_names:
+        return
+    if "context_samples" not in col_names:
+        await conn.execute(text("ALTER TABLE communities ADD COLUMN context_samples JSON"))
+
+
 async def init_db() -> None:
     """Create all database tables."""
     async with engine.begin() as conn:
@@ -134,6 +177,9 @@ async def init_db() -> None:
         await _migrate_checklist_atmosphere_fields(conn)
         await _migrate_decision_tag_field(conn)
         await _migrate_rule_override_count(conn)
+        await _migrate_community_context_field(conn)
+        await _migrate_checklist_context_rename(conn)
+        await _migrate_community_context_samples(conn)
         await conn.run_sync(Base.metadata.create_all)
 
 

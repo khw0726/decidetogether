@@ -19,7 +19,8 @@ def evaluate_deterministic(item: ChecklistItem, post: dict[str, Any]) -> tuple[b
     match_mode = logic.get("match_mode", "any")
     negate = logic.get("negate", False)
 
-    # Get text to match against (title + body)
+    # Get text to match against
+    target_field = logic.get("field", "all")  # "title", "body", or "all"
     content = post.get("content", {})
     if isinstance(content, dict):
         title = content.get("title", "")
@@ -28,7 +29,12 @@ def evaluate_deterministic(item: ChecklistItem, post: dict[str, Any]) -> tuple[b
         title = ""
         body = ""
 
-    text = f"{title} {body}"
+    if target_field == "title":
+        text = title
+    elif target_field == "body":
+        text = body
+    else:
+        text = f"{title} {body}"
 
     matched_patterns = []
     for pattern in patterns:
