@@ -314,33 +314,62 @@ async def sample_subreddit_for_context(
                     "upvote_ratio": post.upvote_ratio,
                 })
 
-            # Ignored posts — low-engagement posts that the community didn't
-            # interact with.  Try the past week first; if too few results
-            # (common on low-volume subs), widen to a month.
-            ignored_count = 0
+            # Ignored posts — community-rejected content that signals implicit
+            # norm violations.  Uses combined relative criteria (low upvote_ratio
+            # + below-median engagement) so it works for both small and large subs.
+            all_new_posts: list = []
+            min_age_hours = 12
             for tf in ("week", "month"):
-                async for post in sub.new(limit=200 if tf == "week" else 500):
-                    # new() doesn't support time_filter; skip posts outside window
-                    age_days = (time.time() - post.created_utc) / 86400
+                scan_limit = 200 if tf == "week" else 500
+                async for post in sub.new(limit=scan_limit):
+                    age_hours = (time.time() - post.created_utc) / 3600
+                    age_days = age_hours / 24
                     if tf == "week" and age_days > 7:
                         break
                     if tf == "month" and age_days > 30:
                         break
-                    if post.stickied:
+                    if post.stickied or age_hours < min_age_hours:
                         continue
-                    if post.score <= 1 and post.num_comments <= 2:
-                        result["ignored"].append({
-                            "title": post.title.strip(),
-                            "body": (post.selftext or "")[:300].strip(),
-                            "score": post.score,
-                            "num_comments": post.num_comments,
-                            "upvote_ratio": post.upvote_ratio,
-                        })
-                        ignored_count += 1
-                        if ignored_count >= 20:
-                            break
-                if ignored_count >= 5:
+                    all_new_posts.append(post)
+                if len(all_new_posts) >= 50:
                     break
+
+            if all_new_posts:
+                scores = sorted(p.score for p in all_new_posts)
+                comments = sorted(p.num_comments for p in all_new_posts)
+                median_score = scores[len(scores) // 2] if scores else 1
+                median_comments = comments[len(comments) // 2] if comments else 2
+
+                # Combined filter: low upvote_ratio AND below-median engagement
+                candidates = [
+                    p for p in all_new_posts
+                    if p.upvote_ratio < 0.45
+                    and p.score < median_score
+                    and p.num_comments < median_comments
+                ]
+
+                # For small subs, also include posts matching absolute thresholds
+                if median_score <= 3:
+                    abs_candidates = [
+                        p for p in all_new_posts
+                        if p.score <= 1 and p.num_comments <= 2
+                        and p not in candidates
+                    ]
+                    candidates.extend(abs_candidates)
+
+                # Fallback: if too few, take bottom N by upvote_ratio
+                if len(candidates) < 5:
+                    by_ratio = sorted(all_new_posts, key=lambda p: p.upvote_ratio)
+                    candidates = by_ratio[:10]
+
+                for p in candidates[:20]:
+                    result["ignored"].append({
+                        "title": p.title.strip(),
+                        "body": (p.selftext or "")[:300].strip(),
+                        "score": p.score,
+                        "num_comments": p.num_comments,
+                        "upvote_ratio": p.upvote_ratio,
+                    })
 
             # Top comments from hot posts — actual language and tone
             for post in hot_posts[:10]:

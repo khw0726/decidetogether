@@ -149,8 +149,9 @@ export default function ExamplesPanel({ ruleId, filterItemId, onItemHighlight, p
         )}
         {filtered.map((ex: Example) => {
           const content = ex.content as Record<string, unknown>
-          const title = (content.content.title as string) || ''
-          const body = (content.content.body as string) || ''
+          const inner = (content.content as Record<string, unknown>) || {}
+          const title = (inner.title as string) || ''
+          const body = (inner.body as string) || ''
           return (
             <div
               key={ex.id}

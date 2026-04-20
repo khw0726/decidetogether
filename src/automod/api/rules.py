@@ -333,6 +333,18 @@ async def _fill_missing_examples(db, rule_id: str, compiler, rule, community) ->
     if not items_needing:
         return
 
+    # Limit to 3 items per rule to avoid overwhelming the calibration step.
+    # Prioritize: subjective > context-influenced > lower thresholds (more ambiguous).
+    if len(items_needing) > 3:
+        def _ambiguity_score(item: ChecklistItem) -> tuple:
+            type_rank = 0 if item.item_type == "subjective" else 1
+            context_rank = 0 if item.context_influenced else 1
+            threshold = (item.logic or {}).get("threshold", 0.7) if item.item_type == "subjective" else 1.0
+            return (type_rank, context_rank, threshold)
+
+        items_needing.sort(key=_ambiguity_score)
+        items_needing = items_needing[:3]
+
     example_ids_result = await db.execute(
         select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
     )

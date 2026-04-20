@@ -227,6 +227,18 @@ class DecisionResolve(BaseModel):
     # (agent had no triggered_rules to link the example to)
 
 
+class BulkDecisionResolve(BaseModel):
+    decision_ids: list[str]
+    verdict: str  # approve | remove
+    notes: Optional[str] = None
+    tag: Optional[str] = None
+
+
+class BulkResolveResponse(BaseModel):
+    resolved_count: int
+    failed_ids: list[str]
+
+
 # ── PostContent ────────────────────────────────────────────────────────────────
 
 class PostAuthor(BaseModel):

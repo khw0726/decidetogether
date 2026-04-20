@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Sparkles, Plus, Trash2, AlertTriangle, Loader2, Link } from 'lucide-react'
+import { Settings, Plus, Trash2, AlertTriangle, Loader2, Link } from 'lucide-react'
 import {
   getCommunity,
-  generateAtmosphere,
+  generateCommunityContext,
   listSamplePosts,
   addSamplePost,
   deleteSamplePost,
   importSamplePostFromUrl,
   type CommunitySamplePost,
 } from '../api/client'
+import ContextDimensionsView from '../components/ContextDimensionsView'
 
 interface CommunitySettingsProps {
   communityId: string
@@ -29,8 +30,8 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
     enabled: !!communityId,
   })
 
-  const generateMutation = useMutation({
-    mutationFn: () => generateAtmosphere(communityId),
+  const contextMutation = useMutation({
+    mutationFn: () => generateCommunityContext(communityId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['community', communityId] })
     },
@@ -52,8 +53,6 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
     )
   }
 
-  const atm = community?.atmosphere
-
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-8">
       <div>
@@ -66,53 +65,36 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
         </p>
       </div>
 
-      {/* Atmosphere Profile */}
+      {/* Community Context */}
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-800 flex items-center gap-1.5">
-              <Sparkles size={16} className="text-amber-500" />
-              Community Atmosphere
-            </h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Used to calibrate subjective rubrics and generate realistic examples during rule compilation.
-            </p>
-          </div>
-          <button
-            className="btn-primary flex items-center gap-1.5 text-sm"
-            onClick={() => generateMutation.mutate()}
-            disabled={generateMutation.isPending}
-          >
-            {generateMutation.isPending ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Sparkles size={14} />
-            )}
-            {atm ? 'Regenerate' : 'Generate'}
-          </button>
+        <div className="mb-3">
+          <h2 className="text-base font-semibold text-gray-800">Community Context</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Four-dimensional profile used to calibrate moderation thresholds and rubrics.
+          </p>
         </div>
 
-        {generateMutation.isError && (
-          <p className="text-sm text-red-600 mb-3">
-            {(generateMutation.error as Error)?.message?.includes('No posts available')
-              ? 'Add sample posts or resolve moderation decisions first, then regenerate.'
-              : 'Failed to generate atmosphere. Try again.'}
-          </p>
-        )}
-
-        {atm ? (
-          <>
-            <div className="card divide-y divide-gray-100">
-              <AtmosphereRow label="Tone" value={atm.tone} />
-              <AtmosphereRow label="Typical content" value={atm.typical_content} />
-              <AtmosphereRow label="What belongs" value={atm.what_belongs} />
-              <AtmosphereRow label="What doesn't belong" value={atm.what_doesnt_belong} />
-              <AtmosphereRow label="Moderation style" value={atm.moderation_style} />
-            </div>
-          </>
+        {contextMutation.isPending && !community?.community_context ? (
+          <div className="card p-8 flex flex-col items-center justify-center gap-3 text-gray-500">
+            <Loader2 size={24} className="animate-spin text-indigo-500" />
+            <p className="text-sm">Crawling posts and generating context...</p>
+          </div>
+        ) : community?.community_context ? (
+          <ContextDimensionsView
+            context={community.community_context}
+            onRegenerate={() => contextMutation.mutate()}
+            isRegenerating={contextMutation.isPending}
+          />
         ) : (
-          <div className="card p-6 text-center text-gray-400 text-sm">
-            No atmosphere profile yet. Add sample posts below, then click Generate.
+          <div className="card p-6 text-center text-gray-400 text-sm space-y-3">
+            <p>No community context yet.</p>
+            <button
+              className="btn-primary text-sm"
+              onClick={() => contextMutation.mutate()}
+              disabled={contextMutation.isPending}
+            >
+              Generate Context
+            </button>
           </div>
         )}
       </section>
@@ -149,15 +131,6 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
           </div>
         )}
       </section>
-    </div>
-  )
-}
-
-function AtmosphereRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="px-4 py-3 flex gap-4">
-      <span className="text-xs font-medium text-gray-500 w-36 flex-shrink-0 pt-0.5">{label}</span>
-      <span className="text-sm text-gray-800">{value}</span>
     </div>
   )
 }

@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Shield, Check, Plus, Loader2, AlertTriangle, ThumbsUp, ThumbsDown, SkipForward } from 'lucide-react'
+import { Shield, Check, Plus, Loader2, AlertTriangle, ThumbsUp, ThumbsDown, SkipForward, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   createCommunity,
   generateCommunityContext,
@@ -19,6 +19,7 @@ import {
   Rule,
   BorderlineItem,
 } from '../api/client'
+import ContextDimensionsView from '../components/ContextDimensionsView'
 
 interface CommunitySetupProps {
   onCommunityChange: (id: string) => void
@@ -653,6 +654,7 @@ function CalibrateStep({
   onFinish: () => void
 }) {
   const [resolved, setResolved] = useState<Set<string>>(new Set())
+  const [expandedRuleId, setExpandedRuleId] = useState<string | null>(null)
 
   const { data: status, refetch } = useQuery({
     queryKey: ['setup-status', communityId],
@@ -698,6 +700,41 @@ function CalibrateStep({
   const borderlineItems: BorderlineItem[] = status?.borderline_examples ?? []
   const pending = borderlineItems.filter(b => !resolved.has(b.suggestion_id))
   const allResolved = borderlineItems.length > 0 && pending.length === 0
+
+  // Group borderline examples by rule for collapsible sections
+  const groupedByRule = useMemo(() => {
+    const groups: [string, string, BorderlineItem[]][] = [] // [ruleId, ruleTitle, items]
+    const seen = new Map<string, BorderlineItem[]>()
+    for (const item of borderlineItems) {
+      if (!seen.has(item.rule_id)) {
+        const arr: BorderlineItem[] = []
+        seen.set(item.rule_id, arr)
+        groups.push([item.rule_id, item.rule_title, arr])
+      }
+      seen.get(item.rule_id)!.push(item)
+    }
+    return groups
+  }, [borderlineItems])
+
+  // Auto-expand first group, or next unresolved group when current is done
+  useEffect(() => {
+    if (groupedByRule.length === 0) return
+    if (expandedRuleId === null) {
+      setExpandedRuleId(groupedByRule[0][0])
+      return
+    }
+    // Check if current expanded group is fully resolved
+    const currentGroup = groupedByRule.find(([id]) => id === expandedRuleId)
+    if (currentGroup) {
+      const allDone = currentGroup[2].every(i => resolved.has(i.suggestion_id))
+      if (allDone) {
+        const nextGroup = groupedByRule.find(([id, , items]) =>
+          id !== expandedRuleId && items.some(i => !resolved.has(i.suggestion_id))
+        )
+        if (nextGroup) setExpandedRuleId(nextGroup[0])
+      }
+    }
+  }, [resolved, groupedByRule, expandedRuleId])
 
   return (
     <div className="space-y-4">
@@ -753,66 +790,85 @@ function CalibrateStep({
             <div className="text-xs text-gray-400 font-medium">
               {pending.length} of {borderlineItems.length} remaining
             </div>
-            {borderlineItems.map((item) => {
-              const done = resolved.has(item.suggestion_id)
-              const content = item.content as Record<string, unknown>
-              const title = (content?.title as string) || (content?.content as any)?.title || '(untitled)'
-              const body = (content?.body as string) || (content?.content as any)?.body || ''
-              const busy = (resolveMutation.isPending || skipMutation.isPending) &&
-                (resolveMutation.variables?.suggestionId === item.suggestion_id ||
-                 skipMutation.variables === item.suggestion_id)
+            {groupedByRule.map(([ruleId, ruleTitle, items]) => {
+              const groupResolved = items.filter(i => resolved.has(i.suggestion_id)).length
+              const isExpanded = expandedRuleId === ruleId
+              const groupDone = groupResolved === items.length
 
               return (
-                <div
-                  key={item.suggestion_id}
-                  className={`rounded-lg border transition-colors ${done ? 'border-gray-200 bg-gray-50 opacity-60' : 'border-gray-300 bg-white'}`}
-                >
-                  <div className="px-4 py-3">
-                    <div className="flex items-start justify-between gap-3 mb-1">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700 font-medium mr-2">
-                          {item.rule_title}
-                        </span>
-                        <span className="text-sm font-medium text-gray-900">{title}</span>
-                      </div>
-                      {done && <Check size={16} className="text-green-500 flex-shrink-0 mt-0.5" />}
-                    </div>
-                    {body && (
-                      <p className="text-sm text-gray-600 line-clamp-3 mt-1">{body}</p>
-                    )}
-                    {item.relevance_note && (
-                      <p className="text-xs text-gray-400 mt-1 italic">{item.relevance_note}</p>
-                    )}
+                <div key={ruleId} className={`rounded-lg border ${groupDone ? 'border-gray-200' : 'border-gray-300'}`}>
+                  <button
+                    className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-gray-50 transition-colors rounded-t-lg"
+                    onClick={() => setExpandedRuleId(isExpanded ? null : ruleId)}
+                  >
+                    {isExpanded ? <ChevronDown size={14} className="text-gray-400 flex-shrink-0" /> : <ChevronRight size={14} className="text-gray-400 flex-shrink-0" />}
+                    <span className="text-sm font-medium text-gray-900 flex-1 truncate">{ruleTitle}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${groupDone ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {groupResolved}/{items.length}
+                    </span>
+                    {groupDone && <Check size={14} className="text-green-500 flex-shrink-0" />}
+                  </button>
 
-                    {!done && (
-                      <div className="flex items-center gap-2 mt-3">
-                        <button
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-green-300 text-green-700 hover:bg-green-50 transition-colors"
-                          disabled={busy}
-                          onClick={() => resolveMutation.mutate({ suggestionId: item.suggestion_id, label: 'compliant' })}
-                        >
-                          {busy && resolveMutation.variables?.label === 'compliant' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />}
-                          Compliant
-                        </button>
-                        <button
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
-                          disabled={busy}
-                          onClick={() => resolveMutation.mutate({ suggestionId: item.suggestion_id, label: 'violating' })}
-                        >
-                          {busy && resolveMutation.variables?.label === 'violating' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsDown size={12} />}
-                          Violating
-                        </button>
-                        <button
-                          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors ml-auto"
-                          disabled={busy}
-                          onClick={() => skipMutation.mutate(item.suggestion_id)}
-                        >
-                          <SkipForward size={12} />
-                          Skip
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  {isExpanded && (
+                    <div className="border-t border-gray-200 divide-y divide-gray-100">
+                      {items.map((item) => {
+                        const done = resolved.has(item.suggestion_id)
+                        const content = item.content as Record<string, unknown>
+                        const title = (content?.title as string) || (content?.content as any)?.title || '(untitled)'
+                        const body = (content?.body as string) || (content?.content as any)?.body || ''
+                        const busy = (resolveMutation.isPending || skipMutation.isPending) &&
+                          (resolveMutation.variables?.suggestionId === item.suggestion_id ||
+                           skipMutation.variables === item.suggestion_id)
+
+                        return (
+                          <div
+                            key={item.suggestion_id}
+                            className={`px-4 py-3 transition-colors ${done ? 'bg-gray-50 opacity-60' : 'bg-white'}`}
+                          >
+                            <div className="flex items-start justify-between gap-3 mb-1">
+                              <span className="text-sm font-medium text-gray-900 flex-1 min-w-0">{title}</span>
+                              {done && <Check size={16} className="text-green-500 flex-shrink-0 mt-0.5" />}
+                            </div>
+                            {body && (
+                              <p className="text-sm text-gray-600 line-clamp-3 mt-1">{body}</p>
+                            )}
+                            {item.relevance_note && (
+                              <p className="text-xs text-gray-400 mt-1 italic">{item.relevance_note}</p>
+                            )}
+
+                            {!done && (
+                              <div className="flex items-center gap-2 mt-3">
+                                <button
+                                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-green-300 text-green-700 hover:bg-green-50 transition-colors"
+                                  disabled={busy}
+                                  onClick={() => resolveMutation.mutate({ suggestionId: item.suggestion_id, label: 'compliant' })}
+                                >
+                                  {busy && resolveMutation.variables?.label === 'compliant' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />}
+                                  Compliant
+                                </button>
+                                <button
+                                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
+                                  disabled={busy}
+                                  onClick={() => resolveMutation.mutate({ suggestionId: item.suggestion_id, label: 'violating' })}
+                                >
+                                  {busy && resolveMutation.variables?.label === 'violating' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsDown size={12} />}
+                                  Violating
+                                </button>
+                                <button
+                                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors ml-auto"
+                                  disabled={busy}
+                                  onClick={() => skipMutation.mutate(item.suggestion_id)}
+                                >
+                                  <SkipForward size={12} />
+                                  Skip
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -840,67 +896,7 @@ function CalibrateStep({
 }
 
 
-const DIMENSION_META: [string, keyof CommunityContext][] = [
-  ['Purpose', 'purpose'],
-  ['Participants', 'participants'],
-  ['Stakes', 'stakes'],
-  ['Tone', 'tone'],
-]
-
-function ContextDimensionsView({
-  context,
-  onRegenerate,
-  isRegenerating,
-}: {
-  context: CommunityContext
-  onRegenerate: () => void
-  isRegenerating: boolean
-}) {
-  const [expandedDim, setExpandedDim] = useState<string | null>(null)
-
-  return (
-    <>
-      <div className="space-y-2">
-        {DIMENSION_META.map(([label, key]) => {
-          const dim = context[key]
-          if (!dim) return null
-          const isOpen = expandedDim === key
-          return (
-            <div key={key} className="rounded-lg bg-gray-50 border border-gray-200">
-              <button
-                className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-gray-100 transition-colors rounded-lg"
-                onClick={() => setExpandedDim(isOpen ? null : key)}
-              >
-                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider w-24 flex-shrink-0">{label}</span>
-                <div className="flex flex-wrap gap-1.5 flex-1">
-                  {dim.tags.map(tag => (
-                    <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <span className="text-xs text-gray-300 flex-shrink-0">{isOpen ? '▾' : '▸'}</span>
-              </button>
-              {isOpen && (
-                <div className="px-4 pb-3 pt-0">
-                  <p className="text-sm text-gray-600 border-t border-gray-200 pt-2">{dim.prose}</p>
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-      <button
-        className="btn-secondary flex items-center gap-2 text-sm"
-        onClick={onRegenerate}
-        disabled={isRegenerating}
-      >
-        {isRegenerating && <Loader2 size={14} className="animate-spin" />}
-        Regenerate
-      </button>
-    </>
-  )
-}
+// ContextDimensionsView is imported from ../components/ContextDimensionsView
 
 
 const CATEGORY_META: Record<string, { label: string; color: string; description: string }> = {

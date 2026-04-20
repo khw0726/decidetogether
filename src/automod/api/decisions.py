@@ -13,6 +13,7 @@ from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
 from ..db.models import ChecklistItem, Community, CommunitySamplePost, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import (
+    BulkDecisionResolve, BulkResolveResponse,
     DecisionRead, DecisionResolve, DecisionStats,
     ExampleRead, SuggestRuleFromDecisionsRequest, SuggestRuleFromOverridesRequest, SuggestionRead,
 )
@@ -69,24 +70,18 @@ async def list_decisions(
     return [DecisionRead.model_validate(d) for d in decisions]
 
 
-@router.put("/decisions/{decision_id}/resolve", response_model=DecisionRead)
-async def resolve_decision(
-    decision_id: str,
+async def _resolve_single_decision(
+    decision: Decision,
     body: DecisionResolve,
-    db: AsyncSession = Depends(get_db),
-) -> DecisionRead:
-    valid_verdicts = {"approve", "remove", "review"}
-    if body.verdict not in valid_verdicts:
-        raise HTTPException(status_code=422, detail=f"verdict must be one of {valid_verdicts}")
+    db: AsyncSession,
+    *,
+    skip_unlinked_check: bool = False,
+) -> None:
+    """Core resolve logic shared by single and bulk endpoints.
 
-    result = await db.execute(select(Decision).where(Decision.id == decision_id))
-    decision = result.scalar_one_or_none()
-    if not decision:
-        raise HTTPException(status_code=404, detail="Decision not found")
-
-    if decision.moderator_verdict != "pending":
-        raise HTTPException(status_code=400, detail="Decision already resolved")
-
+    Applies the moderator verdict, auto-creates examples, links to rules,
+    and optionally checks unlinked removes threshold.
+    """
     decision.moderator_verdict = body.verdict
     decision.moderator_reasoning_category = body.reasoning_category
     decision.moderator_notes = body.notes
@@ -178,12 +173,92 @@ async def resolve_decision(
 
     # After a remove-override with no rule linked (unlinked remove), check if we've hit
     # the M=3 threshold and auto-trigger a new-rule suggestion.
-    if not mod_approved and agent_approved and not (body.rule_ids or []):
+    if not skip_unlinked_check and not mod_approved and agent_approved and not (body.rule_ids or []):
         await _maybe_auto_cluster_unlinked_removes(db, decision.community_id)
+
+
+@router.put("/decisions/{decision_id}/resolve", response_model=DecisionRead)
+async def resolve_decision(
+    decision_id: str,
+    body: DecisionResolve,
+    db: AsyncSession = Depends(get_db),
+) -> DecisionRead:
+    valid_verdicts = {"approve", "remove", "review"}
+    if body.verdict not in valid_verdicts:
+        raise HTTPException(status_code=422, detail=f"verdict must be one of {valid_verdicts}")
+
+    result = await db.execute(select(Decision).where(Decision.id == decision_id))
+    decision = result.scalar_one_or_none()
+    if not decision:
+        raise HTTPException(status_code=404, detail="Decision not found")
+
+    if decision.moderator_verdict != "pending":
+        raise HTTPException(status_code=400, detail="Decision already resolved")
+
+    await _resolve_single_decision(decision, body, db)
 
     await db.commit()
     await db.refresh(decision)
     return DecisionRead.model_validate(decision)
+
+
+@router.put("/communities/{community_id}/decisions/bulk-resolve", response_model=BulkResolveResponse)
+async def bulk_resolve_decisions(
+    community_id: str,
+    body: BulkDecisionResolve,
+    db: AsyncSession = Depends(get_db),
+) -> BulkResolveResponse:
+    """Resolve multiple decisions at once with the same verdict."""
+    valid_verdicts = {"approve", "remove"}
+    if body.verdict not in valid_verdicts:
+        raise HTTPException(status_code=422, detail=f"Bulk verdict must be one of {valid_verdicts}")
+
+    if not body.decision_ids:
+        raise HTTPException(status_code=422, detail="No decision IDs provided")
+
+    result = await db.execute(
+        select(Decision).where(
+            Decision.id.in_(body.decision_ids),
+            Decision.community_id == community_id,
+        )
+    )
+    decisions = {d.id: d for d in result.scalars()}
+
+    resolved_count = 0
+    failed_ids: list[str] = []
+    has_unlinked_removes = False
+
+    resolve_body = DecisionResolve(
+        verdict=body.verdict,
+        notes=body.notes,
+        tag=body.tag,
+    )
+
+    for decision_id in body.decision_ids:
+        decision = decisions.get(decision_id)
+        if not decision or decision.moderator_verdict != "pending":
+            failed_ids.append(decision_id)
+            continue
+
+        await _resolve_single_decision(
+            decision, resolve_body, db, skip_unlinked_check=True
+        )
+        resolved_count += 1
+
+        # Track if we need to check unlinked removes after the batch
+        if body.verdict != "approve" and decision.agent_verdict == "approve":
+            has_unlinked_removes = True
+
+    # Run unlinked-removes clustering once at the end of the batch
+    if has_unlinked_removes:
+        await _maybe_auto_cluster_unlinked_removes(db, community_id)
+
+    await db.commit()
+
+    return BulkResolveResponse(
+        resolved_count=resolved_count,
+        failed_ids=failed_ids,
+    )
 
 
 _UNLINKED_REMOVE_THRESHOLD = 3

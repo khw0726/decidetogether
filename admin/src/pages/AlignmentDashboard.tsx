@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { BarChart2, TrendingUp, AlertTriangle, BookOpen } from 'lucide-react'
-import { getDecisionStats, listRules, listDecisions, listSuggestions, Rule, Decision } from '../api/client'
+import { getDecisionStats, listRules, listDecisions, Rule, Decision } from '../api/client'
 
 interface AlignmentDashboardProps {
   communityId: string

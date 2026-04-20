@@ -702,9 +702,9 @@ async def generate_community_context(
     if community.platform_config:
         subscribers = community.platform_config.get("subscribers")
 
-    # Use stored context samples if available, otherwise sample live
-    sampled_posts = community.context_samples
-    if not sampled_posts and community.platform == "reddit":
+    # Always crawl fresh posts when regenerating context
+    sampled_posts = None
+    if community.platform == "reddit":
         m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
         if m and settings.reddit_client_id:
             sampled_posts = await sample_subreddit_for_context(
@@ -715,8 +715,11 @@ async def generate_community_context(
                 username=settings.reddit_username,
                 password=settings.reddit_password,
             )
-            # Store for future use
             community.context_samples = sampled_posts
+
+    # Fall back to stored samples if crawl didn't produce results
+    if not sampled_posts:
+        sampled_posts = community.context_samples
 
     # Load taxonomy for tag constraint
     taxonomy = _load_taxonomy()

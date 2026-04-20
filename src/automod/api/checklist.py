@@ -7,11 +7,14 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..config import get_anthropic_client, settings
 from ..compiler.compiler import RuleCompiler
+from ..core.subjective import SubjectiveEvaluator
+from ..core.tree_evaluator import TreeEvaluator
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import ChecklistItemCreate, ChecklistItemRead, ChecklistItemUpdate, SuggestionRead
 from .rules import _apply_diff_operations, _persist_new_examples, _persist_new_items, _re_resolve_checklist_links
 
@@ -22,7 +25,9 @@ router = APIRouter(tags=["checklist"])
 # Each accept_recompile bumps the generation counter; the background task
 # waits a short period then only proceeds if no newer request arrived.
 _link_generation: dict[str, int] = {}
+_reeval_generation: dict[str, int] = {}
 _LINK_DEBOUNCE_SECONDS = 5
+_REEVAL_DEBOUNCE_SECONDS = 5
 
 
 async def _link_uncovered_violations(rule_id: str, generation: int) -> None:
@@ -143,6 +148,98 @@ async def _link_uncovered_violations(rule_id: str, generation: int) -> None:
 def get_compiler() -> RuleCompiler:
     client = get_anthropic_client()
     return RuleCompiler(client, settings)
+
+
+async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
+    """Background task: re-evaluate override decisions against updated checklist.
+
+    Updates Decision.agent_reasoning[rule_id] so health metrics
+    self-correct on the next read. Debounced like _link_uncovered_violations.
+    """
+    await asyncio.sleep(_REEVAL_DEBOUNCE_SECONDS)
+
+    if _reeval_generation.get(rule_id, 0) != generation:
+        logger.debug(f"Skipping debounced re-evaluation for rule {rule_id} (superseded)")
+        return
+
+    from ..db.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        try:
+            rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+            rule = rule_result.scalar_one_or_none()
+            if not rule:
+                return
+
+            comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+            community = comm_result.scalar_one_or_none()
+            community_name = community.name if community else ""
+
+            # Fetch updated checklist items
+            items_result = await db.execute(
+                select(ChecklistItem)
+                .where(ChecklistItem.rule_id == rule_id)
+                .order_by(ChecklistItem.order.asc())
+            )
+            checklist = list(items_result.scalars().all())
+            if not checklist:
+                return
+
+            # Find resolved decisions where this rule was evaluated and the moderator overrode
+            decisions_result = await db.execute(
+                select(Decision).where(
+                    Decision.community_id == rule.community_id,
+                    Decision.moderator_verdict != "pending",
+                    Decision.was_override == True,  # noqa: E712
+                )
+            )
+            decisions = [
+                d for d in decisions_result.scalars().all()
+                if rule_id in (d.agent_reasoning or {})
+            ]
+
+            if not decisions:
+                logger.info(f"No override decisions to re-evaluate for rule {rule_id}")
+                return
+
+            # Set up evaluator
+            client = get_anthropic_client()
+            subjective_evaluator = SubjectiveEvaluator(client, settings)
+            tree_evaluator = TreeEvaluator(subjective_evaluator)
+
+            updated = 0
+            for decision in decisions:
+                try:
+                    new_result = await tree_evaluator.evaluate_rule(
+                        rule=rule,
+                        checklist=checklist,
+                        post=decision.post_content or {},
+                        community_name=community_name,
+                        examples=[],
+                    )
+
+                    # Update the rule's reasoning in-place
+                    reasoning = dict(decision.agent_reasoning or {})
+                    old_rule = reasoning.get(rule_id, {})
+                    reasoning[rule_id] = {
+                        "rule_title": old_rule.get("rule_title", rule.title),
+                        "verdict": new_result["verdict"],
+                        "confidence": new_result["confidence"],
+                        "item_reasoning": new_result["reasoning"],
+                        "triggered_items": new_result["triggered_items"],
+                    }
+                    decision.agent_reasoning = reasoning
+                    flag_modified(decision, "agent_reasoning")
+                    updated += 1
+                except Exception as e:
+                    logger.warning(f"Re-evaluation failed for decision {decision.id}: {e}")
+
+            await db.commit()
+            logger.info(f"Re-evaluated {updated} override decision(s) for rule {rule_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to re-evaluate error cases for rule {rule_id}: {e}")
+            await db.rollback()
 
 
 def _item_to_read(item: ChecklistItem) -> ChecklistItemRead:
@@ -480,5 +577,10 @@ async def accept_recompile(
     gen = _link_generation.get(rule_id, 0) + 1
     _link_generation[rule_id] = gen
     background_tasks.add_task(_link_uncovered_violations, rule_id, gen)
+
+    # Re-evaluate override decisions so health metrics self-correct (debounced).
+    reeval_gen = _reeval_generation.get(rule_id, 0) + 1
+    _reeval_generation[rule_id] = reeval_gen
+    background_tasks.add_task(_reevaluate_error_cases, rule_id, reeval_gen)
 
     return {"status": "accepted", "operations_applied": len(operations)}

@@ -433,6 +433,14 @@ export const listDecisions = (communityId: string, params?: { status?: string; v
 export const resolveDecision = (decisionId: string, data: { verdict: string; reasoning_category?: string; notes?: string; tag?: string; rule_ids?: string[] }) =>
   api.put<Decision>(`/decisions/${decisionId}/resolve`, data).then(r => r.data)
 
+export interface BulkResolveResponse {
+  resolved_count: number
+  failed_ids: string[]
+}
+
+export const bulkResolveDecisions = (communityId: string, data: { decision_ids: string[]; verdict: string; notes?: string; tag?: string }) =>
+  api.put<BulkResolveResponse>(`/communities/${communityId}/decisions/bulk-resolve`, data).then(r => r.data)
+
 export const getDecisionStats = (communityId: string) =>
   api.get<DecisionStats>(`/communities/${communityId}/decisions/stats`).then(r => r.data)
 
@@ -448,10 +456,13 @@ export interface ErrorCase {
   decision_id: string
   title: string
   confidence: number
+  moderator_notes?: string
+  moderator_reasoning_category?: string
 }
 
 export interface ItemHealthMetrics {
   item_id: string
+  parent_id: string | null
   description: string
   item_type: 'deterministic' | 'structural' | 'subjective'
   action: string
@@ -486,8 +497,49 @@ export interface RuleHealth {
 export const getRuleHealth = (ruleId: string) =>
   api.get<RuleHealth>(`/rules/${ruleId}/health`).then(r => r.data)
 
+export interface RuleHealthSummary {
+  rule_id: string
+  decision_count: number
+  error_count: number
+  error_rate: number
+}
+
+export const getRulesHealthSummary = (communityId: string) =>
+  api.get<RuleHealthSummary[]>(`/communities/${communityId}/rules-health-summary`).then(r => r.data)
+
 export const analyzeRuleHealth = (ruleId: string) =>
   api.post<Suggestion[]>(`/rules/${ruleId}/analyze-health`).then(r => r.data)
+
+export const reevaluateDecisions = (ruleId: string) =>
+  api.post<{ reevaluated: number }>(`/rules/${ruleId}/reevaluate`).then(r => r.data)
+
+// ── Impact Preview ─────────────────────────────────────────────────────────────
+
+export interface ImpactEvaluation {
+  decision_id: string
+  title: string
+  error_type: 'wrongly_flagged' | 'missed_violation'
+  source_item_id: string
+  moderator_verdict: string
+  old_verdict: string
+  new_verdict: string
+  new_confidence: number
+  fixed: boolean
+  regressed: boolean
+}
+
+export interface ImpactPreviewResult {
+  evaluations: ImpactEvaluation[]
+  summary: {
+    total_error_cases: number
+    would_fix: number
+    would_remain: number
+    would_regress: number
+  }
+}
+
+export const previewFixes = (ruleId: string) =>
+  api.post<ImpactPreviewResult>(`/rules/${ruleId}/preview-fixes`).then(r => r.data)
 
 // ── Evaluation ─────────────────────────────────────────────────────────────────
 

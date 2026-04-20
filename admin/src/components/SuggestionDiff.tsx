@@ -347,9 +347,9 @@ function ExampleSuggestion({ content }: { content: Record<string, unknown> }) {
   const label = (content.label as string) || 'compliant'
   const relevanceNote = (content.relevance_note as string) || ''
   const postBody = (content.content as Record<string, unknown>) || {}
-  const title = postBody.content?.title as string | undefined
-  const body = postBody.content?.body as string | undefined
-  const context = postBody.context as string | undefined
+  const inner = (postBody.content as Record<string, unknown>) || {}
+  const title = inner.title as string | undefined
+  const body = inner.body as string | undefined
   const author = postBody.author as { username: string } | undefined
   const postType = postBody.type as string | undefined
 

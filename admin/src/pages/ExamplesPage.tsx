@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { AlertTriangle, Loader2, Sparkles, ThumbsUp, ThumbsDown, Minus, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Sparkles, ThumbsUp, ThumbsDown, Minus, Trash2 } from 'lucide-react'
 import {
   listCommunityExamples,
   listRules,
@@ -10,9 +10,11 @@ import {
   suggestRuleFromOverrides,
   acceptSuggestion,
   dismissSuggestion,
+  getRulesHealthSummary,
   CommunityExample,
   Example,
   NewRuleSuggestion,
+  RuleHealthSummary,
 } from '../api/client'
 import NewRuleSuggestionModal from '../components/NewRuleSuggestionModal'
 import RuleHealthPanel from '../components/RuleHealthPanel'
@@ -37,6 +39,7 @@ export default function ExamplesPage({ communityId }: ExamplesPageProps) {
   const [selectedUnlinkedIds, setSelectedUnlinkedIds] = useState<Set<string>>(new Set())
   const [suggestion, setSuggestion] = useState<NewRuleSuggestion | null>(null)
   const [suggesting, setSuggesting] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const queryClient = useQueryClient()
 
@@ -51,6 +54,16 @@ export default function ExamplesPage({ communityId }: ExamplesPageProps) {
     queryFn: () => listRules(communityId),
     enabled: !!communityId,
   })
+
+  const { data: healthSummaries = [] } = useQuery({
+    queryKey: ['rules-health-summary', communityId],
+    queryFn: () => getRulesHealthSummary(communityId),
+    enabled: !!communityId,
+  })
+
+  const healthByRule = Object.fromEntries(
+    healthSummaries.map((h: RuleHealthSummary) => [h.rule_id, h])
+  )
 
   const deleteMutation = useMutation({
     mutationFn: deleteExample,
@@ -114,90 +127,166 @@ export default function ExamplesPage({ communityId }: ExamplesPageProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-white">
-        <h1 className="text-lg font-semibold text-gray-900">Rule Health & Examples</h1>
-        <p className="text-xs text-gray-500 mt-0.5">Review rule performance, analyze issues, and manage labeled examples</p>
-      </div>
+    <div className="flex h-full">
+      {/* Sidebar */}
+      <div className={`flex-shrink-0 border-r border-gray-200 bg-white flex flex-col transition-all duration-200 ${sidebarOpen ? 'w-64' : 'w-8'}`}>
+        {sidebarOpen ? (
+          <>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <h2 className="text-sm font-semibold text-gray-700">Rules</h2>
+              <button
+                className="p-0.5 text-gray-400 hover:text-gray-600"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <ChevronLeft size={14} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto">
+              {activeRules.map(rule => {
+                const isSelected = effectiveRuleId === rule.id
+                const health = healthByRule[rule.id] as RuleHealthSummary | undefined
+                const errorRate = health?.error_rate ?? 0
+                const noData = !health || health.decision_count === 0
 
-      {/* Rule tabs */}
-      <div className="flex border-b border-gray-200 bg-white px-6 gap-0 overflow-x-auto flex-shrink-0">
-        {activeRules.map(rule => {
-          const exCount = examples.filter(e => e.rule_ids.includes(rule.id)).length
-          return (
-            <button
-              key={rule.id}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
-                effectiveRuleId === rule.id
-                  ? 'border-indigo-500 text-indigo-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => setSelectedRuleId(rule.id)}
-            >
-              {rule.title}
-              <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5">{exCount}</span>
-            </button>
-          )
-        })}
-        {unlinked.length > 0 && (
+                const severityBadge = noData
+                  ? 'bg-gray-100 text-gray-400'
+                  : errorRate === 0
+                    ? 'bg-green-100 text-green-700'
+                    : errorRate < 0.2
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-red-100 text-red-700'
+
+                const severityLabel = noData
+                  ? '—'
+                  : `${Math.round(errorRate * 100)}%`
+
+                return (
+                  <button
+                    key={rule.id}
+                    className={`w-full text-left px-4 py-2.5 border-l-2 transition-colors flex items-center gap-2 ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                        : 'border-transparent text-gray-600 hover:bg-gray-50 hover:text-gray-800'
+                    }`}
+                    onClick={() => setSelectedRuleId(rule.id)}
+                  >
+                    <span className="text-sm truncate flex-1">{rule.title}</span>
+                    <span className={`text-xs rounded-full px-1.5 py-0.5 flex-shrink-0 font-medium ${severityBadge}`}
+                      title={noData ? 'No decisions yet' : `${health.error_count} errors / ${health.decision_count} decisions`}
+                    >
+                      {severityLabel}
+                    </span>
+                  </button>
+                )
+              })}
+              {unlinked.length > 0 && (
+                <button
+                  className={`w-full text-left px-4 py-2.5 border-l-2 transition-colors flex items-center gap-2 ${
+                    effectiveRuleId === '__unlinked'
+                      ? 'border-amber-500 bg-amber-50 text-amber-700'
+                      : 'border-transparent text-amber-500 hover:bg-amber-50 hover:text-amber-700'
+                  }`}
+                  onClick={() => setSelectedRuleId('__unlinked')}
+                >
+                  <AlertTriangle size={12} className="flex-shrink-0" />
+                  <span className="text-sm truncate flex-1">Unlinked</span>
+                  <span className="text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5 flex-shrink-0">{unlinked.length}</span>
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
           <button
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${
-              effectiveRuleId === '__unlinked'
-                ? 'border-amber-500 text-amber-600'
-                : 'border-transparent text-amber-500 hover:text-amber-700 hover:border-amber-300'
-            }`}
-            onClick={() => setSelectedRuleId('__unlinked')}
+            className="mt-2 mx-auto p-1 text-gray-400 hover:text-gray-600"
+            onClick={() => setSidebarOpen(true)}
           >
-            <AlertTriangle size={13} />
-            Unlinked
-            <span className="text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5">{unlinked.length}</span>
+            <ChevronRight size={14} />
           </button>
         )}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
-        {isLoading && (
-          <div className="text-sm text-gray-400 text-center py-8">Loading...</div>
-        )}
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-white">
+          <h1 className="text-lg font-semibold text-gray-900">Rule Health & Examples</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Review rule performance, analyze issues, and manage labeled examples</p>
+        </div>
 
-        {/* Unlinked tab content */}
-        {!isLoading && effectiveRuleId === '__unlinked' && (
-          <div className="p-6 space-y-4">
-            <div className="border border-amber-200 rounded-lg bg-amber-50">
-              <div className="flex items-center gap-2 px-4 py-3">
-                <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
-                <span className="text-sm font-medium text-amber-900">
-                  Unlinked Examples ({unlinked.length})
-                </span>
-                <span className="text-xs text-amber-700 ml-1">
-                  — agent missed these, may need a new rule
-                </span>
-                <div className="flex-1" />
-                {selectedUnlinkedIds.size > 0 && selectedUnlinkedIds.size < 3 && (
-                  <span className="text-xs text-amber-700 flex items-center gap-1 mr-2">
-                    <AlertTriangle size={11} />
-                    Fewer than 3 — may over-fit
+        {/* Content */}
+        <div className="flex-1 overflow-auto">
+          {isLoading && (
+            <div className="text-sm text-gray-400 text-center py-8">Loading...</div>
+          )}
+
+          {/* Unlinked tab content */}
+          {!isLoading && effectiveRuleId === '__unlinked' && (
+            <div className="p-6 space-y-4">
+              <div className="border border-amber-200 rounded-lg bg-amber-50">
+                <div className="flex items-center gap-2 px-4 py-3">
+                  <AlertTriangle size={14} className="text-amber-600 flex-shrink-0" />
+                  <span className="text-sm font-medium text-amber-900">
+                    Unlinked Examples ({unlinked.length})
                   </span>
-                )}
-                <button
-                  className="btn-primary text-xs flex items-center gap-1.5"
-                  disabled={selectedUnlinkedIds.size === 0 || suggesting}
-                  onClick={handleSuggest}
-                >
-                  {suggesting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                  Suggest Rule{selectedUnlinkedIds.size > 0 ? ` (${selectedUnlinkedIds.size})` : ''}
-                </button>
+                  <span className="text-xs text-amber-700 ml-1">
+                    — agent missed these, may need a new rule
+                  </span>
+                  <div className="flex-1" />
+                  {selectedUnlinkedIds.size > 0 && selectedUnlinkedIds.size < 3 && (
+                    <span className="text-xs text-amber-700 flex items-center gap-1 mr-2">
+                      <AlertTriangle size={11} />
+                      Fewer than 3 — may over-fit
+                    </span>
+                  )}
+                  <button
+                    className="btn-primary text-xs flex items-center gap-1.5"
+                    disabled={selectedUnlinkedIds.size === 0 || suggesting}
+                    onClick={handleSuggest}
+                  >
+                    {suggesting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                    Suggest Rule{selectedUnlinkedIds.size > 0 ? ` (${selectedUnlinkedIds.size})` : ''}
+                  </button>
+                </div>
+                <div className="px-4 pb-4 space-y-2">
+                  {unlinked.map(ex => (
+                    <ExampleCard
+                      key={ex.id}
+                      example={ex}
+                      selectable
+                      selected={selectedUnlinkedIds.has(ex.id)}
+                      onSelect={() => toggleUnlinkedSelect(ex.id)}
+                      onDelete={() => deleteMutation.mutate(ex.id)}
+                      onResolve={(label) => resolveMutation.mutate({ id: ex.id, label })}
+                      resolving={resolveMutation.isPending}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="px-4 pb-4 space-y-2">
-                {unlinked.map(ex => (
+            </div>
+          )}
+
+          {/* Rule tab content: health panel + examples */}
+          {!isLoading && effectiveRuleId && effectiveRuleId !== '__unlinked' && (
+            <div className="flex flex-col">
+              {/* Health panel */}
+              <div className="border-b border-gray-200">
+                <RuleHealthPanel ruleId={effectiveRuleId} />
+              </div>
+
+              {/* Examples for this rule */}
+              <div className="p-6 space-y-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                  Labeled Examples ({selectedRuleExamples.length})
+                </p>
+                {selectedRuleExamples.length === 0 && (
+                  <div className="text-sm text-gray-400 text-center py-4 italic">
+                    No examples linked to this rule yet.
+                  </div>
+                )}
+                {selectedRuleExamples.map(ex => (
                   <ExampleCard
                     key={ex.id}
                     example={ex}
-                    selectable
-                    selected={selectedUnlinkedIds.has(ex.id)}
-                    onSelect={() => toggleUnlinkedSelect(ex.id)}
                     onDelete={() => deleteMutation.mutate(ex.id)}
                     onResolve={(label) => resolveMutation.mutate({ id: ex.id, label })}
                     resolving={resolveMutation.isPending}
@@ -205,45 +294,14 @@ export default function ExamplesPage({ communityId }: ExamplesPageProps) {
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Rule tab content: health panel + examples */}
-        {!isLoading && effectiveRuleId && effectiveRuleId !== '__unlinked' && (
-          <div className="flex flex-col">
-            {/* Health panel */}
-            <div className="border-b border-gray-200">
-              <RuleHealthPanel ruleId={effectiveRuleId} />
+          {!isLoading && activeRules.length === 0 && unlinked.length === 0 && (
+            <div className="text-sm text-gray-400 text-center py-8 italic">
+              No rules or examples yet.
             </div>
-
-            {/* Examples for this rule */}
-            <div className="p-6 space-y-2">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
-                Labeled Examples ({selectedRuleExamples.length})
-              </p>
-              {selectedRuleExamples.length === 0 && (
-                <div className="text-sm text-gray-400 text-center py-4 italic">
-                  No examples linked to this rule yet.
-                </div>
-              )}
-              {selectedRuleExamples.map(ex => (
-                <ExampleCard
-                  key={ex.id}
-                  example={ex}
-                  onDelete={() => deleteMutation.mutate(ex.id)}
-                  onResolve={(label) => resolveMutation.mutate({ id: ex.id, label })}
-                  resolving={resolveMutation.isPending}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!isLoading && activeRules.length === 0 && unlinked.length === 0 && (
-          <div className="text-sm text-gray-400 text-center py-8 italic">
-            No rules or examples yet.
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {suggestion && (

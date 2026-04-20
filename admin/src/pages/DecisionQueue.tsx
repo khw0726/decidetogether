@@ -4,7 +4,7 @@ import {
   ChevronDown, ChevronUp, CheckCircle, XCircle, Filter, Inbox, Loader2, Sparkles, Download, X,
 } from 'lucide-react'
 import {
-  listDecisions, resolveDecision, Decision, listRules,
+  listDecisions, resolveDecision, bulkResolveDecisions, Decision, listRules,
   suggestRuleFromDecisions, acceptSuggestion, dismissSuggestion, NewRuleSuggestion,
   importRedditPosts, RedditImportResponse, getCommunity,
 } from '../api/client'
@@ -85,6 +85,19 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
 
   const rulesMap = Object.fromEntries(rules.map(r => [r.id, r]))
 
+  const bulkResolveMutation = useMutation({
+    mutationFn: ({ verdict }: { verdict: string }) =>
+      bulkResolveDecisions(communityId, {
+        decision_ids: [...selectedIds],
+        verdict,
+      }),
+    onSuccess: () => {
+      setSelectedIds(new Set())
+      queryClient.invalidateQueries({ queryKey: ['decisions', communityId] })
+      queryClient.invalidateQueries({ queryKey: ['stats', communityId] })
+    },
+  })
+
   const resolveMutation = useMutation({
     mutationFn: ({
       decisionId,
@@ -137,14 +150,36 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
         </div>
         <div className="flex items-center gap-2 ml-auto">
           {selectedIds.size > 0 && (
-            <button
-              className="btn-primary text-xs flex items-center gap-1.5"
-              onClick={handleSuggestRule}
-              disabled={suggesting}
-            >
-              {suggesting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-              Suggest Rule ({selectedIds.size})
-            </button>
+            <>
+              <button
+                className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded border border-green-300 text-green-700 font-medium hover:bg-green-50 transition-colors"
+                onClick={() => bulkResolveMutation.mutate({ verdict: 'approve' })}
+                disabled={bulkResolveMutation.isPending}
+              >
+                {bulkResolveMutation.isPending && bulkResolveMutation.variables?.verdict === 'approve'
+                  ? <Loader2 size={12} className="animate-spin" />
+                  : <CheckCircle size={12} />}
+                Approve All ({selectedIds.size})
+              </button>
+              <button
+                className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded border border-red-300 text-red-700 font-medium hover:bg-red-50 transition-colors"
+                onClick={() => bulkResolveMutation.mutate({ verdict: 'remove' })}
+                disabled={bulkResolveMutation.isPending}
+              >
+                {bulkResolveMutation.isPending && bulkResolveMutation.variables?.verdict === 'remove'
+                  ? <Loader2 size={12} className="animate-spin" />
+                  : <XCircle size={12} />}
+                Reject All ({selectedIds.size})
+              </button>
+              <button
+                className="btn-primary text-xs flex items-center gap-1.5"
+                onClick={handleSuggestRule}
+                disabled={suggesting}
+              >
+                {suggesting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                Suggest Rule ({selectedIds.size})
+              </button>
+            </>
           )}
           {isReddit && (
             <button

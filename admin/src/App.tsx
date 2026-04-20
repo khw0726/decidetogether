@@ -7,6 +7,7 @@ import DecisionQueue from './pages/DecisionQueue'
 import CommunitySettings from './pages/CommunitySettings'
 import CommunitySetup from './pages/CommunitySetup'
 import ExamplesPage from './pages/ExamplesPage'
+import UnlinkedOverridesPage from './pages/UnlinkedOverridesPage'
 
 export default function App() {
   const [communityId, setCommunityId] = useState<string>(
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="rules" element={<RuleEditor communityId={communityId} />} />
           <Route path="examples" element={<ExamplesPage communityId={communityId} />} />
           <Route path="decisions" element={<DecisionQueue communityId={communityId} />} />
+          <Route path="overrides" element={<UnlinkedOverridesPage communityId={communityId} />} />
           <Route path="settings" element={<CommunitySettings communityId={communityId} />} />
         </Route>
       </Routes>

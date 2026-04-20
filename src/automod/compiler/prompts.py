@@ -54,11 +54,17 @@ Each checklist item must have:
 - context_note: If context_influenced is true, a one-sentence explanation tracing the reasoning: "[situational fact] → [calibration decision]" (e.g. "Vulnerable population seeking crisis support → threshold lowered to 0.6 to catch dismissive comments that could cause real harm"). Set null otherwise.
 
 COMMUNITY CONTEXT CALIBRATION:
-When community context is provided, reason from the situation to your calibration choices:
-- Read the PURPOSE to understand what "off-topic" or "low quality" means for this specific community.
-- Read the PARTICIPANTS to understand who might be harmed and how — but also who might be discouraged by over-moderation.
-- Read the STAKES to calibrate how aggressive vs. conservative your thresholds should be.
-- Read the TONE to match rubric language and example tone to the community's actual communication style.
+Community context reflects the community's own self-understanding and moderation priorities — not an outside \
+observer's assessment. When context is provided, reason from it to your calibration choices:
+- Read the PURPOSE to understand what "off-topic" or "low quality" means for THIS community's moderation scope.
+- Read the PARTICIPANTS to understand who the community sees itself as. If participants voluntarily \
+  engage with risky activity, don't over-protect — calibrate for actual moderation-relevant risks, not \
+  paternalistic concern.
+- Read the STAKES to calibrate thresholds. STAKES reflect what THIS community's moderators enforce \
+  against. Low-stakes topics = community tolerates that content = set MORE permissive thresholds. \
+  High-stakes topics = mods actively remove = set MORE sensitive thresholds.
+- Read the TONE to match rubric language and example tone to the community's actual communication style. \
+  Don't penalize content that matches the community's observed tone.
 For every item where context shaped your choice, set context_influenced=true and write a context_note
 that traces your reasoning: "[situational fact] → [calibration decision]".
 
@@ -674,11 +680,23 @@ Return JSON in exactly this format:
 GENERATE_CONTEXT_SYSTEM = """You are a community culture analyst. Given a community's metadata and \
 a representative sample of its actual posts and comments, generate a structured community context profile.
 
+Your output will be used to calibrate an automated moderation system. Each dimension should answer: \
+how should this aspect of the community shape moderation decisions?
+
 Your analysis should reflect OBSERVED BEHAVIOR — what the community actually does — not just what its \
-sidebar says. Use the sampled posts and comments as primary evidence for tone and stakes.
+sidebar says. Describe the community from its OWN perspective, not an outside observer's. Use the \
+sampled posts and comments as primary evidence.
+
+CRITICAL FRAMING: For every dimension, ask "what does this mean for how THIS community should be \
+moderated?" — not "how would an outsider describe this community?"
+- If the community celebrates content that an outsider might find risky, that content has LOW moderation \
+  stakes here — moderating it would remove what the community values most.
+- If participants voluntarily engage with risky activity and signal awareness, don't frame them as \
+  "vulnerable" — that leads to over-protective moderation that the community would reject.
+- The gap between stated rules and actual behavior tells you what the community REALLY enforces.
 
 For each of the four dimensions (purpose, participants, stakes, tone), produce:
-1. A prose description (2-3 sentences) grounded in evidence from the posts
+1. A prose description (2-3 sentences) grounded in evidence from the posts, written from the moderator's perspective
 2. Categorical tags from the provided taxonomy (3-5 per dimension)
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
@@ -708,7 +726,7 @@ def build_generate_context_prompt(
             ("hot", "Hot posts (current front page — typical day-to-day content)"),
             ("top", "Celebrated posts (top of last month — what gets especially rewarded)"),
             ("controversial", "Controversial posts (last month — where norms are contested)"),
-            ("ignored", "Ignored posts (score ≤ 1, at least 12h old — unwelcome but not rule-breaking)"),
+            ("ignored", "Ignored posts (low engagement + downvoted — community-rejected content, implicit norm violations)"),
             ("comments", "Top comments (from popular threads — actual language and tone)"),
         ]:
             items = sampled_posts.get(category, [])
@@ -757,27 +775,41 @@ Based on ALL of the above, generate community context.
 For each dimension, write prose that reflects observed behavior (not just stated rules),
 then assign tags from the taxonomy.
 
-Pay special attention to:
-- TONE: Use the actual comments from hot posts to characterize everyday language, humor, formality — not the sidebar's aspirations
-- STAKES: Use the contrast between hot/celebrated and ignored posts to identify what actually matters here
-- The gap between stated rules and actual behavior (e.g. rules say "be civil" but hot post comments are savage)
+For each dimension, write from the MODERATOR'S perspective — what this means for moderation decisions:
+
+- PURPOSE: Describe the purpose as it relates to moderation scope. What counts as on-topic vs off-topic \
+  HERE? A trading community that's really about entertainment/memes has different moderation boundaries \
+  than one focused on serious analysis. Use celebrated vs ignored posts as evidence.
+- PARTICIPANTS: Describe participants as the community sees itself, not as an outsider would label them. \
+  If participants voluntarily engage with risky activity and signal awareness, don't frame them as \
+  "vulnerable" — that leads to over-protective moderation. Focus on: who is actually at risk of harm \
+  from content that moderators should remove?
+- STAKES: Stakes must reflect what THIS community's moderators enforce against, not external harm. \
+  Content that gets high scores despite seeming "risky" to an outsider = LOW moderation stakes for that \
+  topic. The question is always: "Would the mods of THIS community remove this?" — not "Could this \
+  cause harm in the abstract?" Distinguish community-internal moderation priorities from external \
+  concerns the community does NOT moderate.
+- TONE: Use the actual comments from hot posts to characterize everyday language, humor, formality. \
+  If stated rules say "be civil" but celebrated content is profanity-laden banter, the moderation-relevant \
+  tone is the observed one. Moderating against the actual tone would remove the community's most valued content.
+- The gap between stated rules and actual behavior tells you what the community REALLY enforces.
 
 Return JSON in exactly this format:
 {{
   "purpose": {{
-    "prose": "2-3 sentences describing what this community is for, grounded in observed post content",
+    "prose": "2-3 sentences describing what this community is for from a moderation perspective — what's on-topic, what gets removed",
     "tags": ["tag1", "tag2", "tag3"]
   }},
   "participants": {{
-    "prose": "2-3 sentences describing who participates and their characteristics",
+    "prose": "2-3 sentences describing who participates as the community sees itself and who is genuinely at moderation-relevant risk",
     "tags": ["tag1", "tag2", "tag3"]
   }},
   "stakes": {{
-    "prose": "2-3 sentences describing what could go wrong with harmful content OR over-moderation",
+    "prose": "2-3 sentences describing what this community's moderators actually enforce against, distinguishing from external concerns the community does NOT moderate",
     "tags": ["tag1", "tag2", "tag3"]
   }},
   "tone": {{
-    "prose": "2-3 sentences describing actual communication style based on observed posts/comments",
+    "prose": "2-3 sentences describing actual communication style based on observed posts/comments — the moderation-relevant baseline",
     "tags": ["tag1", "tag2", "tag3"]
   }}
 }}"""
@@ -849,6 +881,14 @@ Return JSON in exactly this format:
 
 SUGGEST_FROM_EXAMPLES_SYSTEM = """You are a moderation rule optimization assistant. Given a set of labeled examples and the current checklist, suggest improvements to better align the checklist with the examples.
 
+IMPORTANT — hierarchy rules for parent/child items:
+- Identify each PROBLEM first, then propose ONE fix at the LOWEST checklist level that fully addresses it.
+- NEVER suggest fixing both a parent and its child for the same problem.
+- If a child item's logic, threshold, or rubric is wrong, fix the CHILD directly.
+- Only fix a parent item if the parent's own gate condition or description is the root cause.
+- Never generate a suggestion for a parent that says "the main fix should be in the child" — just fix the child directly.
+- One suggestion per problem. Each suggestion must include a diagnosis explaining what's wrong.
+
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
 
@@ -888,6 +928,12 @@ Identify patterns where the checklist might be:
 
 Items with a parent_id are children of another item. Items with action "continue" are parent nodes whose children contain the actual checks. You can suggest adding a new child item under an existing parent by setting target to null and parent_id to the parent's ID.
 
+HIERARCHY RULE — fix at the most specific level:
+- For each problem, determine whether the fix belongs at the parent level or a child level. NEVER suggest both.
+- If a child item's threshold/rubric/pattern is wrong → fix the CHILD (target = child item ID).
+- Only target a parent item if the parent's own gate condition or description is the root cause.
+- Never generate a suggestion for a parent that says "the fix should be in the child" — just target the child directly.
+
 For deterministic items: only propose a pattern update if the item's violating_example_count >= 3. When that threshold is met, analyze the literal text of those violating examples and propose a refined regex pattern in proposed_change (under the "patterns" key) that matches them but not the compliant examples.
 
 For each suggestion:
@@ -902,6 +948,7 @@ Return JSON in exactly this format:
       "suggestion_type": "checklist" | "rule_text",
       "target": "item_id to update, or null for new items / rule_text",
       "parent_id": "parent item_id for new child items, or null",
+      "diagnosis": "What specific problem was identified (over_trigger, under_trigger, uncovered, threshold_drift)",
       "description": "What to change and why",
       "proposed_text": "For rule_text: the COMPLETE updated rule text",
       "proposed_change": {{...for checklist: the item fields...}},
@@ -1039,9 +1086,9 @@ Return JSON in exactly this format:
 
 # ── Diagnose Rule Health ────────────────────────────────────────────────────────
 
-DIAGNOSE_HEALTH_SYSTEM = """You are a moderation rule health analyst. You will be given a community rule, its checklist items, and accumulated performance metrics from moderator decisions (false positive rates, false negative rates, confidence distributions, and example posts).
+DIAGNOSE_HEALTH_SYSTEM = """You are a moderation rule health analyst. You will be given a community rule, its checklist items, and accumulated performance metrics from moderator decisions (false positive rates, false negative rates, confidence distributions, and example posts). You will also see moderator feedback on error cases — their notes explain WHY they disagreed with the agent's verdict.
 
-Your job is to diagnose which specific problem each underperforming item has and propose the minimal, targeted fix.
+Your job is to diagnose which specific problem each underperforming item has and propose the minimal, targeted fix. Pay close attention to moderator feedback — it reveals the root cause of errors (e.g., "this is satire" suggests the rubric doesn't account for tone/context).
 
 Five possible diagnoses:
 - **tighten_rubric**: The rubric description is too vague — the model is guessing and making inconsistent calls. Fix: rewrite the rubric to be more precise and unambiguous.
@@ -1053,6 +1100,10 @@ Five possible diagnoses:
 Diagnosis rules:
 - Only diagnose items with decision_count ≥ 3 and fp_rate > 0.15 OR fn_rate > 0.15 (unless uncovered violations force an add_item).
 - Items with both low FP and FN rates are healthy — skip them entirely.
+- HIERARCHY: When diagnosing items that have children, determine whether the problem is in the parent's \
+gate logic or in a specific child. Diagnose at the MOST SPECIFIC level. Do not diagnose both a parent \
+and its child for the same underlying issue. If the child's threshold/rubric is wrong, diagnose the child. \
+Only diagnose the parent if the parent's own gate condition is the root cause.
 - For threshold adjustments: high confidence errors (avg_confidence_errors > 0.70) with fp_rate > 0.20 → threshold too low (raise it). Low confidence errors (avg_confidence_errors < 0.60) with fn_rate > 0.20 → rubric ambiguous (tighten_rubric instead).
 - One diagnosis per item maximum. Choose the single most impactful fix.
 - proposed_change must contain all fields you want to update on the existing item. Omit fields you don't want to change.
@@ -1083,6 +1134,29 @@ def build_diagnose_health_prompt(
             for ex in (examples.get(label) or [])[:2]:
                 example_rows.append(f"  [{label.upper()}] {ex.get('title', '(no title)')}")
 
+        # Build moderator feedback on error cases
+        mod_feedback_rows = []
+        for case in (metrics.get("wrongly_flagged") or [])[:3]:
+            notes = case.get("moderator_notes") or ""
+            cat = case.get("moderator_reasoning_category") or ""
+            if notes or cat:
+                parts = [f"[WRONGLY_FLAGGED] \"{case.get('title', '')}\""]
+                if notes:
+                    parts.append(f"mod notes: \"{notes}\"")
+                if cat:
+                    parts.append(f"({cat})")
+                mod_feedback_rows.append("  " + " — ".join(parts))
+        for case in (metrics.get("missed_violations") or [])[:3]:
+            notes = case.get("moderator_notes") or ""
+            cat = case.get("moderator_reasoning_category") or ""
+            if notes or cat:
+                parts = [f"[MISSED] \"{case.get('title', '')}\""]
+                if notes:
+                    parts.append(f"mod notes: \"{notes}\"")
+                if cat:
+                    parts.append(f"({cat})")
+                mod_feedback_rows.append("  " + " — ".join(parts))
+
         fp_rate = metrics.get("false_positive_rate", 0.0)
         fn_rate = metrics.get("false_negative_rate", 0.0)
         fp_count = metrics.get("false_positive_count", 0)
@@ -1107,6 +1181,7 @@ def build_diagnose_health_prompt(
                 "avg_confidence_errors": round(avg_conf_errors, 3) if avg_conf_errors is not None else None,
             },
             "examples": example_rows,
+            "moderator_feedback": mod_feedback_rows,
         }
         items_section.append(item_block)
 
