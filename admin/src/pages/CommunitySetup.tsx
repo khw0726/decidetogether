@@ -5,6 +5,7 @@ import { Shield, Check, Plus, Loader2, AlertTriangle, ThumbsUp, ThumbsDown, Skip
 import {
   createCommunity,
   generateCommunityContext,
+  updateCommunityContext,
   crawlContextSamples,
   listRules,
   createRule,
@@ -15,6 +16,7 @@ import {
   dismissSuggestion,
   populateQueue,
   CommunityContext,
+  CommunityContextDimension,
   ContextSamples,
   Rule,
   BorderlineItem,
@@ -84,6 +86,13 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
       setContextError('')
     },
     onError: () => setContextError('Failed to generate community context.'),
+  })
+
+  const contextUpdateMutation = useMutation({
+    mutationFn: (data: Partial<CommunityContext>) => updateCommunityContext(communityId, data),
+    onSuccess: (data) => {
+      setCommunityContext(data)
+    },
   })
 
   // Auto-trigger context generation on entering step 3
@@ -398,7 +407,16 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
               )}
 
               {communityContext && (
-                <ContextDimensionsView context={communityContext} onRegenerate={() => { contextTriggered.current = false; contextMutation.mutate() }} isRegenerating={contextMutation.isPending} />
+                <ContextDimensionsView
+                  context={communityContext}
+                  communityId={communityId}
+                  onRegenerate={() => { contextTriggered.current = false; contextMutation.mutate() }}
+                  isRegenerating={contextMutation.isPending}
+                  onSaveDimension={async (key: keyof CommunityContext, dim: CommunityContextDimension) => {
+                    await contextUpdateMutation.mutateAsync({ [key]: dim })
+                  }}
+                  isSaving={contextUpdateMutation.isPending}
+                />
               )}
 
               <StepNav

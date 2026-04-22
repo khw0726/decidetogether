@@ -42,13 +42,15 @@ const LABEL_TO_VERDICT: Record<string, string> = {
 
 const VERDICT_BADGE: Record<string, string> = {
   approve: 'badge-green',
+  warn: 'badge-yellow',
   remove: 'badge-red',
-  review: 'badge-yellow',
+  review: 'badge-purple',
   error: 'badge-gray',
 }
 
 const VERDICT_LABEL: Record<string, string> = {
   approve: 'approve',
+  warn: 'warn',
   remove: 'remove',
   review: 'review',
   error: 'error',

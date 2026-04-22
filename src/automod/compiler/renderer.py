@@ -35,7 +35,7 @@ def _render_items(
 
         action_badge = {
             "remove": "→REMOVE",
-            "flag": "→FLAG",
+            "warn": "→WARN",
             "continue": "→continue",
         }.get(item.action, "")
 

@@ -55,6 +55,8 @@ class Rule(Base):
     applies_to: Mapped[str] = mapped_column(String, nullable=False, default="both")
     # posts | comments | both
     override_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    base_checklist_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    context_adjustment_summary: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -84,10 +86,17 @@ class ChecklistItem(Base):
     rule_text_anchor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     item_type: Mapped[str] = mapped_column(String, nullable=False)  # deterministic | structural | subjective
     logic: Mapped[dict] = mapped_column(JSON, nullable=False)
-    action: Mapped[str] = mapped_column(String, nullable=False, default="flag")
-    # remove | flag | continue
+    action: Mapped[str] = mapped_column(String, nullable=False, default="warn")
+    # remove | warn | continue
     context_influenced: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     context_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    context_change_types: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # e.g. ["threshold", "rubric", "description", "action", "new_item", "pattern", "check"]
+    base_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # If this item was produced by context adjustment, the exact description of the base-checklist
+    # item it was derived from — used to look up base threshold / rubric for diffing.
+    context_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    context_override_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     rule: Mapped["Rule"] = relationship("Rule", back_populates="checklist_items", foreign_keys=[rule_id])
@@ -170,12 +179,12 @@ class Decision(Base):
     community_id: Mapped[str] = mapped_column(String, ForeignKey("communities.id"), nullable=False)
     post_content: Mapped[dict] = mapped_column(JSON, nullable=False)
     post_platform_id: Mapped[str] = mapped_column(String, nullable=False)
-    agent_verdict: Mapped[str] = mapped_column(String, nullable=False)  # approve | remove | review
+    agent_verdict: Mapped[str] = mapped_column(String, nullable=False)  # approve | warn | remove | review
     agent_confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
     agent_reasoning: Mapped[dict] = mapped_column(JSON, nullable=False)
     triggered_rules: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
     moderator_verdict: Mapped[str] = mapped_column(String, nullable=False, default="pending")
-    # approve | remove | review | pending
+    # approve | warn | remove | pending
     moderator_reasoning_category: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     # rule_doesnt_apply | edge_case_allow | rule_needs_update | agent_wrong_interpretation | agree
     moderator_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

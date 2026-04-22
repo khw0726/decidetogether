@@ -165,8 +165,8 @@ class TreeEvaluator:
             return "approve", confidence, [], visited
 
         # Item says YES — translate action to verdict
-        # "flag" action → "review" verdict; "continue" is not a verdict on its own
-        _ACTION_TO_VERDICT = {"remove": "remove", "flag": "review", "continue": "approve"}
+        # "warn" action → "warn" verdict; "continue" is not a verdict on its own
+        _ACTION_TO_VERDICT = {"remove": "remove", "warn": "warn", "continue": "approve"}
         self_verdict = _ACTION_TO_VERDICT.get(item.action, "approve")
         worst_verdict = self_verdict
         worst_confidence = confidence

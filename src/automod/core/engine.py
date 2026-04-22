@@ -120,7 +120,7 @@ class EvaluationEngine:
                 "triggered_items": rule_result["triggered_items"],
             }
 
-            if rule_verdict in ("remove", "review"):
+            if rule_verdict in ("remove", "warn"):
                 triggered_rule_ids.append(rule.id)
 
         # 5. Aggregate verdict
@@ -150,7 +150,7 @@ class EvaluationEngine:
                             "description": "Community norms check",
                             "reasoning": norms_result.get("reasoning", ""),
                             "confidence": norms_confidence,
-                            "action": "flag",
+                            "action": "review",
                             "item_type": "subjective",
                         }
                     },

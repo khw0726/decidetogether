@@ -3,6 +3,13 @@
 from typing import Any, Optional
 
 
+def _extract_note(note) -> tuple[str, str]:
+    """Extract (text, tag) from a note in either old (str) or new (dict) format."""
+    if isinstance(note, dict):
+        return note.get("text", ""), note.get("tag", "")
+    return str(note), ""
+
+
 # ── Triage ─────────────────────────────────────────────────────────────────────
 
 TRIAGE_SYSTEM = """You are a moderation rule classifier. Your task is to classify community rules into one of four categories:
@@ -46,8 +53,8 @@ Each checklist item must have:
 - rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred). Keep the exact punctuation and wording. 
 - item_type: "deterministic" (regex), "structural" (metadata), or "subjective" (LLM judgment)
 - logic: Type-specific schema (see below)
-- action: "remove", "flag", or "continue"
-  - Leaf nodes (no children): use "remove" or "flag" to set the consequence. "continue" is not allowed for leaf nodes.
+- action: "remove", "warn", or "continue"
+  - Leaf nodes (no children): use "remove" or "warn" to set the consequence. "continue" is not allowed for leaf nodes.
   - Non-leaf nodes (has children): MUST always be "continue". The verdict comes entirely from the children.
 - children: Sub-items evaluated when this item says YES (empty list for leaf nodes)
 - context_influenced: true if the community context (purpose, participants, stakes, tone) shaped how this item was framed, calibrated, or phrased. Set false when the item derives purely from the rule text.
@@ -114,7 +121,7 @@ Output:
         "match_mode": "any",
         "negate": false
       },
-      "action": "flag",
+      "action": "warn",
       "children": [],
       "context_influenced": false,
       "context_note": null
@@ -131,7 +138,7 @@ Output:
         "match_mode": "any",
         "negate": false
       },
-      "action": "flag",
+      "action": "warn",
       "children": [],
       "context_influenced": false,
       "context_note": null
@@ -163,7 +170,7 @@ Output:
         ],
         "match_mode": "all"
       },
-      "action": "flag",
+      "action": "warn",
       "children": [],
       "context_influenced": false,
       "context_note": null
@@ -321,13 +328,13 @@ def build_compile_prompt(
         for dim, label in [("purpose", "PURPOSE"), ("participants", "PARTICIPANTS"),
                            ("stakes", "STAKES"), ("tone", "TONE")]:
             d = community_context.get(dim, {})
-            prose = d.get("prose", "")
-            tags = d.get("tags", [])
-            if prose:
+            notes = d.get("notes", [])
+            if notes:
                 ctx_lines.append(f"  {label}:")
-                ctx_lines.append(f"    {prose}")
-                if tags:
-                    ctx_lines.append(f"    [Tags: {', '.join(tags)}]")
+                for note in notes:
+                    text, tag = _extract_note(note)
+                    tag_suffix = f" [{tag}]" if tag else ""
+                    ctx_lines.append(f"    - {text}{tag_suffix}")
         if ctx_lines:
             context_section = "\n\nCommunity context for calibration:\n" + "\n".join(ctx_lines)
 
@@ -591,9 +598,13 @@ def build_community_norms_prompt(
         for dim, label in [("purpose", "Purpose"), ("participants", "Participants"),
                            ("stakes", "Stakes"), ("tone", "Tone")]:
             d = community_context.get(dim, {})
-            prose = d.get("prose", "")
-            if prose:
-                ctx_lines.append(f"  {label}: {prose}")
+            notes = d.get("notes", [])
+            if notes:
+                ctx_lines.append(f"  {label}:")
+                for note in notes:
+                    text, tag = _extract_note(note)
+                    tag_suffix = f" [{tag}]" if tag else ""
+                    ctx_lines.append(f"    - {text}{tag_suffix}")
         if ctx_lines:
             context_str = "\n\nCommunity context:\n" + "\n".join(ctx_lines)
 
@@ -695,9 +706,12 @@ moderated?" — not "how would an outsider describe this community?"
   "vulnerable" — that leads to over-protective moderation that the community would reject.
 - The gap between stated rules and actual behavior tells you what the community REALLY enforces.
 
-For each of the four dimensions (purpose, participants, stakes, tone), produce:
-1. A prose description (2-3 sentences) grounded in evidence from the posts, written from the moderator's perspective
-2. Categorical tags from the provided taxonomy (3-5 per dimension)
+For each of the four dimensions (purpose, participants, stakes, tone):
+1. Select 3-5 tags from the provided taxonomy that best characterize this community's moderation profile.
+2. For each selected tag, write a brief explanation (one sentence) of how that tag specifically applies \
+to THIS community — grounded in evidence from the posts, written from the moderator's perspective. \
+The explanation should help a moderator understand why this tag was chosen and what it means for \
+moderation decisions here.
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -772,8 +786,14 @@ COMMUNITY METADATA:
 {taxonomy_section}
 
 Based on ALL of the above, generate community context.
-For each dimension, write prose that reflects observed behavior (not just stated rules),
-then assign tags from the taxonomy.
+For each dimension, SELECT 3-5 tags from the provided taxonomy that best characterize this community's \
+moderation profile. For EACH selected tag, write one short calibration note (one moderator-readable \
+sentence) explaining how THAT specific tag applies to this community — grounded in observed behavior \
+from the samples, not just stated rules.
+
+The tag is primary; the note is a per-tag explanation. Do NOT produce free-standing notes that aren't \
+tied to a specific tag, and do NOT produce a separate list of tags alongside prose notes. Every note \
+MUST be paired with exactly one tag.
 
 For each dimension, write from the MODERATOR'S perspective — what this means for moderation decisions:
 
@@ -794,24 +814,288 @@ For each dimension, write from the MODERATOR'S perspective — what this means f
   tone is the observed one. Moderating against the actual tone would remove the community's most valued content.
 - The gap between stated rules and actual behavior tells you what the community REALLY enforces.
 
-Return JSON in exactly this format:
+Return JSON in exactly this format (each note = one selected tag + brief explanation of how it applies):
 {{
   "purpose": {{
-    "prose": "2-3 sentences describing what this community is for from a moderation perspective — what's on-topic, what gets removed",
-    "tags": ["tag1", "tag2", "tag3"]
+    "notes": [
+      {{"tag": "taxonomy_tag", "text": "How this tag applies to this community's moderation"}},
+      {{"tag": "another_tag", "text": "How this tag applies here"}}
+    ]
   }},
   "participants": {{
-    "prose": "2-3 sentences describing who participates as the community sees itself and who is genuinely at moderation-relevant risk",
-    "tags": ["tag1", "tag2", "tag3"]
+    "notes": [
+      {{"tag": "taxonomy_tag", "text": "How this tag applies here"}},
+      {{"tag": "another_tag", "text": "How this tag applies here"}}
+    ]
   }},
   "stakes": {{
-    "prose": "2-3 sentences describing what this community's moderators actually enforce against, distinguishing from external concerns the community does NOT moderate",
-    "tags": ["tag1", "tag2", "tag3"]
+    "notes": [
+      {{"tag": "taxonomy_tag", "text": "How this tag applies here"}},
+      {{"tag": "another_tag", "text": "How this tag applies here"}}
+    ]
   }},
   "tone": {{
-    "prose": "2-3 sentences describing actual communication style based on observed posts/comments — the moderation-relevant baseline",
-    "tags": ["tag1", "tag2", "tag3"]
+    "notes": [
+      {{"tag": "taxonomy_tag", "text": "How this tag applies here"}},
+      {{"tag": "another_tag", "text": "How this tag applies here"}}
+    ]
   }}
+}}"""
+
+
+# ── No-Context Compile (Pass 1 of two-pass) ──────────────────────────────────
+
+NO_CONTEXT_COMPILE_SYSTEM = """You are an expert community moderation system architect. Your job is to compile a moderator's \
+natural-language rule into a precise, structured decision tree that an automated system can execute.
+
+Compile based SOLELY on the rule text. Do NOT consider community culture, tone, participant demographics, \
+or stakes. Produce a neutral, context-free checklist that any community with this rule text would use.
+
+Each node in the tree is a YES/NO question where YES = a potential violation is detected.
+
+Each checklist item must have:
+- description: A short, concise yes/no question framed so that YES = violation signal
+- rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred)
+- item_type: "deterministic" (regex), "structural" (metadata), or "subjective" (LLM judgment)
+- logic: Type-specific schema (deterministic/structural/subjective as defined in compilation docs)
+- action: "remove", "warn", or "continue"
+  - Leaf nodes (no children): use "remove" or "warn". "continue" is not allowed for leaf nodes.
+  - Non-leaf nodes (has children): MUST always be "continue".
+- children: Sub-items evaluated when this item says YES (empty list for leaf nodes)
+
+All items should have context_influenced=false and context_note=null (no context is provided).
+
+Tree evaluation semantics:
+- If an item says NO: no action, children are skipped.
+- If an item says YES: apply its action, then evaluate children.
+- Non-leaf action is always "continue" — children are the sole decision-makers.
+- At every level, the worst action (REMOVE > FLAG > approve) wins across all siblings.
+- Frame every question so YES = violation.
+- Use children to refine broad checks: e.g. deterministic parent (fast gate) with subjective child.
+
+Logic schemas:
+- deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any"|"all", "negate": false, "field": "all"|"title"|"body"}
+- structural: {"type": "structural", "checks": [{"field": "...", "operator": "<"|">"|"=="|"!="|"<="|">="|"in", "value": ...}], "match_mode": "all"|"any"}
+- subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
+
+Keep trees shallow (3 levels max). Generate one violating and one borderline example per top-level item.
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_no_context_compile_prompt(
+    rule_title: str,
+    rule_text: str,
+    community_name: str,
+    platform: str,
+    other_rules_summary: str,
+    existing_checklist: Optional[list] = None,
+    existing_examples: Optional[list] = None,
+) -> str:
+    import json
+
+    existing_context = ""
+    if existing_checklist:
+        existing_context += f"\n\nExisting checklist (preserve user customizations where rule intent unchanged):\n{json.dumps(existing_checklist, indent=2)}"
+    if existing_examples:
+        existing_context += f"\n\nExisting examples:\n{json.dumps(existing_examples, indent=2)}"
+
+    return f"""{COMPILE_FEW_SHOT_EXAMPLES}
+
+Now compile the following rule for the "{community_name}" community on {platform}.
+NOTE: Compile based SOLELY on the rule text — no community context calibration.
+
+Community context (other rules, for background):
+{other_rules_summary if other_rules_summary else "No other rules yet."}
+{existing_context}
+
+Rule to compile:
+{rule_title}: {rule_text}
+
+Generate a minimal checklist tree — only as many items as the rule genuinely requires, no more. For each item, provide one violating example and one borderline example.
+
+Return JSON in exactly this format:
+{{
+  "checklist_tree": [
+    {{
+      "description": "...",
+      "rule_text_anchor": "...",
+      "item_type": "...",
+      "logic": {{}},
+      "action": "...",
+      "children": [],
+      "context_influenced": false,
+      "context_note": null
+    }}
+  ],
+  "examples": [
+    {{
+      "label": "compliant" | "violating" | "borderline",
+      "content": {{...}},
+      "relevance_note": "...",
+      "related_checklist_item_description": "..."
+    }}
+  ]
+}}"""
+
+
+# ── Context Adjust (Pass 2 of two-pass) ──────────────────────────────────────
+
+CONTEXT_ADJUST_SYSTEM = """You are a community moderation calibration expert. You are given a base checklist tree \
+(compiled purely from rule text, without community context) and a community context profile. Your job is to \
+adjust the checklist to fit THIS specific community.
+
+You may:
+1. **Adjust thresholds** on subjective items (e.g., lower from 0.7 to 0.6 for sensitive communities)
+2. **Refine rubric language** to match the community's tone and priorities
+3. **Add new items** that the community context demands but the rule text alone didn't suggest \
+   (e.g., a support community might need a "toxic positivity" check under a civility rule)
+4. **Keep items unchanged** when no context-driven adjustment is needed
+
+For every item you modify or add, set context_influenced=true and:
+- Write a context_note tracing your reasoning: "[situational fact from context] → [calibration decision]"
+- Set context_change_types to an array of what you changed: "threshold", "rubric", "description", "action", \
+"new_item" (for items added by context), "pattern" (regex changes), "check" (structural check changes). \
+An item can have multiple change types (e.g. ["threshold", "rubric"]).
+
+For EVERY item derived from a base-checklist entry (i.e., not a brand-new context-added item), set \
+`base_description` to the EXACT description string of the base item you started from — copy it verbatim \
+from the base checklist input. This is the ONLY way the UI can diff current-vs-base, so it is required \
+whenever the item has a base counterpart, regardless of whether you changed the description. Set \
+`base_description` to null ONLY when context_change_types=["new_item"] (the item has no base equivalent).
+
+Items you keep unchanged should have context_influenced=false, context_note=null, context_change_types=[], \
+and base_description set to their own description (copied from the base entry).
+
+Return the FULL adjusted checklist tree (not a diff) plus an adjustment_summary as an array of short \
+bullet strings (one per change, each under 20 words). Example: \
+["Lowered threshold on item X from 0.7 → 0.6 (vulnerable population)", "Added new toxic-positivity check"].
+
+Return ONLY valid JSON with no markdown formatting or code blocks."""
+
+
+def build_context_adjust_prompt(
+    rule_title: str,
+    rule_text: str,
+    community_name: str,
+    platform: str,
+    base_checklist: list[dict],
+    community_context: dict,
+    community_atmosphere: Optional[dict] = None,
+    community_posts_sample: Optional[list] = None,
+    pinned_items: Optional[list[dict]] = None,
+    current_checklist: Optional[list[dict]] = None,
+) -> str:
+    import json
+
+    ctx_lines = []
+    for dim, label in [("purpose", "PURPOSE"), ("participants", "PARTICIPANTS"),
+                       ("stakes", "STAKES"), ("tone", "TONE")]:
+        d = community_context.get(dim, {})
+        notes = d.get("notes", [])
+        if notes:
+            ctx_lines.append(f"  {label}:")
+            for note in notes:
+                text, tag = _extract_note(note)
+                tag_suffix = f" [{tag}]" if tag else ""
+                ctx_lines.append(f"    - {text}{tag_suffix}")
+    context_section = "\n".join(ctx_lines)
+
+    atmosphere_section = ""
+    if community_atmosphere:
+        atm = community_atmosphere
+        lines = []
+        if atm.get("tone"):
+            lines.append(f"  Tone: {atm['tone']}")
+        if atm.get("typical_content"):
+            lines.append(f"  Typical content: {atm['typical_content']}")
+        if atm.get("what_belongs"):
+            lines.append(f"  What belongs: {atm['what_belongs']}")
+        if atm.get("what_doesnt_belong"):
+            lines.append(f"  What doesn't belong: {atm['what_doesnt_belong']}")
+        if atm.get("moderation_style"):
+            lines.append(f"  Moderation style: {atm['moderation_style']}")
+        atmosphere_section = "\n\nCommunication patterns (auto-inferred):\n" + "\n".join(lines)
+
+    posts_section = ""
+    if community_posts_sample:
+        acceptable = [p for p in community_posts_sample if p.get("label") == "acceptable"]
+        unacceptable = [p for p in community_posts_sample if p.get("label") == "unacceptable"]
+        parts = []
+        if acceptable:
+            snippets = []
+            for p in acceptable[:4]:
+                c = p.get("content", {}).get("content", {})
+                title = c.get("title", "")
+                body = (c.get("body", "") or "")
+                snippets.append(f'    - "{title}" — {body}')
+            parts.append("  Acceptable posts:\n" + "\n".join(snippets))
+        if unacceptable:
+            snippets = []
+            for p in unacceptable[:4]:
+                c = p.get("content", {}).get("content", {})
+                title = c.get("title", "")
+                body = (c.get("body", "") or "")
+                snippets.append(f'    - "{title}" — {body}')
+            parts.append("  Removed/unacceptable posts:\n" + "\n".join(snippets))
+        if parts:
+            posts_section = "\n\nRepresentative community posts:\n" + "\n".join(parts)
+
+    pinned_section = ""
+    if pinned_items:
+        pinned_lines = []
+        for p in pinned_items:
+            desc = p.get("description", "")
+            note = p.get("context_override_note", "")
+            pinned_lines.append(f'  - "{desc}"' + (f" — Moderator note: {note}" if note else ""))
+        pinned_section = (
+            "\n\nMODERATOR-PINNED ITEMS (preserve these items' calibration exactly as-is — "
+            "do not adjust thresholds, rubric, or logic):\n" + "\n".join(pinned_lines)
+        )
+
+    current_section = ""
+    if current_checklist:
+        current_section = f"""
+
+Current live checklist (what moderators see today, already context-adjusted):
+{json.dumps(current_checklist, indent=2)}
+
+NOTE: Your adjustment_summary should describe changes relative to the CURRENT LIVE checklist above, \
+not the base checklist. For example, if the current checklist has threshold 0.70 and you set it to 0.72, \
+write "Raised threshold from 0.70 → 0.72", not from the base value. If an item is unchanged from the \
+current live version, do NOT mention it in the summary."""
+
+    return f"""Adjust this base checklist for the "{community_name}" community on {platform}.
+
+Rule: {rule_title}: {rule_text}
+
+Community context:
+{context_section}
+{atmosphere_section}{posts_section}{pinned_section}
+
+Base checklist (compiled from rule text only, no context):
+{json.dumps(base_checklist, indent=2)}
+{current_section}
+
+Review each item and adjust for this community's context. Return the full adjusted tree plus a summary.
+
+Return JSON in exactly this format:
+{{
+  "checklist_tree": [
+    {{
+      "description": "...",
+      "rule_text_anchor": "...",
+      "item_type": "...",
+      "logic": {{}},
+      "action": "...",
+      "children": [],
+      "context_influenced": true | false,
+      "context_note": "[situational fact] → [calibration decision], or null",
+      "context_change_types": ["threshold", "rubric", ...] or [],
+      "base_description": "verbatim description from the base checklist entry this was derived from, or null only for new_item"
+    }}
+  ],
+  "adjustment_summary": "Human-readable summary of what was adjusted and why (2-5 sentences)"
 }}"""
 
 
@@ -873,147 +1157,6 @@ Return JSON in exactly this format:
     {{"op": "update", "existing_id": "...", "description": "...", "rule_text_anchor": "...", "item_type": "...", "logic": {{}}, "action": "...", "children": []}},
     {{"op": "delete", "existing_id": "..."}},
     {{"op": "add", "description": "...", "rule_text_anchor": "...", "item_type": "...", "logic": {{}}, "action": "...", "children": []}}
-  ]
-}}"""
-
-
-# ── Suggest from Examples ──────────────────────────────────────────────────────
-
-SUGGEST_FROM_EXAMPLES_SYSTEM = """You are a moderation rule optimization assistant. Given a set of labeled examples and the current checklist, suggest improvements to better align the checklist with the examples.
-
-IMPORTANT — hierarchy rules for parent/child items:
-- Identify each PROBLEM first, then propose ONE fix at the LOWEST checklist level that fully addresses it.
-- NEVER suggest fixing both a parent and its child for the same problem.
-- If a child item's logic, threshold, or rubric is wrong, fix the CHILD directly.
-- Only fix a parent item if the parent's own gate condition or description is the root cause.
-- Never generate a suggestion for a parent that says "the main fix should be in the child" — just fix the child directly.
-- One suggestion per problem. Each suggestion must include a diagnosis explaining what's wrong.
-
-Return ONLY valid JSON with no markdown formatting or code blocks."""
-
-
-def build_suggest_from_examples_prompt(
-    rule_text: str,
-    checklist_items: list[dict],
-    examples: list[dict],
-    community_name: str,
-    violating_counts: dict[str, int] | None = None,
-) -> str:
-    import json
-
-    # Annotate each item with its violating example count
-    annotated_items = []
-    for item in checklist_items:
-        annotated = dict(item)
-        if violating_counts is not None:
-            annotated["violating_example_count"] = violating_counts.get(item.get("id", ""), 0)
-        annotated_items.append(annotated)
-
-    return f"""Analyze these labeled examples for the "{community_name}" community and suggest improvements to the moderation checklist.
-
-Rule text:
-{rule_text}
-
-Current checklist (each item includes violating_example_count — the number of violating examples linked to it):
-{json.dumps(annotated_items, indent=2)}
-
-Labeled examples:
-{json.dumps(examples, indent=2)}
-
-Identify patterns where the checklist might be:
-1. Missing criteria that distinguish compliant from violating examples
-2. Over-triggering (flagging compliant posts as violations)
-3. Under-triggering (missing clear violations)
-4. Using thresholds or patterns that need adjustment
-
-Items with a parent_id are children of another item. Items with action "continue" are parent nodes whose children contain the actual checks. You can suggest adding a new child item under an existing parent by setting target to null and parent_id to the parent's ID.
-
-HIERARCHY RULE — fix at the most specific level:
-- For each problem, determine whether the fix belongs at the parent level or a child level. NEVER suggest both.
-- If a child item's threshold/rubric/pattern is wrong → fix the CHILD (target = child item ID).
-- Only target a parent item if the parent's own gate condition or description is the root cause.
-- Never generate a suggestion for a parent that says "the fix should be in the child" — just target the child directly.
-
-For deterministic items: only propose a pattern update if the item's violating_example_count >= 3. When that threshold is met, analyze the literal text of those violating examples and propose a refined regex pattern in proposed_change (under the "patterns" key) that matches them but not the compliant examples.
-
-For each suggestion:
-- If suggestion_type is "rule_text": set proposed_text to the COMPLETE updated rule text (all paragraphs preserved — only modify the specific sentences that need changing, leave the rest intact). Do NOT return a partial snippet.
-- If suggestion_type is "checklist" and target is an item ID: set proposed_change to the fields to update on that item.
-- If suggestion_type is "checklist" and target is null: set proposed_change to the new item object. Set parent_id to an existing item's ID to add it as a child, or null for a new root item.
-
-Return JSON in exactly this format:
-{{
-  "suggestions": [
-    {{
-      "suggestion_type": "checklist" | "rule_text",
-      "target": "item_id to update, or null for new items / rule_text",
-      "parent_id": "parent item_id for new child items, or null",
-      "diagnosis": "What specific problem was identified (over_trigger, under_trigger, uncovered, threshold_drift)",
-      "description": "What to change and why",
-      "proposed_text": "For rule_text: the COMPLETE updated rule text",
-      "proposed_change": {{...for checklist: the item fields...}},
-      "reasoning": "Which examples motivated this suggestion"
-    }}
-  ]
-}}"""
-
-
-# ── Suggest from Checklist ─────────────────────────────────────────────────────
-
-SUGGEST_FROM_CHECKLIST_SYSTEM = """You are a moderation rule alignment assistant. Given changes to a checklist, suggest new examples that test the updated logic and optionally suggest rule text updates.
-
-Return ONLY valid JSON with no markdown formatting or code blocks."""
-
-
-def build_suggest_from_checklist_prompt(
-    rule_text: str,
-    checklist_items: list[dict],
-    existing_examples: list[dict],
-    community_name: str,
-) -> str:
-    import json
-
-    return f"""The moderation checklist for the "{community_name}" community has been updated. Generate new examples that test the updated logic, especially edge cases.
-
-Rule text:
-{rule_text}
-
-Updated checklist:
-{json.dumps(checklist_items, indent=2)}
-
-Existing examples (do not duplicate these):
-{json.dumps(existing_examples, indent=2)}
-
-Generate examples that:
-1. Test boundary cases near the new thresholds or patterns
-2. Cover scenarios the existing examples don't address
-3. Include both compliant (rule-following) and violating (triggering checklist) cases
-
-For rule_text_suggestions: proposed_text must be the COMPLETE updated rule text (all paragraphs, not a snippet — only modify the specific sentences that need changing, leave the rest intact).
-
-Return JSON in exactly this format:
-{{
-  "suggested_examples": [
-    {{
-      "label": "compliant" | "violating" | "borderline",
-      "content": {{
-        "id": "...",
-        "platform": "...",
-        "author": "...",
-        "content": {{"title": "...", "body": "...", "media": [], "links": []}},
-        "context": "...",
-        "timestamp": "..."
-      }},
-      "relevance_note": "What aspect of the updated checklist this example tests",
-      "related_checklist_item_description": "Exact description of the checklist item this example primarily tests (null if it spans multiple items)"
-    }}
-  ],
-  "rule_text_suggestions": [
-    {{
-      "description": "Optional suggestion to update rule text if checklist has diverged",
-      "proposed_text": "Complete updated rule text here, not a snippet",
-      "reasoning": "..."
-    }}
   ]
 }}"""
 
@@ -1212,7 +1355,7 @@ Return JSON in exactly this format:
         "description": "...",
         "item_type": "deterministic | structural | subjective",
         "logic": {{}},
-        "action": "remove | flag | continue"
+        "action": "remove | warn | continue"
       }},
       "confidence": "high | medium | low"
     }}
@@ -1225,7 +1368,7 @@ Return JSON in exactly this format:
         "description": "...",
         "item_type": "deterministic | structural | subjective",
         "logic": {{}},
-        "action": "remove | flag | continue",
+        "action": "remove | warn | continue",
         "rule_text_anchor": null,
         "context_influenced": false,
         "context_note": null,

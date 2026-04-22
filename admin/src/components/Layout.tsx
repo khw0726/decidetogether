@@ -110,7 +110,7 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
         <div className="border-t border-gray-700 flex items-center">
           {sidebarOpen && (
             <span className="flex-1 px-4 py-3 text-xs text-gray-500 truncate">
-              v2.0.0 — All decisions require human review
+              v2.1.0 — All decisions require human review
             </span>
           )}
           <button

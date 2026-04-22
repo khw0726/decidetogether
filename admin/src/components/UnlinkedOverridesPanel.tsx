@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react'
+import { showErrorToast } from './Toast'
 import {
   listUnlinkedOverrides,
   suggestRuleFromOverrides,
@@ -61,6 +62,8 @@ export default function UnlinkedOverridesPanel({ communityId }: UnlinkedOverride
     try {
       const result = await suggestRuleFromOverrides(communityId, [...selectedIds])
       setSuggestion(result)
+    } catch (e) {
+      showErrorToast(e instanceof Error ? e.message : 'Failed to generate suggestion')
     } finally {
       setSuggesting(false)
     }

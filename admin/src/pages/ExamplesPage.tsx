@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ChevronLeft, ChevronRight, Loader2, Sparkles, ThumbsUp, ThumbsDown, Minus, Trash2 } from 'lucide-react'
+import { showErrorToast } from '../components/Toast'
 import {
   listCommunityExamples,
   listRules,
@@ -104,6 +105,8 @@ export default function ExamplesPage({ communityId }: ExamplesPageProps) {
     try {
       const result = await suggestRuleFromOverrides(communityId, [...selectedUnlinkedIds])
       setSuggestion(result)
+    } catch (e) {
+      showErrorToast(e instanceof Error ? e.message : 'Failed to generate suggestion')
     } finally {
       setSuggesting(false)
     }

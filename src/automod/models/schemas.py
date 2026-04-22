@@ -13,10 +13,26 @@ class CommunityCreate(BaseModel):
 
 # ── Community Context ─────────────────────────────────────────────────────────
 
+class CommunityContextNote(BaseModel):
+    """A single calibration note paired with its tag."""
+    text: str
+    tag: str = ""
+
+
 class CommunityContextDimension(BaseModel):
     """A single context dimension (purpose, participants, stakes, or tone)."""
-    prose: str = ""
-    tags: list[str] = []
+    notes: list[CommunityContextNote] = []
+    manually_edited: bool = False
+
+    @field_validator('notes', mode='before')
+    @classmethod
+    def _migrate_notes(cls, v):
+        """Handle old format where notes were plain strings."""
+        if not v:
+            return []
+        if v and isinstance(v[0], str):
+            return [{"text": note, "tag": ""} for note in v]
+        return v
 
 
 class CommunityContextData(BaseModel):
@@ -95,6 +111,8 @@ class RuleRead(BaseModel):
     rule_type_reasoning: Optional[str] = None
     applies_to: str = "both"
     override_count: int = 0
+    base_checklist_json: Optional[list[dict[str, Any]]] = None
+    context_adjustment_summary: Optional[list[str]] = None
     created_at: datetime
     updated_at: datetime
 
@@ -124,6 +142,10 @@ class ChecklistItemRead(BaseModel):
     action: str
     context_influenced: bool = False
     context_note: Optional[str] = None
+    context_change_types: Optional[list[str]] = None
+    base_description: Optional[str] = None
+    context_pinned: bool = False
+    context_override_note: Optional[str] = None
     updated_at: datetime
     children: list["ChecklistItemRead"] = []
 
@@ -133,7 +155,7 @@ class ChecklistItemRead(BaseModel):
 class ChecklistItemCreate(BaseModel):
     description: str
     item_type: str = "subjective"  # deterministic | structural | subjective
-    action: str = "flag"           # remove | flag | continue
+    action: str = "warn"            # remove | warn | continue
     parent_id: Optional[str] = None
     rule_text_anchor: Optional[str] = None
     logic: dict[str, Any] = {}
@@ -216,7 +238,7 @@ class DecisionRead(BaseModel):
 
 
 class DecisionResolve(BaseModel):
-    verdict: str  # approve | remove | review
+    verdict: str  # approve | warn | remove
     reasoning_category: Optional[str] = None
     # rule_doesnt_apply | edge_case_allow | rule_needs_update | agent_wrong_interpretation | agree
     notes: Optional[str] = None

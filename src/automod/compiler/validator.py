@@ -8,7 +8,7 @@ class ValidationError(Exception):
 
 
 VALID_ITEM_TYPES = {"deterministic", "structural", "subjective"}
-VALID_ACTIONS = {"remove", "flag", "continue"}
+VALID_ACTIONS = {"remove", "warn", "continue"}
 VALID_RULE_TYPES = {"actionable", "procedural", "meta", "informational"}
 
 
@@ -23,7 +23,7 @@ def validate_checklist_item(item_data: dict[str, Any]) -> list[str]:
     if item_type not in VALID_ITEM_TYPES:
         errors.append(f"item_type must be one of {VALID_ITEM_TYPES}, got: {item_type!r}")
 
-    action = item_data.get("action", "flag")
+    action = item_data.get("action", "warn")
     if action not in VALID_ACTIONS:
         errors.append(f"action must be one of {VALID_ACTIONS}")
 

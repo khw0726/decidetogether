@@ -1,19 +1,282 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus, Sparkles } from 'lucide-react'
-import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem } from '../api/client'
+import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus, Sparkles, Pin, PinOff, Loader2, Gauge, FileText, Type, Zap, PlusCircle, Search } from 'lucide-react'
+import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem, setContextOverride, Rule } from '../api/client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+
+// ── Change Type Icons ────────────────────────────────────────────────────────
+
+const CHANGE_TYPE_META: Record<string, { icon: typeof Gauge; label: string; color: string }> = {
+  threshold: { icon: Gauge, label: 'Threshold adjusted', color: 'text-teal-600' },
+  rubric: { icon: FileText, label: 'Rubric refined', color: 'text-blue-600' },
+  description: { icon: Type, label: 'Description changed', color: 'text-violet-600' },
+  action: { icon: Zap, label: 'Action changed', color: 'text-orange-600' },
+  new_item: { icon: PlusCircle, label: 'Added by context', color: 'text-emerald-600' },
+  pattern: { icon: Search, label: 'Pattern changed', color: 'text-indigo-600' },
+  check: { icon: Search, label: 'Check changed', color: 'text-indigo-600' },
+}
+
+function ChangeTypeIcons({ types }: { types: string[] }) {
+  if (!types || types.length === 0) return null
+  return (
+    <span className="inline-flex items-center gap-0.5 ml-1">
+      {types.map(t => {
+        const meta = CHANGE_TYPE_META[t]
+        if (!meta) return null
+        const Icon = meta.icon
+        return (
+          <span key={t} className={meta.color} title={meta.label}>
+            <Icon size={10} />
+          </span>
+        )
+      })}
+    </span>
+  )
+}
+
+// ── Threshold Gauge ──────────────────────────────────────────────────────────
+
+function ThresholdGauge({ current, base }: { current: number; base: number | null }) {
+  if (base === null || base === current) return null
+  const lowered = current < base
+  const delta = current - base
+  const barColor = lowered ? 'bg-teal-400' : 'bg-amber-400'
+  const markerColor = lowered ? 'border-teal-600' : 'border-amber-600'
+  const textColor = lowered ? 'text-teal-700' : 'text-amber-700'
+  const label = lowered ? 'more sensitive' : 'stricter'
+
+  return (
+    <div className="flex items-center gap-2 mt-1.5" title={`Base: ${base.toFixed(2)} → Current: ${current.toFixed(2)}`}>
+      <div className="relative w-28 h-2 bg-gray-200 rounded-full overflow-visible">
+        {/* Base marker */}
+        <div
+          className="absolute top-[-1px] w-0.5 h-[10px] bg-gray-400 rounded-full z-10"
+          style={{ left: `${base * 100}%` }}
+          title={`Base: ${base.toFixed(2)}`}
+        />
+        {/* Current fill */}
+        <div
+          className={`absolute top-0 left-0 h-full rounded-full ${barColor}`}
+          style={{ width: `${current * 100}%` }}
+        />
+        {/* Current marker */}
+        <div
+          className={`absolute top-[-2px] w-1 h-[12px] ${markerColor} border rounded-full z-20`}
+          style={{ left: `${current * 100}%`, transform: 'translateX(-50%)' }}
+        />
+      </div>
+      <span className={`text-[10px] font-mono font-medium ${textColor} whitespace-nowrap`}>
+        {delta > 0 ? '+' : ''}{delta.toFixed(2)} {label}
+      </span>
+    </div>
+  )
+}
+
+// ── Rubric Diff ──────────────────────────────────────────────────────────────
+
+function RubricDiff({ base, current }: { base: string; current: string }) {
+  return (
+    <div className="mt-1.5 space-y-1.5 text-xs">
+      <div>
+        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Base rubric</p>
+        <p className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-gray-600 leading-relaxed whitespace-pre-wrap">{base}</p>
+      </div>
+      <div>
+        <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wider mb-0.5">Adjusted rubric</p>
+        <p className="bg-blue-50 border border-blue-200 rounded px-2 py-1.5 text-blue-800 leading-relaxed whitespace-pre-wrap">{current}</p>
+      </div>
+    </div>
+  )
+}
+
+// ── Context Badge ────────────────────────────────────────────────────────────
+
+function ContextBadge({ itemId, note, changeTypes, pinned, overrideNote, ruleId, threshold, baseThreshold, baseRubric, currentRubric }: {
+  itemId: string
+  note: string | null
+  changeTypes: string[] | null
+  pinned: boolean
+  overrideNote: string | null
+  ruleId: string
+  threshold: number | null
+  baseThreshold: number | null
+  baseRubric: string | null
+  currentRubric: string | null
+}) {
+  const [open, setOpen] = useState(false)
+  const [showRubric, setShowRubric] = useState(false)
+  const [editingNote, setEditingNote] = useState(false)
+  const [draftNote, setDraftNote] = useState(overrideNote ?? '')
+  const queryClient = useQueryClient()
+
+  const pinMutation = useMutation({
+    mutationFn: (args: { pin: boolean; note?: string }) =>
+      setContextOverride(itemId, args.pin, args.note),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['checklist', ruleId] }),
+  })
+
+  const handlePin = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (pinned) {
+      pinMutation.mutate({ pin: false })
+      setEditingNote(false)
+    } else {
+      setEditingNote(true)
+    }
+  }
+
+  const submitPin = (e: React.MouseEvent | React.FormEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    pinMutation.mutate({ pin: true, note: draftNote.trim() || undefined })
+    setEditingNote(false)
+  }
+
+  const isNewItem = changeTypes?.includes('new_item')
+  const hasThresholdChange = changeTypes?.includes('threshold') && threshold !== null && baseThreshold !== null
+  const hasRubricChange = changeTypes?.includes('rubric') && baseRubric !== null && currentRubric !== null && baseRubric !== currentRubric
+
+  return (
+    <div className="mt-1">
+      <span className="inline-flex items-center gap-0.5">
+        <button
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-colors ${
+            pinned
+              ? 'bg-amber-50 border border-amber-300 text-amber-700 hover:bg-amber-100'
+              : isNewItem
+              ? 'bg-emerald-50 border border-emerald-300 text-emerald-700 hover:bg-emerald-100'
+              : 'bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100'
+          }`}
+          onClick={(e) => { e.stopPropagation(); setOpen(v => !v) }}
+          title={note ?? 'Shaped by community context'}
+        >
+          {pinned
+            ? <Pin size={10} className="flex-shrink-0" />
+            : isNewItem
+            ? <PlusCircle size={10} className="flex-shrink-0" />
+            : <Sparkles size={10} className="flex-shrink-0" />
+          }
+          {pinned ? 'pinned' : isNewItem ? 'context-added' : 'context'}
+        </button>
+        {!pinned && changeTypes && !isNewItem && <ChangeTypeIcons types={changeTypes} />}
+      </span>
+
+      {open && (
+        <div className={`text-xs mt-1 pl-1 border-l-2 ${
+          pinned ? 'border-amber-200' : isNewItem ? 'border-emerald-200' : 'border-teal-200'
+        }`}>
+          {note && <p className={pinned ? 'text-amber-700' : isNewItem ? 'text-emerald-700' : 'text-teal-700'}>{note}</p>}
+          {hasThresholdChange && (
+            <ThresholdGauge current={threshold!} base={baseThreshold!} />
+          )}
+          {hasRubricChange && (
+            <div className="mt-1.5">
+              <button
+                className="inline-flex items-center gap-1 text-[10px] font-medium text-blue-600 hover:text-blue-800"
+                onClick={(e) => { e.stopPropagation(); setShowRubric(v => !v) }}
+              >
+                <FileText size={10} />
+                {showRubric ? 'Hide rubric diff' : 'View rubric diff'}
+              </button>
+              {showRubric && <RubricDiff base={baseRubric!} current={currentRubric!} />}
+            </div>
+          )}
+          {pinned && overrideNote && (
+            <p className="text-amber-600 mt-0.5 italic">Pin note: {overrideNote}</p>
+          )}
+          {editingNote ? (
+            <form onSubmit={submitPin} className="mt-1.5 flex gap-1.5 items-start" onClick={e => e.stopPropagation()}>
+              <input
+                type="text"
+                className="flex-1 text-xs border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:border-amber-400"
+                value={draftNote}
+                onChange={e => setDraftNote(e.target.value)}
+                placeholder="Why pin this? (optional)"
+                autoFocus
+              />
+              <button type="submit" className="text-amber-600 hover:text-amber-800" disabled={pinMutation.isPending}>
+                {pinMutation.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+              </button>
+              <button type="button" className="text-gray-400 hover:text-gray-600" onClick={(e) => { e.stopPropagation(); setEditingNote(false) }}>
+                <X size={12} />
+              </button>
+            </form>
+          ) : (
+            <button
+              className={`mt-1 inline-flex items-center gap-1 text-[10px] font-medium ${
+                pinned ? 'text-amber-500 hover:text-amber-700' : 'text-teal-500 hover:text-teal-700'
+              }`}
+              onClick={handlePin}
+              disabled={pinMutation.isPending}
+              title={pinned ? 'Unpin — let recompilation change this item freely' : 'Pin — preserve this calibration across recompilations'}
+            >
+              {pinMutation.isPending
+                ? <Loader2 size={10} className="animate-spin" />
+                : pinned ? <><PinOff size={10} /> unpin</> : <><Pin size={10} /> pin this adjustment</>
+              }
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Ghost Row (removed by context) ──────────────────────────────────────────
+
+function GhostRow({ item, depth }: { item: Record<string, unknown>; depth: number }) {
+  const indent = depth * 16
+  const description = (item.description as string) || ''
+  const itemType = (item.item_type as string) || 'subjective'
+
+  const typeBadge = {
+    deterministic: <span className="badge badge-blue opacity-40">DETERMINISTIC</span>,
+    structural: <span className="badge badge-yellow opacity-40">STRUCTURAL</span>,
+    subjective: <span className="badge badge-purple opacity-40">SUBJECTIVE</span>,
+  }[itemType] ?? <span className="badge badge-gray opacity-40">{itemType}</span>
+
+  return (
+    <div style={{ marginLeft: indent }}>
+      <div className="border border-dashed border-gray-300 rounded-lg p-3 bg-gray-50 opacity-50">
+        <div className="flex items-center gap-2">
+          <div className="w-4 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {typeBadge}
+              <span className="text-sm font-medium text-gray-400 line-through">{description}</span>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-50 border border-red-200 text-red-500">
+                <X size={9} /> removed by context
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Tree ────────────────────────────────────────────────────────────────
 
 interface ChecklistTreeProps {
   items: ChecklistItem[]
   ruleId: string
+  rule?: Rule | null
   onAnchorHover?: (anchor: string | null) => void
   selectedItemId?: string | null
   onItemSelect?: (itemId: string | null) => void
   highlightedItemId?: string | null
 }
 
-export default function ChecklistTree({ items, ruleId, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId }: ChecklistTreeProps) {
+export default function ChecklistTree({ items, ruleId, rule, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId }: ChecklistTreeProps) {
   const [adding, setAdding] = useState(false)
+  const [showGhosts, setShowGhosts] = useState(false)
+
+  // Compute ghost items: items in base_checklist_json but not in current checklist
+  const ghostItems = computeGhostItems(rule?.base_checklist_json as Record<string, unknown>[] | null, items)
+  const hasGhosts = ghostItems.length > 0
+
+  // Build a map from base_checklist_json for diffing and threshold comparison
+  const baseItemMap = buildBaseItemMap(rule?.base_checklist_json as Record<string, unknown>[] | null)
+
   return (
     <div className="space-y-1">
       {items.length === 0 && !adding && (
@@ -21,8 +284,35 @@ export default function ChecklistTree({ items, ruleId, onAnchorHover, selectedIt
           No checklist items yet. Compile the rule to generate them, or add one manually.
         </div>
       )}
+      {hasGhosts && (
+        <div className="flex justify-end mb-1">
+          <button
+            className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${
+              showGhosts
+                ? 'bg-gray-200 text-gray-600'
+                : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+            }`}
+            onClick={() => setShowGhosts(v => !v)}
+          >
+            {showGhosts ? 'Hide' : 'Show'} {ghostItems.length} removed by context
+          </button>
+        </div>
+      )}
       {items.map(item => (
-        <ChecklistNode key={item.id} item={item} ruleId={ruleId} depth={0} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} />
+        <ChecklistNode
+          key={item.id}
+          item={item}
+          ruleId={ruleId}
+          depth={0}
+          onAnchorHover={onAnchorHover}
+          selectedItemId={selectedItemId}
+          onItemSelect={onItemSelect}
+          highlightedItemId={highlightedItemId}
+          baseItemMap={baseItemMap}
+        />
+      ))}
+      {showGhosts && ghostItems.map((ghost, i) => (
+        <GhostRow key={`ghost-${i}`} item={ghost} depth={0} />
       ))}
       {adding
         ? <AddItemForm ruleId={ruleId} parentId={null} onDone={() => setAdding(false)} />
@@ -39,7 +329,132 @@ export default function ChecklistTree({ items, ruleId, onAnchorHover, selectedIt
   )
 }
 
-// ── Logic Inspector ───────────────────────────────────────────────────────────
+// ── Helpers for ghost items and base thresholds ─────────────────────────────
+
+function computeGhostItems(baseChecklist: Record<string, unknown>[] | null, currentItems: ChecklistItem[]): Record<string, unknown>[] {
+  if (!baseChecklist) return []
+  const currentDescriptions = new Set(flattenDescriptions(currentItems))
+  return flattenBaseItems(baseChecklist).filter(
+    baseItem => !currentDescriptions.has((baseItem.description as string || '').toLowerCase().trim())
+  )
+}
+
+function flattenDescriptions(items: ChecklistItem[]): string[] {
+  const result: string[] = []
+  for (const item of items) {
+    result.push(item.description.toLowerCase().trim())
+    if (item.children) result.push(...flattenDescriptions(item.children))
+  }
+  return result
+}
+
+function flattenBaseItems(items: Record<string, unknown>[]): Record<string, unknown>[] {
+  const result: Record<string, unknown>[] = []
+  for (const item of items) {
+    result.push(item)
+    const children = item.children as Record<string, unknown>[] | undefined
+    if (children) result.push(...flattenBaseItems(children))
+  }
+  return result
+}
+
+type BaseItemMap = Map<string, Record<string, unknown>>
+
+function buildBaseItemMap(baseChecklist: Record<string, unknown>[] | null): BaseItemMap {
+  const map = new Map<string, Record<string, unknown>>()
+  if (!baseChecklist) return map
+
+  function walk(items: Record<string, unknown>[]) {
+    for (const item of items) {
+      const desc = (item.description as string || '').toLowerCase().trim()
+      map.set(desc, item)
+      const children = item.children as Record<string, unknown>[] | undefined
+      if (children) walk(children)
+    }
+  }
+  walk(baseChecklist)
+  return map
+}
+
+/** Look up a base item by the persisted base_description (preferred) or by falling back to current description. */
+function lookupBaseItem(baseItemMap: BaseItemMap, item: ChecklistItem): Record<string, unknown> | undefined {
+  if (item.base_description) {
+    const byBase = baseItemMap.get(item.base_description.toLowerCase().trim())
+    if (byBase) return byBase
+  }
+  return baseItemMap.get(item.description.toLowerCase().trim())
+}
+
+function getBaseThreshold(baseItemMap: BaseItemMap, item: ChecklistItem): number | null {
+  const baseItem = lookupBaseItem(baseItemMap, item)
+  if (!baseItem) return null
+  const logic = baseItem.logic as Record<string, unknown> | undefined
+  if (logic && typeof logic.threshold === 'number') return logic.threshold
+  return null
+}
+
+function getBaseRubric(baseItemMap: BaseItemMap, item: ChecklistItem): string | null {
+  const baseItem = lookupBaseItem(baseItemMap, item)
+  if (!baseItem) return null
+  const logic = baseItem.logic as Record<string, unknown> | undefined
+  if (logic && typeof logic.rubric === 'string') return logic.rubric
+  return null
+}
+
+/** Infer context_change_types by diffing current item against base when field is null. */
+function inferChangeTypes(item: ChecklistItem, baseItemMap: BaseItemMap): string[] {
+  // If server already provided change types, use them
+  if (item.context_change_types && item.context_change_types.length > 0) {
+    return item.context_change_types
+  }
+  // If item is not context-influenced, nothing to infer
+  if (!item.context_influenced) return []
+
+  const baseItem = lookupBaseItem(baseItemMap, item)
+
+  // No matching base item → it was added by context
+  if (!baseItem) return ['new_item']
+
+  const changes: string[] = []
+  const baseLgc = (baseItem.logic as Record<string, unknown>) || {}
+  const curLgc = (item.logic as Record<string, unknown>) || {}
+
+  // Threshold change
+  if (typeof baseLgc.threshold === 'number' && typeof curLgc.threshold === 'number' && baseLgc.threshold !== curLgc.threshold) {
+    changes.push('threshold')
+  }
+  // Rubric change
+  if (typeof baseLgc.rubric === 'string' && typeof curLgc.rubric === 'string' && baseLgc.rubric !== curLgc.rubric) {
+    changes.push('rubric')
+  }
+  // Prompt template change
+  if (typeof baseLgc.prompt_template === 'string' && typeof curLgc.prompt_template === 'string' && baseLgc.prompt_template !== curLgc.prompt_template) {
+    changes.push('description')
+  }
+  // Action change
+  if ((baseItem.action as string) !== item.action) {
+    changes.push('action')
+  }
+  // Pattern change (deterministic)
+  if (JSON.stringify(baseLgc.patterns) !== JSON.stringify(curLgc.patterns)) {
+    changes.push('pattern')
+  }
+  // Check change (structural)
+  if (JSON.stringify(baseLgc.checks) !== JSON.stringify(curLgc.checks)) {
+    changes.push('check')
+  }
+  // Description itself changed
+  if ((baseItem.description as string || '') !== item.description) {
+    changes.push('description')
+  }
+
+  // If context_influenced but we couldn't detect specific changes, mark generically
+  if (changes.length === 0) changes.push('rubric')
+
+  return [...new Set(changes)]
+}
+
+// ─��� Logic Inspector ───────────────────────────────────────────────────────────
 
 function LogicInspector({ item }: { item: ChecklistItem }) {
   const logic = item.logic as Record<string, unknown>
@@ -136,7 +551,7 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
 
 function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: string | null; onDone: () => void }) {
   const [description, setDescription] = useState('')
-  const [action, setAction] = useState('flag')
+  const [action, setAction] = useState('warn')
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
@@ -164,7 +579,7 @@ function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: s
           value={action}
           onChange={e => setAction(e.target.value)}
         >
-          <option value="flag">Flag</option>
+          <option value="warn">Warn</option>
           <option value="remove">Remove</option>
           <option value="continue">Continue</option>
         </select>
@@ -187,7 +602,7 @@ function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: s
 
 // ── ChecklistNode ─────────────────────────────────────────────────────────────
 
-function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void; selectedItemId?: string | null; onItemSelect?: (itemId: string | null) => void; highlightedItemId?: string | null }) {
+function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId, baseItemMap }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void; selectedItemId?: string | null; onItemSelect?: (itemId: string | null) => void; highlightedItemId?: string | null; baseItemMap: BaseItemMap }) {
   const [expanded, setExpanded] = useState(true)
   const [editing, setEditing] = useState(false)
   const [showLogic, setShowLogic] = useState(false)
@@ -220,7 +635,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
 
   const actionBadge = {
     remove: <span className="badge badge-red">REMOVE</span>,
-    flag: <span className="badge badge-yellow">FLAG</span>,
+    warn: <span className="badge badge-yellow">WARN</span>,
     continue: <span className="badge badge-gray">continue</span>,
   }[item.action] ?? null
 
@@ -230,20 +645,32 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
   const handleSave = () => {
     mutation.mutate({
       description: editedDescription,
-      action: editedFailAction as 'remove' | 'flag' | 'continue',
+      action: editedFailAction as 'remove' | 'warn' | 'continue',
     })
   }
 
   const isSelected = selectedItemId === item.id
   const isHighlighted = highlightedItemId === item.id
 
+  // Infer change types from base diff when server field is null
+  const effectiveChangeTypes = inferChangeTypes(item, baseItemMap)
+  const isContextAdded = effectiveChangeTypes.includes('new_item')
+
+  // Look up base threshold for this item by description match
+  const currentThreshold = item.item_type === 'subjective' ? (item.logic as Record<string, unknown>).threshold as number | null : null
+  const baseThreshold = getBaseThreshold(baseItemMap, item)
+  const baseRubric = getBaseRubric(baseItemMap, item)
+  const currentRubric = item.item_type === 'subjective' ? (item.logic as Record<string, unknown>).rubric as string | null : null
+
   return (
     <div style={{ marginLeft: indent }}>
       <div
         className={`border rounded-lg p-3 transition-colors cursor-pointer ${
-          isSelected ? 'bg-white border-indigo-400 ring-1 ring-indigo-300' :
-          isHighlighted ? 'bg-amber-50 border-amber-400 ring-1 ring-amber-300' :
-          'bg-white border-gray-200 hover:border-gray-300'
+          isContextAdded
+            ? 'bg-emerald-50/30 border-dashed border-emerald-300 hover:border-emerald-400'
+            : isSelected ? 'bg-white border-indigo-400 ring-1 ring-indigo-300'
+            : isHighlighted ? 'bg-amber-50 border-amber-400 ring-1 ring-amber-300'
+            : 'bg-white border-gray-200 hover:border-gray-300'
         }`}
         onMouseEnter={() => onAnchorHover?.(item.rule_text_anchor || null)}
         onMouseLeave={() => onAnchorHover?.(null)}
@@ -293,7 +720,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
                       onChange={e => setEditedFailAction(e.target.value)}
                     >
                       <option value="remove">remove</option>
-                      <option value="flag">flag</option>
+                      <option value="warn">warn</option>
                       <option value="continue">continue</option>
                     </select>
                   </div>
@@ -311,18 +738,19 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
               </div>
             ) : (
               <>
-                {/* {item.rule_text_anchor && (
-                  <p className="text-xs text-indigo-600 mt-1">
-                    Anchor: &ldquo;{item.rule_text_anchor}&rdquo;
-                  </p>
-                )} */}
                 {item.context_influenced && (
-                  <div className="flex items-start gap-1 mt-1" title={item.context_note ?? 'Shaped by community context'}>
-                    <Sparkles size={11} className="text-teal-500 mt-0.5 flex-shrink-0" />
-                    <span className="text-xs text-teal-700">
-                      {item.context_note ?? 'Influenced by community context'}
-                    </span>
-                  </div>
+                  <ContextBadge
+                    itemId={item.id}
+                    note={item.context_note}
+                    changeTypes={effectiveChangeTypes}
+                    pinned={item.context_pinned}
+                    overrideNote={item.context_override_note}
+                    ruleId={ruleId}
+                    threshold={currentThreshold}
+                    baseThreshold={baseThreshold}
+                    baseRubric={baseRubric}
+                    currentRubric={currentRubric}
+                  />
                 )}
                 {showLogic && <LogicInspector item={item} />}
               </>
@@ -398,7 +826,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
       {expanded && (item.children.length > 0 || addingChild) && (
         <div className="mt-1 space-y-1">
           {item.children.map(child => (
-            <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} />
+            <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} baseItemMap={baseItemMap} />
           ))}
           {addingChild && (
             <AddItemForm ruleId={ruleId} parentId={item.id} onDone={() => setAddingChild(false)} />

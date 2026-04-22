@@ -55,7 +55,7 @@ _COMPILE_TOOL = {
                         "logic": {"type": "object"},
                         "action": {
                             "type": "string",
-                            "enum": ["remove", "flag", "continue"],
+                            "enum": ["remove", "warn", "continue"],
                         },
                         "children": {"type": "array", "items": {"type": "object"}},
                         "context_influenced": {
@@ -126,7 +126,7 @@ _RECOMPILE_TOOL = {
                         "logic": {"type": "object"},
                         "action": {
                             "type": "string",
-                            "enum": ["remove", "flag", "continue"],
+                            "enum": ["remove", "warn", "continue"],
                         },
                         "children": {"type": "array", "items": {"type": "object"}},
                     },
@@ -135,50 +135,6 @@ _RECOMPILE_TOOL = {
             },
         },
         "required": ["operations"],
-    },
-}
-
-_SUGGEST_FROM_EXAMPLES_TOOL = {
-    "name": "submit_suggestions",
-    "description": "Submit checklist and rule text improvement suggestions",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "suggestions": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "suggestion_type": {
-                            "type": "string",
-                            "enum": ["checklist", "rule_text"],
-                        },
-                        "target": {
-                            "type": ["string", "null"],
-                            "description": "Item ID to update, or null for new items / rule_text suggestions",
-                        },
-                        "parent_id": {
-                            "type": ["string", "null"],
-                            "description": "For new child items: the ID of the parent item to add under. Null for root-level items or updates.",
-                        },
-                        "description": {"type": "string"},
-                        "proposed_text": {
-                            "type": "string",
-                            "description": "For rule_text suggestions: the COMPLETE updated rule text (all paragraphs, not just the changed portion)",
-                        },
-                        "proposed_change": {
-                            "type": "object",
-                            "description": "For checklist suggestions: the updated or new checklist item object",
-                        },
-                        "reasoning": {"type": "string"},
-                    },
-                    "required": [
-                        "suggestion_type", "target", "description", "reasoning",
-                    ],
-                },
-            },
-        },
-        "required": ["suggestions"],
     },
 }
 
@@ -317,91 +273,134 @@ _GENERATE_ATMOSPHERE_TOOL = {
     },
 }
 
+_NOTE_ITEM_SCHEMA = {
+    "type": "object",
+    "description": "One tagged calibration note. The tag (from the taxonomy) is primary; the text is a short per-tag explanation of how that tag applies to this community.",
+    "properties": {
+        "tag": {
+            "type": "string",
+            "description": "Taxonomy tag for this dimension (primary field).",
+        },
+        "text": {
+            "type": "string",
+            "description": "One-sentence moderator-readable explanation of how this tag applies here.",
+        },
+    },
+    "required": ["tag", "text"],
+    "additionalProperties": False,
+}
+
+_DIMENSION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "notes": {
+            "type": "array",
+            "description": "3-5 tagged notes. Do NOT include a separate 'tags' field — tags live inside each note.",
+            "items": _NOTE_ITEM_SCHEMA,
+        },
+    },
+    "required": ["notes"],
+    "additionalProperties": False,
+}
+
 _GENERATE_CONTEXT_TOOL = {
     "name": "submit_community_context",
-    "description": "Submit a structured community context profile with four dimensions",
+    "description": "Submit a structured community context profile with four dimensions. Each dimension's notes are tag-primary: each note = one taxonomy tag + a short explanation. Do NOT emit a separate tags array.",
     "input_schema": {
         "type": "object",
         "properties": {
-            "purpose": {
-                "type": "object",
-                "properties": {
-                    "prose": {"type": "string"},
-                    "tags": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["prose", "tags"],
-            },
-            "participants": {
-                "type": "object",
-                "properties": {
-                    "prose": {"type": "string"},
-                    "tags": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["prose", "tags"],
-            },
-            "stakes": {
-                "type": "object",
-                "properties": {
-                    "prose": {"type": "string"},
-                    "tags": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["prose", "tags"],
-            },
-            "tone": {
-                "type": "object",
-                "properties": {
-                    "prose": {"type": "string"},
-                    "tags": {"type": "array", "items": {"type": "string"}},
-                },
-                "required": ["prose", "tags"],
-            },
+            "purpose": _DIMENSION_SCHEMA,
+            "participants": _DIMENSION_SCHEMA,
+            "stakes": _DIMENSION_SCHEMA,
+            "tone": _DIMENSION_SCHEMA,
         },
         "required": ["purpose", "participants", "stakes", "tone"],
     },
 }
 
-_SUGGEST_FROM_CHECKLIST_TOOL = {
-    "name": "submit_checklist_suggestions",
-    "description": "Submit suggested examples and optional rule text updates",
+_NO_CONTEXT_COMPILE_TOOL = {
+    "name": "submit_compiled_rule",
+    "description": "Submit the compiled checklist tree and examples (no context)",
     "input_schema": {
         "type": "object",
         "properties": {
-            "suggested_examples": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {
-                            "type": "string",
-                            "enum": ["compliant", "violating", "borderline"],
-                        },
-                        "content": {"type": "object"},
-                        "relevance_note": {"type": "string"},
-                        "related_checklist_item_description": {
-                            "type": ["string", "null"],
-                            "description": "Exact description of the checklist item this example primarily tests",
-                        },
-                    },
-                    "required": ["label", "content", "relevance_note"],
-                },
-            },
-            "rule_text_suggestions": {
+            "checklist_tree": {
                 "type": "array",
                 "items": {
                     "type": "object",
                     "properties": {
                         "description": {"type": "string"},
-                        "proposed_text": {"type": "string"},
-                        "reasoning": {"type": "string"},
+                        "rule_text_anchor": {"type": ["string", "null"]},
+                        "item_type": {"type": "string", "enum": ["deterministic", "structural", "subjective"]},
+                        "logic": {"type": "object"},
+                        "action": {"type": "string", "enum": ["remove", "warn", "continue"]},
+                        "children": {"type": "array", "items": {"type": "object"}},
                     },
-                    "required": ["description", "proposed_text", "reasoning"],
+                    "required": ["description", "item_type", "logic", "action", "children"],
+                },
+            },
+            "examples": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {"type": "string", "enum": ["compliant", "violating", "borderline"]},
+                        "content": {"type": "object"},
+                        "relevance_note": {"type": "string"},
+                        "related_checklist_item_description": {"type": ["string", "null"]},
+                    },
+                    "required": ["label", "content", "relevance_note"],
                 },
             },
         },
-        "required": ["suggested_examples", "rule_text_suggestions"],
+        "required": ["checklist_tree", "examples"],
     },
 }
 
+_CONTEXT_ADJUST_TOOL = {
+    "name": "submit_adjusted_checklist",
+    "description": "Submit the context-adjusted checklist tree and adjustment summary",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "checklist_tree": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "description": {"type": "string"},
+                        "rule_text_anchor": {"type": ["string", "null"]},
+                        "item_type": {"type": "string", "enum": ["deterministic", "structural", "subjective"]},
+                        "logic": {"type": "object"},
+                        "action": {"type": "string", "enum": ["remove", "warn", "continue"]},
+                        "children": {"type": "array", "items": {"type": "object"}},
+                        "context_influenced": {"type": "boolean"},
+                        "context_note": {"type": ["string", "null"]},
+                        "context_change_types": {
+                            "type": "array",
+                            "items": {
+                                "type": "string",
+                                "enum": ["threshold", "rubric", "description", "action", "new_item", "pattern", "check"],
+                            },
+                            "description": "What was changed by context: threshold, rubric, description, action, new_item (added by context), pattern (regex), check (structural)",
+                        },
+                        "base_description": {
+                            "type": ["string", "null"],
+                            "description": "If this item was derived from a base checklist item, the EXACT description of that base item (copy verbatim from the base checklist input). Null only for items with context_change_types=['new_item'].",
+                        },
+                    },
+                    "required": ["description", "item_type", "logic", "action", "children", "context_influenced"],
+                },
+            },
+            "adjustment_summary": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Short bullet points summarizing each adjustment (one bullet per change, under 20 words each)",
+            },
+        },
+        "required": ["checklist_tree", "adjustment_summary"],
+    },
+}
 
 _LINK_VIOLATIONS_TOOL = {
     "name": "submit_violation_links",
@@ -521,7 +520,7 @@ class RuleCompiler:
                 rule_text_anchor=item_data.get("rule_text_anchor"),
                 item_type=item_data.get("item_type", "subjective"),
                 logic=item_data.get("logic", {}),
-                action=item_data.get("action", "flag"),
+                action=item_data.get("action", "warn"),
             )
             result.append(item)
 
@@ -587,6 +586,184 @@ class RuleCompiler:
 
         return checklist_items, examples
 
+    def _items_to_nested_dicts(self, items: list[ChecklistItem]) -> list[dict]:
+        """Convert flat ChecklistItem list to nested dict tree for serialization."""
+        items_by_id = {item.id: item for item in items}
+        roots = []
+        children_map: dict[str, list[dict]] = {}
+
+        for item in sorted(items, key=lambda x: x.order):
+            d = {
+                "description": item.description,
+                "rule_text_anchor": item.rule_text_anchor,
+                "item_type": item.item_type,
+                "logic": item.logic,
+                "action": item.action,
+                "context_influenced": item.context_influenced,
+                "context_note": item.context_note,
+                "children": [],
+            }
+            if item.parent_id:
+                children_map.setdefault(item.parent_id, []).append(d)
+            else:
+                roots.append(d)
+
+        # Attach children recursively
+        def _attach(node_dict: dict, item_id: str) -> None:
+            for child_d in children_map.get(item_id, []):
+                node_dict["children"].append(child_d)
+                # Find child item to get its ID for further nesting
+                for it in items:
+                    if it.description == child_d["description"] and it.parent_id == item_id:
+                        _attach(child_d, it.id)
+                        break
+
+        for root_d in roots:
+            for it in items:
+                if it.description == root_d["description"] and it.parent_id is None:
+                    _attach(root_d, it.id)
+                    break
+
+        return roots
+
+    async def compile_rule_base(
+        self,
+        rule: Rule,
+        community: Community,
+        other_rules: list[Rule],
+        existing_items: Optional[list[ChecklistItem]] = None,
+        existing_examples: Optional[list[Example]] = None,
+    ) -> tuple[list[ChecklistItem], list[dict]]:
+        """Pass 1: Compile rule without community context (context-free baseline).
+
+        Returns (checklist_items, example_dicts).
+        """
+        logger.info(f"Pass 1: Compiling rule '{rule.title}' without context")
+
+        other_rules_summary = self._make_other_rules_summary(
+            [r for r in other_rules if r.id != rule.id]
+        )
+
+        existing_checklist_dicts = None
+        if existing_items:
+            existing_checklist_dicts = [self._checklist_item_to_dict(i) for i in existing_items]
+
+        existing_example_dicts = None
+        if existing_examples:
+            existing_example_dicts = [self._example_to_dict(e) for e in existing_examples]
+
+        user_prompt = prompts.build_no_context_compile_prompt(
+            rule_title=rule.title,
+            rule_text=rule.text,
+            community_name=community.name,
+            platform=community.platform,
+            other_rules_summary=other_rules_summary,
+            existing_checklist=existing_checklist_dicts,
+            existing_examples=existing_example_dicts,
+        )
+
+        compiled = await self._call_claude(
+            prompts.NO_CONTEXT_COMPILE_SYSTEM, user_prompt, tool=_NO_CONTEXT_COMPILE_TOOL
+        )
+
+        checklist_items = self._parse_flat_items(
+            compiled.get("checklist_tree", []), rule.id
+        )
+        examples = compiled.get("examples", [])
+
+        return checklist_items, examples
+
+    async def adjust_for_context(
+        self,
+        rule: Rule,
+        community: Community,
+        base_checklist_dicts: list[dict],
+        community_context: dict,
+        community_atmosphere: Optional[dict] = None,
+        community_posts_sample: Optional[list] = None,
+        pinned_items: Optional[list[dict]] = None,
+        current_checklist_dicts: Optional[list[dict]] = None,
+    ) -> tuple[list[ChecklistItem], str]:
+        """Pass 2: Adjust a base checklist using community context.
+
+        Args:
+            pinned_items: List of dicts with keys: description, context_override_note.
+                          These items' calibration must be preserved as-is.
+            current_checklist_dicts: If provided, the LLM will describe changes
+                          relative to these (the live checklist) instead of the base.
+
+        Returns (adjusted_items, adjustment_summary).
+        If no community_context is provided, returns base items unchanged.
+        """
+        if not community_context:
+            items = self._parse_flat_items(base_checklist_dicts, rule.id)
+            return items, ""
+
+        logger.info(f"Pass 2: Adjusting rule '{rule.title}' for community context")
+
+        user_prompt = prompts.build_context_adjust_prompt(
+            rule_title=rule.title,
+            rule_text=rule.text,
+            community_name=community.name,
+            platform=community.platform,
+            base_checklist=base_checklist_dicts,
+            community_context=community_context,
+            community_atmosphere=community_atmosphere,
+            community_posts_sample=community_posts_sample,
+            pinned_items=pinned_items,
+            current_checklist=current_checklist_dicts,
+        )
+
+        result = await self._call_claude(
+            prompts.CONTEXT_ADJUST_SYSTEM, user_prompt, tool=_CONTEXT_ADJUST_TOOL
+        )
+
+        adjusted_items = self._parse_flat_items(
+            result.get("checklist_tree", []), rule.id
+        )
+        raw_summary = result.get("adjustment_summary", [])
+        # Normalize: accept both list and legacy string
+        if isinstance(raw_summary, str):
+            summary = [s.strip() for s in raw_summary.split(". ") if s.strip()]
+        else:
+            summary = list(raw_summary)
+
+        return adjusted_items, summary
+
+    async def compile_rule_two_pass(
+        self,
+        rule: Rule,
+        community: Community,
+        other_rules: list[Rule],
+        existing_items: Optional[list[ChecklistItem]] = None,
+        existing_examples: Optional[list[Example]] = None,
+        community_context: Optional[dict] = None,
+        community_atmosphere: Optional[dict] = None,
+        community_posts_sample: Optional[list] = None,
+    ) -> tuple[list[ChecklistItem], list[dict], list[dict], str]:
+        """Two-pass compilation: base compile then context adjustment.
+
+        Returns (adjusted_items, example_dicts, base_checklist_dicts, adjustment_summary).
+        """
+        # Pass 1: context-free
+        base_items, examples = await self.compile_rule_base(
+            rule, community, other_rules, existing_items, existing_examples,
+        )
+
+        base_checklist_dicts = self._items_to_nested_dicts(base_items)
+
+        # Pass 2: adjust for context
+        if community_context:
+            adjusted_items, summary = await self.adjust_for_context(
+                rule, community, base_checklist_dicts, community_context,
+                community_atmosphere, community_posts_sample,
+            )
+        else:
+            adjusted_items = base_items
+            summary = ""
+
+        return adjusted_items, examples, base_checklist_dicts, summary
+
     async def generate_community_atmosphere(
         self,
         community: Community,
@@ -647,10 +824,14 @@ class RuleCompiler:
         context = {}
         for dim in ["purpose", "participants", "stakes", "tone"]:
             d = result.get(dim, {})
-            context[dim] = {
-                "prose": d.get("prose", ""),
-                "tags": d.get("tags", []),
-            }
+            notes_raw = d.get("notes", [])
+            notes = []
+            for n in notes_raw:
+                if isinstance(n, str):
+                    notes.append({"text": n, "tag": ""})
+                elif isinstance(n, dict):
+                    notes.append({"text": n.get("text", ""), "tag": n.get("tag", "")})
+            context[dim] = {"notes": notes}
         return context
 
     def _parse_flat_items(
@@ -680,9 +861,11 @@ class RuleCompiler:
                 rule_text_anchor=item_data.get("rule_text_anchor"),
                 item_type=item_data.get("item_type", "subjective"),
                 logic=item_data.get("logic", {}),
-                action=item_data.get("action", "flag"),
+                action=item_data.get("action", "warn"),
                 context_influenced=item_data.get("context_influenced", item_data.get("atmosphere_influenced", False)),
                 context_note=item_data.get("context_note", item_data.get("atmosphere_note")),
+                context_change_types=item_data.get("context_change_types"),
+                base_description=item_data.get("base_description"),
             )
             result.append(item)
             order += 1
@@ -749,72 +932,6 @@ class RuleCompiler:
             "item_type": result.get("item_type", "subjective"),
             "logic": result.get("logic", {}),
         }
-
-    async def suggest_from_examples(
-        self,
-        rule: Rule,
-        checklist: list[ChecklistItem],
-        examples: list[Example],
-        violating_counts: dict[str, int] | None = None,
-    ) -> list[dict]:
-        """Generate checklist/rule text suggestions from examples."""
-        logger.info(f"Generating suggestions from examples for rule '{rule.title}'")
-
-        checklist_dicts = [self._checklist_item_to_dict(i) for i in checklist]
-        example_dicts = [self._example_to_dict(e) for e in examples]
-
-        # Get community name (we use rule's community_id as fallback)
-        community_name = f"community ({rule.community_id})"
-
-        user_prompt = prompts.build_suggest_from_examples_prompt(
-            rule_text=rule.text,
-            checklist_items=checklist_dicts,
-            examples=example_dicts,
-            community_name=community_name,
-            violating_counts=violating_counts,
-        )
-
-        result = await self._call_claude(
-            prompts.SUGGEST_FROM_EXAMPLES_SYSTEM, user_prompt, tool=_SUGGEST_FROM_EXAMPLES_TOOL
-        )
-        return result.get("suggestions", [])
-
-    async def suggest_from_checklist(
-        self,
-        rule: Rule,
-        checklist: list[ChecklistItem],
-        examples: list[Example],
-        community_name: str = "",
-    ) -> list[dict]:
-        """Generate example/rule text suggestions from checklist changes."""
-        logger.info(f"Generating suggestions from checklist for rule '{rule.title}'")
-
-        checklist_dicts = [self._checklist_item_to_dict(i) for i in checklist]
-        example_dicts = [self._example_to_dict(e) for e in examples]
-
-        user_prompt = prompts.build_suggest_from_checklist_prompt(
-            rule_text=rule.text,
-            checklist_items=checklist_dicts,
-            existing_examples=example_dicts,
-            community_name=community_name or f"community ({rule.community_id})",
-        )
-
-        result = await self._call_claude(
-            prompts.SUGGEST_FROM_CHECKLIST_SYSTEM, user_prompt, tool=_SUGGEST_FROM_CHECKLIST_TOOL
-        )
-
-        suggestions = []
-        for ex in result.get("suggested_examples", []):
-            suggestions.append({
-                "suggestion_type": "example",
-                **ex,
-            })
-        for rt in result.get("rule_text_suggestions", []):
-            suggestions.append({
-                "suggestion_type": "rule_text",
-                **rt,
-            })
-        return suggestions
 
     async def generate_examples_for_items(
         self,

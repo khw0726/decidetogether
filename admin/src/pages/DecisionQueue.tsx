@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ChevronDown, ChevronUp, CheckCircle, XCircle, Filter, Inbox, Loader2, Sparkles, Download, X,
+  ChevronDown, ChevronUp, CheckCircle, XCircle, AlertTriangle, Filter, Inbox, Loader2, Sparkles, Download, X,
 } from 'lucide-react'
+import { showErrorToast } from '../components/Toast'
 import {
   listDecisions, resolveDecision, bulkResolveDecisions, Decision, listRules,
   suggestRuleFromDecisions, acceptSuggestion, dismissSuggestion, NewRuleSuggestion,
@@ -52,6 +53,8 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
     try {
       const result = await suggestRuleFromDecisions(communityId, [...selectedIds])
       setSuggestion(result)
+    } catch (e) {
+      showErrorToast(e instanceof Error ? e.message : 'Failed to generate suggestion')
     } finally {
       setSuggesting(false)
     }
@@ -526,8 +529,9 @@ function DecisionCard({
 
   const verdictColors: Record<string, string> = {
     approve: 'bg-green-100 text-green-800 border-green-200',
+    warn: 'bg-amber-100 text-amber-800 border-amber-200',
     remove: 'bg-red-100 text-red-800 border-red-200',
-    review: 'bg-amber-100 text-amber-800 border-amber-200',
+    review: 'bg-purple-100 text-purple-800 border-purple-200',
     pending: 'bg-gray-100 text-gray-700 border-gray-200',
   }
 
@@ -599,6 +603,13 @@ function DecisionCard({
               >
                 <CheckCircle size={13} />
                 Approve
+              </button>
+              <button
+                className={`text-xs px-2.5 py-1.5 rounded-md font-medium inline-flex items-center gap-1.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 ${selectedVerdict === 'warn' ? 'ring-2 ring-amber-500' : ''}`}
+                onClick={() => setSelectedVerdict('warn')}
+              >
+                <AlertTriangle size={13} />
+                Warn
               </button>
               <button
                 className={`btn-danger text-xs ${selectedVerdict === 'remove' ? 'ring-2 ring-red-500' : ''}`}

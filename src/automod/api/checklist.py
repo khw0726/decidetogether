@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
@@ -254,6 +255,12 @@ def _item_to_read(item: ChecklistItem) -> ChecklistItemRead:
         item_type=item.item_type,
         logic=item.logic,
         action=item.action,
+        context_influenced=item.context_influenced,
+        context_note=item.context_note,
+        context_change_types=item.context_change_types,
+        base_description=item.base_description,
+        context_pinned=item.context_pinned,
+        context_override_note=item.context_override_note,
         updated_at=item.updated_at,
         children=[],
     )
@@ -420,6 +427,30 @@ async def update_checklist_item(
     if body.order is not None:
         item.order = body.order
 
+    await db.commit()
+    await db.refresh(item)
+    return _item_to_read(item)
+
+
+class ContextOverrideBody(BaseModel):
+    pinned: bool
+    override_note: str | None = None
+
+
+@router.patch("/checklist-items/{item_id}/context-override", response_model=ChecklistItemRead)
+async def set_context_override(
+    item_id: str,
+    body: ContextOverrideBody,
+    db: AsyncSession = Depends(get_db),
+) -> ChecklistItemRead:
+    """Pin or unpin a checklist item's context calibration."""
+    result = await db.execute(select(ChecklistItem).where(ChecklistItem.id == item_id))
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+
+    item.context_pinned = body.pinned
+    item.context_override_note = body.override_note
     await db.commit()
     await db.refresh(item)
     return _item_to_read(item)

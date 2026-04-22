@@ -3,120 +3,16 @@
 import logging
 from collections import defaultdict
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from sqlalchemy import and_, select
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import get_anthropic_client, settings
-from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..db.models import Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule
 from ..models.schemas import CommunityExampleRead, ExampleCreate, ExampleRead, ExampleUpdate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["examples"])
-
-
-def get_compiler() -> RuleCompiler:
-    client = get_anthropic_client()
-    return RuleCompiler(client, settings)
-
-
-async def _generate_suggestions_from_example(rule_id: str) -> None:
-    """Background task to generate suggestions after a new example is added."""
-    from ..db.database import AsyncSessionLocal
-
-    async with AsyncSessionLocal() as db:
-        try:
-            rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-            rule = rule_result.scalar_one_or_none()
-            if not rule:
-                return
-
-            checklist_result = await db.execute(
-                select(ChecklistItem)
-                .where(ChecklistItem.rule_id == rule_id)
-                .order_by(ChecklistItem.order.asc())
-            )
-            checklist = list(checklist_result.scalars().all())
-
-            examples_result = await db.execute(
-                select(Example)
-                .join(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
-                .where(ExampleRuleLink.rule_id == rule_id)
-            )
-            examples = list(examples_result.scalars().all())
-
-            if not checklist or not examples:
-                return
-
-            # Count violating examples per checklist item for deterministic regex threshold
-            checklist_ids = [i.id for i in checklist]
-            links_result = await db.execute(
-                select(ExampleChecklistItemLink)
-                .join(Example, ExampleChecklistItemLink.example_id == Example.id)
-                .where(
-                    and_(
-                        ExampleChecklistItemLink.checklist_item_id.in_(checklist_ids),
-                        Example.label == "violating",
-                    )
-                )
-            )
-            violating_counts: dict[str, int] = {}
-            for link in links_result.scalars():
-                cid = link.checklist_item_id
-                if cid:
-                    violating_counts[cid] = violating_counts.get(cid, 0) + 1
-
-            compiler = get_compiler()
-            suggestions = await compiler.suggest_from_examples(rule, checklist, examples, violating_counts)
-
-            checklist_by_id = {i.id: i for i in checklist}
-
-            for sug in suggestions:
-                sug_type = sug.get("suggestion_type", "checklist")
-
-                if sug_type == "checklist":
-                    # Convert to operations format for accept_recompile
-                    target = sug.get("target")
-                    parent_id = sug.get("parent_id")
-                    proposed = sug.get("proposed_change") or {}
-
-                    if target and target in checklist_by_id:
-                        # Update existing item
-                        op = {"op": "update", "existing_id": target}
-                        op.update({k: v for k, v in proposed.items() if k != "id"})
-                    else:
-                        # Add new item (root or child)
-                        op = {"op": "add", **proposed}
-                        if parent_id and parent_id in checklist_by_id:
-                            op["parent_id"] = parent_id
-                        if "children" not in op:
-                            op["children"] = []
-
-                    content = {
-                        "operations": [op],
-                        "description": sug.get("description", ""),
-                        "reasoning": sug.get("reasoning", ""),
-                    }
-                else:
-                    # rule_text suggestions — store as-is
-                    content = sug
-
-                suggestion = Suggestion(
-                    rule_id=rule_id,
-                    suggestion_type=sug_type,
-                    content=content,
-                    status="pending",
-                )
-                db.add(suggestion)
-
-            await db.commit()
-            logger.info(f"Generated {len(suggestions)} suggestions for rule {rule_id}")
-
-        except Exception as e:
-            logger.error(f"Suggestion generation failed for rule {rule_id}: {e}")
-            await db.rollback()
 
 
 @router.get("/communities/{community_id}/examples", response_model=list[CommunityExampleRead])
@@ -316,7 +212,6 @@ async def list_examples(
 async def update_example(
     example_id: str,
     body: ExampleUpdate,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> ExampleRead:
     result = await db.execute(select(Example).where(Example.id == example_id))
@@ -330,16 +225,7 @@ async def update_example(
         valid_labels = {"compliant", "violating", "borderline"}
         if body.label not in valid_labels:
             raise HTTPException(status_code=422, detail=f"label must be one of {valid_labels}")
-        old_label = example.label
         example.label = body.label
-        # Trigger suggestion/tuning generation when a borderline example is resolved
-        if old_label == "borderline" and body.label in ("compliant", "violating"):
-            link_result = await db.execute(
-                select(ExampleRuleLink).where(ExampleRuleLink.example_id == example_id)
-            )
-            rule_link = link_result.scalar_one_or_none()
-            if rule_link:
-                background_tasks.add_task(_generate_suggestions_from_example, rule_link.rule_id)
     if body.moderator_reasoning is not None:
         example.moderator_reasoning = body.moderator_reasoning
 

@@ -168,6 +168,128 @@ async def _migrate_community_context_samples(conn) -> None:
         await conn.execute(text("ALTER TABLE communities ADD COLUMN context_samples JSON"))
 
 
+async def _migrate_rule_two_pass_fields(conn) -> None:
+    """Add base_checklist_json and context_adjustment_summary to rules if missing."""
+    cols_result = await conn.execute(text("PRAGMA table_info(rules)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if not col_names:
+        return
+    if "base_checklist_json" not in col_names:
+        await conn.execute(text("ALTER TABLE rules ADD COLUMN base_checklist_json JSON"))
+    if "context_adjustment_summary" not in col_names:
+        await conn.execute(text("ALTER TABLE rules ADD COLUMN context_adjustment_summary TEXT"))
+
+
+async def _migrate_context_summary_to_json(conn) -> None:
+    """Convert legacy string context_adjustment_summary to JSON array."""
+    import json as _json
+    rows = await conn.execute(text(
+        "SELECT id, context_adjustment_summary FROM rules "
+        "WHERE context_adjustment_summary IS NOT NULL AND context_adjustment_summary != ''"
+    ))
+    for row in rows.fetchall():
+        rule_id, raw = row[0], row[1]
+        # Already a JSON array?
+        if isinstance(raw, list):
+            continue
+        if isinstance(raw, str):
+            try:
+                parsed = _json.loads(raw)
+                if isinstance(parsed, list):
+                    continue  # already valid JSON array
+            except (ValueError, TypeError):
+                pass
+            # Split prose into sentences as bullets
+            bullets = [s.strip().rstrip(".") for s in raw.split(". ") if s.strip()]
+            await conn.execute(
+                text("UPDATE rules SET context_adjustment_summary = :val WHERE id = :id"),
+                {"val": _json.dumps(bullets), "id": rule_id},
+            )
+
+
+async def _migrate_checklist_context_pin_fields(conn) -> None:
+    """Add context_pinned and context_override_note to checklist_items if missing."""
+    cols_result = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    col_names = {row[1] for row in cols_result.fetchall()}
+    if not col_names:
+        return
+    if "context_pinned" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN context_pinned BOOLEAN NOT NULL DEFAULT 0"
+        ))
+    if "context_override_note" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN context_override_note TEXT"
+        ))
+
+
+async def _migrate_community_context_prose_to_notes(conn) -> None:
+    """Migrate community_context from prose (string) to notes (list of strings).
+
+    Splits prose sentences into individual note items.
+    """
+    import json as _json
+    import re as _re
+
+    rows = await conn.execute(
+        text("SELECT id, community_context FROM communities WHERE community_context IS NOT NULL")
+    )
+    for row in rows.fetchall():
+        community_id, ctx_raw = row
+        if not ctx_raw:
+            continue
+        ctx = _json.loads(ctx_raw) if isinstance(ctx_raw, str) else ctx_raw
+        changed = False
+        for dim in ["purpose", "participants", "stakes", "tone"]:
+            d = ctx.get(dim, {})
+            if "prose" in d and "notes" not in d:
+                prose = d.pop("prose", "")
+                # Split prose into sentences
+                if prose:
+                    sentences = [s.strip() for s in _re.split(r'(?<=[.!?])\s+', prose) if s.strip()]
+                    d["notes"] = sentences
+                else:
+                    d["notes"] = []
+                ctx[dim] = d
+                changed = True
+        if changed:
+            await conn.execute(
+                text("UPDATE communities SET community_context = :ctx WHERE id = :id"),
+                {"ctx": _json.dumps(ctx), "id": community_id},
+            )
+
+
+async def _migrate_checklist_context_change_types(conn) -> None:
+    """Add context_change_types column to checklist_items."""
+    cols = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if "context_change_types" not in col_names and col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN context_change_types TEXT DEFAULT NULL"
+        ))
+
+
+async def _migrate_checklist_base_description(conn) -> None:
+    """Add base_description column — links a context-adjusted item back to its entry in base_checklist_json."""
+    cols = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if "base_description" not in col_names and col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN base_description TEXT DEFAULT NULL"
+        ))
+
+
+async def _migrate_flag_to_warn(conn) -> None:
+    """Rename action='flag' to 'warn' in checklist_items and verdict='review' to 'warn' in decisions."""
+    # Checklist items
+    await conn.execute(text(
+        "UPDATE checklist_items SET action = 'warn' WHERE action = 'flag'"
+    ))
+    # Decisions: agent_verdict 'review' from rule-based path should become 'warn'
+    # (keep 'review' only for community norms — those have '__community_norms__' in reasoning,
+    # but we can't easily filter JSON here, so leave existing decisions as-is for now)
+
+
 async def init_db() -> None:
     """Create all database tables."""
     async with engine.begin() as conn:
@@ -180,6 +302,13 @@ async def init_db() -> None:
         await _migrate_community_context_field(conn)
         await _migrate_checklist_context_rename(conn)
         await _migrate_community_context_samples(conn)
+        await _migrate_rule_two_pass_fields(conn)
+        await _migrate_checklist_context_pin_fields(conn)
+        await _migrate_context_summary_to_json(conn)
+        await _migrate_community_context_prose_to_notes(conn)
+        await _migrate_checklist_context_change_types(conn)
+        await _migrate_checklist_base_description(conn)
+        await _migrate_flag_to_warn(conn)
         await conn.run_sync(Base.metadata.create_all)
 
 

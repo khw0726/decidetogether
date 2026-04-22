@@ -1,4 +1,4 @@
-"""Alignment endpoints: suggest-from-examples, suggest-from-checklist, suggestions CRUD."""
+"""Alignment endpoints: suggestions CRUD, preview-recompile, accept/dismiss."""
 
 import logging
 import uuid
@@ -17,8 +17,6 @@ from ..models.schemas import SuggestionRead
 from ..core.subjective import SubjectiveEvaluator
 from ..core.tree_evaluator import TreeEvaluator
 from .rules import _compile_rule_background
-from .examples import _generate_suggestions_from_example
-
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["alignment"])
 
@@ -30,135 +28,6 @@ class AcceptSuggestionBody(BaseModel):
 def get_compiler() -> RuleCompiler:
     client = get_anthropic_client()
     return RuleCompiler(client, settings)
-
-
-async def _get_rule_checklist_examples(
-    rule_id: str, db: AsyncSession
-) -> tuple[Rule, list[ChecklistItem], list[Example]]:
-    rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-    rule = rule_result.scalar_one_or_none()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Rule not found")
-
-    checklist_result = await db.execute(
-        select(ChecklistItem)
-        .where(ChecklistItem.rule_id == rule_id)
-        .order_by(ChecklistItem.order.asc())
-    )
-    checklist = list(checklist_result.scalars().all())
-
-    examples_result = await db.execute(
-        select(Example)
-        .join(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
-        .where(ExampleRuleLink.rule_id == rule_id)
-        .order_by(Example.created_at.desc())
-    )
-    examples = list(examples_result.scalars().all())
-
-    return rule, checklist, examples
-
-
-@router.post("/rules/{rule_id}/suggest-from-examples", response_model=list[SuggestionRead])
-async def suggest_from_examples(
-    rule_id: str, db: AsyncSession = Depends(get_db)
-) -> list[SuggestionRead]:
-    """Generate checklist/rule text suggestions from current examples."""
-    rule, checklist, examples = await _get_rule_checklist_examples(rule_id, db)
-
-    if not examples:
-        raise HTTPException(status_code=400, detail="No examples found for this rule")
-
-    # Get community name
-    comm_result = await db.execute(
-        select(Community).where(Community.id == rule.community_id)
-    )
-    community = comm_result.scalar_one_or_none()
-
-    compiler = get_compiler()
-    suggestion_dicts = await compiler.suggest_from_examples(rule, checklist, examples)
-
-    checklist_by_id = {i.id: i for i in checklist}
-
-    created = []
-    for sug in suggestion_dicts:
-        sug_type = sug.get("suggestion_type", "checklist")
-
-        if sug_type == "checklist":
-            target = sug.get("target")
-            parent_id = sug.get("parent_id")
-            proposed = sug.get("proposed_change") or {}
-
-            if target and target in checklist_by_id:
-                op = {"op": "update", "existing_id": target}
-                op.update({k: v for k, v in proposed.items() if k != "id"})
-            else:
-                op = {"op": "add", **proposed}
-                if parent_id and parent_id in checklist_by_id:
-                    op["parent_id"] = parent_id
-                if "children" not in op:
-                    op["children"] = []
-
-            content = {
-                "operations": [op],
-                "description": sug.get("description", ""),
-                "reasoning": sug.get("reasoning", ""),
-            }
-        else:
-            content = sug
-
-        suggestion = Suggestion(
-            rule_id=rule_id,
-            suggestion_type=sug_type,
-            content=content,
-            status="pending",
-        )
-        db.add(suggestion)
-        created.append(suggestion)
-
-    await db.commit()
-    for s in created:
-        await db.refresh(s)
-
-    return [SuggestionRead.model_validate(s) for s in created]
-
-
-@router.post("/rules/{rule_id}/suggest-from-checklist", response_model=list[SuggestionRead])
-async def suggest_from_checklist(
-    rule_id: str, db: AsyncSession = Depends(get_db)
-) -> list[SuggestionRead]:
-    """Generate example/rule text suggestions from current checklist."""
-    rule, checklist, examples = await _get_rule_checklist_examples(rule_id, db)
-
-    if not checklist:
-        raise HTTPException(status_code=400, detail="No checklist items found for this rule")
-
-    comm_result = await db.execute(
-        select(Community).where(Community.id == rule.community_id)
-    )
-    community = comm_result.scalar_one_or_none()
-    community_name = community.name if community else ""
-
-    compiler = get_compiler()
-    suggestion_dicts = await compiler.suggest_from_checklist(
-        rule, checklist, examples, community_name
-    )
-
-    created = []
-    for sug in suggestion_dicts:
-        suggestion = Suggestion(
-            rule_id=rule_id,
-            suggestion_type=sug.get("suggestion_type", "example"),
-            content=sug,
-            status="pending",
-        )
-        db.add(suggestion)
-        created.append(suggestion)
-
-    await db.commit()
-    for s in created:
-        await db.refresh(s)
-
-    return [SuggestionRead.model_validate(s) for s in created]
 
 
 @router.get("/rules/{rule_id}/suggestions", response_model=list[SuggestionRead])
@@ -253,11 +122,6 @@ async def accept_suggestion(
                     checklist_item_id=item.id if item else None,
                     checklist_item_description=related_desc,
                 ))
-            # Trigger tuning when a borderline example is resolved to a clear label
-            original_label = suggestion.content.get("label", "compliant")
-            if original_label == "borderline" and ex_label in ("compliant", "violating"):
-                background_tasks.add_task(_generate_suggestions_from_example, suggestion.rule_id)
-
     # Create a new rule from synthesized suggestion
     if suggestion.suggestion_type == "new_rule":
         content = suggestion.content
@@ -486,6 +350,7 @@ def _apply_diff_to_checklist(
                 action=op.get("action") or item.action,
                 context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", item.context_influenced)),
                 context_note=op.get("context_note", op.get("atmosphere_note", item.context_note)),
+                context_change_types=op.get("context_change_types", item.context_change_types),
             ))
         else:
             hypothetical.append(item)
@@ -502,9 +367,10 @@ def _apply_diff_to_checklist(
                 rule_text_anchor=op.get("rule_text_anchor"),
                 item_type=op.get("item_type", "subjective"),
                 logic=op.get("logic") or {},
-                action=op.get("action", "flag"),
+                action=op.get("action", "warn"),
                 context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", False)),
                 context_note=op.get("context_note", op.get("atmosphere_note")),
+                context_change_types=op.get("context_change_types"),
             ))
 
     return hypothetical

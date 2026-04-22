@@ -149,22 +149,26 @@ async def _compile_rule_read_and_llm(
     compiler = get_compiler()
 
     if not existing_items:
-        checklist_items, example_dicts = await compiler.compile_rule(
-            rule=rule,
-            community=community,
-            other_rules=other_rules,
-            community_atmosphere=community_atmosphere,
-            community_context=community_context,
-            community_posts_sample=community_posts_sample or None,
-        )
+        # Two-pass compilation: base compile then context adjustment
+        adjusted_items, example_dicts, base_checklist_dicts, adjustment_summary = \
+            await compiler.compile_rule_two_pass(
+                rule=rule,
+                community=community,
+                other_rules=other_rules,
+                community_context=community_context,
+                community_atmosphere=community_atmosphere,
+                community_posts_sample=community_posts_sample or None,
+            )
         return {
             "mode": "compile",
             "rule_id": rule_id,
             "community_id": community_id,
             "rule": rule,
             "community": community,
-            "checklist_items": checklist_items,
+            "checklist_items": adjusted_items,
             "example_dicts": example_dicts,
+            "base_checklist_json": base_checklist_dicts,
+            "context_adjustment_summary": adjustment_summary,
         }
     else:
         operations = await compiler.recompile_with_diff(
@@ -207,6 +211,15 @@ async def _compile_rule_persist(result: dict) -> None:
                     item_description_map=item_desc_map, community_id=result["community_id"],
                 )
                 await db.flush()
+                # Save two-pass artifacts on the Rule
+                if result.get("base_checklist_json") is not None:
+                    rule_obj = (await db.execute(
+                        select(Rule).where(Rule.id == rule_id)
+                    )).scalar_one_or_none()
+                    if rule_obj:
+                        rule_obj.base_checklist_json = result["base_checklist_json"]
+                        rule_obj.context_adjustment_summary = result.get("context_adjustment_summary", "")
+                        await db.flush()
                 await _fill_missing_examples(db, rule_id, compiler, rule, community)
             else:
                 # Re-attach existing items to this session (merge returns new tracked instances)
@@ -422,9 +435,10 @@ async def _apply_diff_operations(
                         rule_text_anchor=child_data.get("rule_text_anchor"),
                         item_type=child_data.get("item_type", "subjective"),
                         logic=child_data.get("logic", {}),
-                        action=child_data.get("action", "flag"),
+                        action=child_data.get("action", "warn"),
                         context_influenced=child_data.get("context_influenced", child_data.get("atmosphere_influenced", False)),
                         context_note=child_data.get("context_note", child_data.get("atmosphere_note")),
+                        context_change_types=child_data.get("context_change_types"),
                     ))
 
         elif kind == "delete":
@@ -476,9 +490,10 @@ async def _apply_diff_operations(
                 rule_text_anchor=op.get("rule_text_anchor"),
                 item_type=op.get("item_type", "subjective"),
                 logic=op.get("logic", {}),
-                action=op.get("action", "flag"),
+                action=op.get("action", "warn"),
                 context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", False)),
                 context_note=op.get("context_note", op.get("atmosphere_note")),
+                context_change_types=op.get("context_change_types"),
             )
             db.add(new_item)
             await db.flush()
@@ -491,9 +506,10 @@ async def _apply_diff_operations(
                     rule_text_anchor=child_data.get("rule_text_anchor"),
                     item_type=child_data.get("item_type", "subjective"),
                     logic=child_data.get("logic", {}),
-                    action=child_data.get("action", "flag"),
+                    action=child_data.get("action", "warn"),
                     context_influenced=child_data.get("context_influenced", child_data.get("atmosphere_influenced", False)),
                     context_note=child_data.get("context_note", child_data.get("atmosphere_note")),
+                    context_change_types=child_data.get("context_change_types"),
                 ))
 
         else:

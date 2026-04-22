@@ -3,8 +3,8 @@
 from typing import Any
 
 
-# Verdict precedence: REMOVE > REVIEW > APPROVE
-VERDICT_PRECEDENCE = {"remove": 3, "review": 2, "approve": 1}
+# Verdict precedence: REMOVE > WARN > REVIEW > APPROVE
+VERDICT_PRECEDENCE = {"remove": 4, "warn": 3, "review": 2, "approve": 1}
 
 
 def resolve_verdict(rule_results: list[dict[str, Any]]) -> tuple[str, float]:

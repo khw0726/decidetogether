@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Zap, Eye, Check } from 'lucide-react'
+import { showErrorToast } from './Toast'
 import {
   getRuleHealth,
   analyzeRuleHealth,
@@ -277,6 +278,8 @@ function SuggestedFixesPanel({
       queryClient.invalidateQueries({ queryKey: ['suggestions', ruleId] })
       queryClient.invalidateQueries({ queryKey: ['checklist', ruleId] })
       queryClient.invalidateQueries({ queryKey: ['rule-health', ruleId] })
+    } catch (e) {
+      showErrorToast(e instanceof Error ? e.message : 'Failed to accept fixes')
     } finally {
       setAcceptAllPhase(null)
       setPreviewResult(null)

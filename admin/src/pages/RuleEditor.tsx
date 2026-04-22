@@ -29,6 +29,16 @@ import ChecklistTree from '../components/ChecklistTree'
 import ChecklistPreview from '../components/ChecklistPreview'
 import ExamplesPanel from '../components/ExamplesPanel'
 import SuggestionDiff from '../components/SuggestionDiff'
+import { showErrorToast } from '../components/Toast'
+
+function extractErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const axiosErr = error as { response?: { data?: { detail?: string } }; message?: string }
+    if (axiosErr.response?.data?.detail) return axiosErr.response.data.detail
+    if (axiosErr.message) return axiosErr.message
+  }
+  return 'Something went wrong. Please try again.'
+}
 
 function renderTextWithHighlight(text: string, anchor: string | null) {
   if (!anchor) return <>{text}</>
@@ -147,6 +157,8 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     try {
       const result = await previewRecompile(selectedRuleId, editingText)
       setPreviewResult(result)
+    } catch (e) {
+      showErrorToast(extractErrorMessage(e))
     } finally {
       setIsPreviewLoading(false)
     }
@@ -173,6 +185,8 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     try {
       const results = await evaluateExamplesWithDraft(selectedRuleId, editingText)
       setDraftEvalResults(results)
+    } catch (e) {
+      showErrorToast(extractErrorMessage(e))
     } finally {
       setIsDraftEvaluating(false)
     }
@@ -184,6 +198,8 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     try {
       await updateRule(selectedRuleId, { text: editingText, title: editingTitle })
       queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+    } catch (e) {
+      showErrorToast(extractErrorMessage(e))
     } finally {
       setIsSaving(false)
     }
@@ -480,6 +496,30 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                 </span>
               </div>
             )}
+            {!previewResult && selectedRule?.context_adjustment_summary && selectedRule.context_adjustment_summary.length > 0 && (
+              <details className="mx-3 mt-2 mb-1 flex-shrink-0 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-800">
+                <summary className="px-3 py-2 cursor-pointer select-none font-semibold hover:bg-teal-100 rounded-lg transition-colors">
+                  Context adjustments
+                  <span className="ml-1.5 font-normal text-teal-500">
+                    ({(Array.isArray(selectedRule.context_adjustment_summary)
+                      ? selectedRule.context_adjustment_summary
+                      : [selectedRule.context_adjustment_summary]
+                    ).length} changes)
+                  </span>
+                </summary>
+                <ul className="px-3 pb-2 space-y-0.5">
+                  {(Array.isArray(selectedRule.context_adjustment_summary)
+                    ? selectedRule.context_adjustment_summary
+                    : [selectedRule.context_adjustment_summary]
+                  ).map((bullet, i) => (
+                    <li key={i} className="flex gap-1.5">
+                      <span className="text-teal-400 flex-shrink-0">•</span>
+                      <span>{bullet}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
             <div className="flex-1 overflow-auto p-3">
               {previewResult ? (
                 <ChecklistPreview operations={previewResult.operations} existingItems={checklist} />
@@ -494,7 +534,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                       Compiling checklist… this may take a moment.
                     </div>
                   ) : (
-                    <ChecklistTree items={checklist} ruleId={selectedRuleId} onAnchorHover={setHoveredAnchor} selectedItemId={selectedChecklistItemId} onItemSelect={setSelectedChecklistItemId} highlightedItemId={highlightedItemId} />
+                    <ChecklistTree items={checklist} ruleId={selectedRuleId} rule={selectedRule} onAnchorHover={setHoveredAnchor} selectedItemId={selectedChecklistItemId} onItemSelect={setSelectedChecklistItemId} highlightedItemId={highlightedItemId} />
                   )
                 ) : (
                   <div className="text-xs text-gray-400 italic">Only actionable rules have checklists.</div>
@@ -765,15 +805,17 @@ function TestingPanel({
 
 const VERDICT_STYLES: Record<string, string> = {
   approve: 'text-green-700 bg-green-50 border-green-200',
+  warn: 'text-amber-700 bg-amber-50 border-amber-200',
   remove: 'text-red-700 bg-red-50 border-red-200',
-  review: 'text-amber-700 bg-amber-50 border-amber-200',
+  review: 'text-purple-700 bg-purple-50 border-purple-200',
   pending: 'text-gray-600 bg-gray-50 border-gray-200',
 }
 
 const VERDICT_HEADER_STYLES: Record<string, string> = {
   approve: 'bg-green-50 text-green-700',
+  warn: 'bg-amber-50 text-amber-700',
   remove: 'bg-red-50 text-red-700',
-  review: 'bg-amber-50 text-amber-700',
+  review: 'bg-purple-50 text-purple-700',
 }
 
 function TestResults({

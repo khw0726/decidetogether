@@ -183,7 +183,7 @@ async def resolve_decision(
     body: DecisionResolve,
     db: AsyncSession = Depends(get_db),
 ) -> DecisionRead:
-    valid_verdicts = {"approve", "remove", "review"}
+    valid_verdicts = {"approve", "warn", "remove"}
     if body.verdict not in valid_verdicts:
         raise HTTPException(status_code=422, detail=f"verdict must be one of {valid_verdicts}")
 
@@ -209,7 +209,7 @@ async def bulk_resolve_decisions(
     db: AsyncSession = Depends(get_db),
 ) -> BulkResolveResponse:
     """Resolve multiple decisions at once with the same verdict."""
-    valid_verdicts = {"approve", "remove"}
+    valid_verdicts = {"approve", "warn", "remove"}
     if body.verdict not in valid_verdicts:
         raise HTTPException(status_code=422, detail=f"Bulk verdict must be one of {valid_verdicts}")
 
@@ -400,7 +400,7 @@ async def get_decision_stats(
     )
     all_decisions = list(all_decisions_result.scalars().all())
 
-    verdicts_breakdown: dict[str, int] = {"approve": 0, "remove": 0, "review": 0}
+    verdicts_breakdown: dict[str, int] = {"approve": 0, "warn": 0, "remove": 0, "review": 0}
     override_categories: dict[str, int] = {}
 
     for d in all_decisions:

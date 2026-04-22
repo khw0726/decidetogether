@@ -4,11 +4,14 @@ import { Settings, Plus, Trash2, AlertTriangle, Loader2, Link } from 'lucide-rea
 import {
   getCommunity,
   generateCommunityContext,
+  updateCommunityContext,
   listSamplePosts,
   addSamplePost,
   deleteSamplePost,
   importSamplePostFromUrl,
   type CommunitySamplePost,
+  type CommunityContext,
+  type CommunityContextDimension,
 } from '../api/client'
 import ContextDimensionsView from '../components/ContextDimensionsView'
 
@@ -37,6 +40,13 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
     },
   })
 
+  const contextUpdateMutation = useMutation({
+    mutationFn: (data: Partial<CommunityContext>) => updateCommunityContext(communityId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['community', communityId] })
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (postId: string) => deleteSamplePost(communityId, postId),
     onSuccess: () => {
@@ -58,7 +68,7 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
       <div>
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Settings size={22} />
-          Community Settings
+          Community Profile
         </h1>
         <p className="text-sm text-gray-500 mt-1">
           {community?.name} — {community?.platform}
@@ -82,8 +92,13 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
         ) : community?.community_context ? (
           <ContextDimensionsView
             context={community.community_context}
+            communityId={communityId}
             onRegenerate={() => contextMutation.mutate()}
             isRegenerating={contextMutation.isPending}
+            onSaveDimension={async (key: keyof CommunityContext, dim: CommunityContextDimension) => {
+              await contextUpdateMutation.mutateAsync({ [key]: dim })
+            }}
+            isSaving={contextUpdateMutation.isPending}
           />
         ) : (
           <div className="card p-6 text-center text-gray-400 text-sm space-y-3">

@@ -17,9 +17,14 @@ export interface CommunityAtmosphere {
   moderation_style: string
 }
 
+export interface CommunityContextNote {
+  text: string
+  tag: string
+}
+
 export interface CommunityContextDimension {
-  prose: string
-  tags: string[]
+  notes: CommunityContextNote[]
+  manually_edited?: boolean
 }
 
 export interface CommunityContext {
@@ -79,6 +84,8 @@ export interface Rule {
   rule_type_reasoning: string | null
   applies_to: string  // "posts" | "comments" | "both"
   override_count: number
+  base_checklist_json: Record<string, unknown> | null
+  context_adjustment_summary: string[] | null
   created_at: string
   updated_at: string
 }
@@ -95,6 +102,10 @@ export interface ChecklistItem {
   action: string
   context_influenced: boolean
   context_note: string | null
+  context_change_types: string[] | null
+  base_description: string | null
+  context_pinned: boolean
+  context_override_note: string | null
   updated_at: string
   children: ChecklistItem[]
 }
@@ -159,7 +170,7 @@ export interface PreviewRecompileResult {
 export interface DraftEvaluationResult {
   example_id: string
   old_label: 'compliant' | 'violating' | 'borderline'
-  new_verdict: 'approve' | 'remove' | 'review' | 'error'
+  new_verdict: 'approve' | 'warn' | 'remove' | 'review' | 'error'
   new_confidence: number
 }
 
@@ -235,6 +246,22 @@ export const updateCommunityContext = (communityId: string, data: Partial<Commun
 
 export const generateCommunityContext = (communityId: string) =>
   api.post<{ community_context: CommunityContext }>(`/communities/${communityId}/context/generate`).then(r => r.data)
+
+export const reapplyContext = (communityId: string) =>
+  api.post<{ rules_updated: number; summaries: Record<string, string> }>(`/communities/${communityId}/reapply-context`).then(r => r.data)
+
+export interface ContextPreviewImpact {
+  rules_affected: number
+  impacts: Array<{ rule_id: string; rule_title: string; adjustment_summary: string[] | string }>
+}
+
+export const previewContextImpact = (communityId: string, draftContext: Partial<CommunityContext>) =>
+  api.post<ContextPreviewImpact>(`/communities/${communityId}/context/preview-impact`, draftContext).then(r => r.data)
+
+export type ContextTaxonomy = Record<string, Record<string, string>>
+
+export const getContextTaxonomy = () =>
+  api.get<ContextTaxonomy>('/communities/context-taxonomy').then(r => r.data)
 
 export const getContextSamples = (communityId: string) =>
   api.get<{ context_samples: ContextSamples }>(`/communities/${communityId}/context-samples`).then(r => r.data)
@@ -345,6 +372,12 @@ export const createChecklistItem = (ruleId: string, data: {
 export const updateChecklistItem = (itemId: string, data: Partial<ChecklistItem>) =>
   api.put<ChecklistItem>(`/checklist-items/${itemId}`, data).then(r => r.data)
 
+export const setContextOverride = (itemId: string, pinned: boolean, overrideNote?: string) =>
+  api.patch<ChecklistItem>(`/checklist-items/${itemId}/context-override`, {
+    pinned,
+    override_note: overrideNote,
+  }).then(r => r.data)
+
 export const deleteChecklistItem = (itemId: string) =>
   api.delete(`/checklist-items/${itemId}`)
 
@@ -386,12 +419,6 @@ export const deleteExample = (exampleId: string) =>
 
 // ── Alignment ──────────────────────────────────────────────────────────────────
 
-export const suggestFromExamples = (ruleId: string) =>
-  api.post<Suggestion[]>(`/rules/${ruleId}/suggest-from-examples`).then(r => r.data)
-
-export const suggestFromChecklist = (ruleId: string) =>
-  api.post<Suggestion[]>(`/rules/${ruleId}/suggest-from-checklist`).then(r => r.data)
-
 export const listSuggestions = (ruleId: string, status?: string) =>
   api.get<Suggestion[]>(`/rules/${ruleId}/suggestions`, { params: status ? { status } : {} }).then(r => r.data)
 
@@ -403,9 +430,6 @@ export const acceptSuggestionWithLabel = (suggestionId: string, labelOverride?: 
     `/suggestions/${suggestionId}/accept`,
     labelOverride ? { label_override: labelOverride } : {},
   ).then(r => r.data)
-
-export const refreshSuggestions = (ruleId: string) =>
-  api.post<Suggestion[]>(`/rules/${ruleId}/suggest-from-examples`).then(r => r.data)
 
 export const dismissSuggestion = (suggestionId: string) =>
   api.post<Suggestion>(`/suggestions/${suggestionId}/dismiss`).then(r => r.data)

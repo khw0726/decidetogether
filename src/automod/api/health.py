@@ -99,8 +99,8 @@ async def get_rules_health_summary(
                 # FP: item triggered but mod approved
                 if triggered and mod_verdict == "approve":
                     error_count += 1
-                # FN: item missed but mod removed, and rule was relevant
-                elif not triggered and mod_verdict == "remove" and any_item_triggered:
+                # FN: item missed but mod acted (removed/warned), and rule was relevant
+                elif not triggered and mod_verdict in ("remove", "warn") and any_item_triggered:
                     error_count += 1
 
         summaries.append({
@@ -167,8 +167,8 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
         rule_verdict = reasoning.get("verdict", "approve")
 
         # Per-rule override: this rule's verdict disagrees with the moderator
-        rule_would_act = rule_verdict in ("remove", "review")
-        mod_would_act = mod_verdict in ("remove", "review")
+        rule_would_act = rule_verdict in ("remove", "warn", "review")
+        mod_would_act = mod_verdict in ("remove", "warn")
         if rule_would_act != mod_would_act:
             override_count += 1
 
@@ -211,7 +211,7 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
             # (at least one sibling item triggered — proving the rule applied to this post).
             # If no items triggered, the removal is unlinked and belongs in
             # uncovered_violations, not as a per-item miss.
-            elif not triggered and mod_verdict == "remove" and any_item_triggered:
+            elif not triggered and mod_verdict in ("remove", "warn") and any_item_triggered:
                 item_fn_count[item_id] += 1
                 item_conf_errors[item_id].append(confidence)
                 if len(item_fn_cases[item_id]) < _MAX_ERROR_CASES:
@@ -582,12 +582,12 @@ async def preview_fixes(
         if error_type == "wrongly_flagged":
             fixed = new_verdict == "approve"
         else:
-            fixed = new_verdict in ("remove", "review")
+            fixed = new_verdict in ("remove", "warn", "review")
 
         old_aligned = (old_verdict == "approve" and mod_verdict == "approve") or \
-                      (old_verdict in ("remove", "review") and mod_verdict == "remove")
+                      (old_verdict in ("remove", "warn", "review") and mod_verdict in ("remove", "warn"))
         new_aligned = (new_verdict == "approve" and mod_verdict == "approve") or \
-                      (new_verdict in ("remove", "review") and mod_verdict == "remove")
+                      (new_verdict in ("remove", "warn", "review") and mod_verdict in ("remove", "warn"))
         regressed = old_aligned and not new_aligned
 
         if fixed:

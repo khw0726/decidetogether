@@ -87,6 +87,15 @@ async def create_community(
     return CommunityRead.model_validate(community)
 
 
+@router.get("/communities/context-taxonomy")
+async def get_context_taxonomy():
+    """Return the available context tags per dimension for the tag picker UI."""
+    taxonomy = _load_taxonomy()
+    if not taxonomy:
+        return {}
+    return taxonomy
+
+
 @router.get("/communities/{community_id}", response_model=CommunityRead)
 async def get_community(
     community_id: str, db: AsyncSession = Depends(get_db)
@@ -654,13 +663,17 @@ async def update_community_context(
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
 
-    existing = community.community_context or {}
+    # Deep copy so SQLAlchemy detects the mutation on the JSON column
+    import copy
+    updated = copy.deepcopy(community.community_context or {})
     for dim in ["purpose", "participants", "stakes", "tone"]:
         update_val = getattr(body, dim, None)
         if update_val is not None:
-            existing[dim] = update_val.model_dump()
+            dim_data = update_val.model_dump()
+            dim_data["manually_edited"] = True
+            updated[dim] = dim_data
 
-    community.community_context = existing
+    community.community_context = updated
     await db.commit()
     await db.refresh(community)
     return community.community_context or {}
@@ -735,19 +748,186 @@ async def generate_community_context(
         taxonomy=taxonomy,
     )
 
-    # Merge with existing context (preserve manually-edited fields if present)
+    # Merge with existing context (preserve manually-edited dimensions)
     existing = community.community_context or {}
     for dim in ["purpose", "participants", "stakes", "tone"]:
         if dim not in existing:
             existing[dim] = context[dim]
+        elif existing[dim].get("manually_edited"):
+            # Skip regeneration for dimensions the moderator has hand-edited
+            continue
         else:
-            # Overwrite prose and tags from generation
             existing[dim] = context[dim]
 
     community.community_context = existing
     await db.commit()
     await db.refresh(community)
     return ContextGenerateResponse(community_context=community.community_context)
+
+
+class ContextPreviewImpactItem(BaseModel):
+    rule_id: str
+    rule_title: str
+    adjustment_summary: list[str]
+
+
+class ContextPreviewImpactResponse(BaseModel):
+    rules_affected: int
+    impacts: list[ContextPreviewImpactItem]
+
+
+@router.post(
+    "/communities/{community_id}/context/preview-impact",
+    response_model=ContextPreviewImpactResponse,
+)
+async def preview_context_impact(
+    community_id: str,
+    body: CommunityContextUpdate,
+    db: AsyncSession = Depends(get_db),
+    compiler: RuleCompiler = Depends(get_compiler),
+) -> ContextPreviewImpactResponse:
+    """Preview how a draft context change would affect rules with stored base checklists."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    # Build draft context by merging current context with the update
+    draft_context = dict(community.community_context or {})
+    for dim in ["purpose", "participants", "stakes", "tone"]:
+        update_val = getattr(body, dim, None)
+        if update_val is not None:
+            draft_context[dim] = update_val.model_dump()
+
+    # Find actionable rules with stored base checklists
+    rules_result = await db.execute(
+        select(Rule).where(
+            Rule.community_id == community_id,
+            Rule.is_active == True,  # noqa: E712
+            Rule.rule_type == "actionable",
+            Rule.base_checklist_json.isnot(None),
+        )
+    )
+    rules = list(rules_result.scalars().all())
+
+    # Fetch current live checklist items for all rules so the LLM can
+    # describe changes relative to what moderators see today.
+    rule_ids = [r.id for r in rules]
+    items_result = await db.execute(
+        select(ChecklistItem).where(ChecklistItem.rule_id.in_(rule_ids))
+    )
+    all_items = list(items_result.scalars().all())
+    items_by_rule: dict[str, list[ChecklistItem]] = {}
+    for item in all_items:
+        items_by_rule.setdefault(item.rule_id, []).append(item)
+
+    impacts = []
+    for rule in rules:
+        try:
+            current_items = items_by_rule.get(rule.id, [])
+            current_dicts = (
+                compiler._items_to_nested_dicts(current_items)
+                if current_items else None
+            )
+            _, summary = await compiler.adjust_for_context(
+                rule=rule,
+                community=community,
+                base_checklist_dicts=rule.base_checklist_json,
+                community_context=draft_context,
+                community_atmosphere=community.atmosphere,
+                current_checklist_dicts=current_dicts,
+            )
+            if summary:
+                impacts.append(ContextPreviewImpactItem(
+                    rule_id=rule.id,
+                    rule_title=rule.title,
+                    adjustment_summary=summary,
+                ))
+        except Exception as e:
+            logger.warning(f"Preview failed for rule '{rule.title}': {e}")
+
+    return ContextPreviewImpactResponse(
+        rules_affected=len(impacts),
+        impacts=impacts,
+    )
+
+
+class ReapplyContextResponse(BaseModel):
+    rules_updated: int
+    summaries: dict  # rule_id -> adjustment_summary
+
+
+@router.post(
+    "/communities/{community_id}/reapply-context",
+    response_model=ReapplyContextResponse,
+)
+async def reapply_context(
+    community_id: str,
+    db: AsyncSession = Depends(get_db),
+    compiler: RuleCompiler = Depends(get_compiler),
+) -> ReapplyContextResponse:
+    """Re-run context adjustment (Pass 2) on all rules that have a stored base checklist."""
+    result = await db.execute(select(Community).where(Community.id == community_id))
+    community = result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    if not community.community_context:
+        raise HTTPException(status_code=422, detail="No community context to apply")
+
+    # Find actionable rules with stored base checklists
+    rules_result = await db.execute(
+        select(Rule).where(
+            Rule.community_id == community_id,
+            Rule.is_active == True,  # noqa: E712
+            Rule.rule_type == "actionable",
+            Rule.base_checklist_json.isnot(None),
+        )
+    )
+    rules = list(rules_result.scalars().all())
+
+    summaries = {}
+    updated = 0
+
+    for rule in rules:
+        try:
+            # Collect pinned items before replacement
+            pinned_result = await db.execute(
+                select(ChecklistItem).where(
+                    ChecklistItem.rule_id == rule.id,
+                    ChecklistItem.context_pinned == True,  # noqa: E712
+                )
+            )
+            pinned_items = [
+                {"description": p.description, "context_override_note": p.context_override_note}
+                for p in pinned_result.scalars().all()
+            ] or None
+
+            adjusted_items, summary = await compiler.adjust_for_context(
+                rule=rule,
+                community=community,
+                base_checklist_dicts=rule.base_checklist_json,
+                community_context=community.community_context,
+                community_atmosphere=community.atmosphere,
+                pinned_items=pinned_items,
+            )
+
+            # Replace existing checklist items
+            await db.execute(
+                delete(ChecklistItem).where(ChecklistItem.rule_id == rule.id)
+            )
+            for item in adjusted_items:
+                item.rule_id = rule.id
+                db.add(item)
+
+            rule.context_adjustment_summary = summary
+            summaries[rule.id] = summary
+            updated += 1
+        except Exception as e:
+            logger.warning(f"Failed to reapply context for rule '{rule.title}': {e}")
+
+    await db.commit()
+    return ReapplyContextResponse(rules_updated=updated, summaries=summaries)
 
 
 def _load_taxonomy() -> dict | None:

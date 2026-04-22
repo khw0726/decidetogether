@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X, AlertCircle, RefreshCw } from 'lucide-react'
-import { acceptSuggestionWithLabel, acceptRecompile, dismissSuggestion, refreshSuggestions, Suggestion } from '../api/client'
+import { Check, X, AlertCircle } from 'lucide-react'
+import { acceptSuggestionWithLabel, acceptRecompile, dismissSuggestion, Suggestion } from '../api/client'
 
 interface SuggestionDiffProps {
   suggestions: Suggestion[]
@@ -32,13 +32,6 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
     },
   })
 
-  const refreshMutation = useMutation({
-    mutationFn: () => refreshSuggestions(ruleId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['suggestions', ruleId] })
-    },
-  })
-
   const pending = suggestions.filter(s => s.status === 'pending')
 
   if (pending.length === 0) {
@@ -54,20 +47,9 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
             <h3 className="font-semibold">Pending Suggestions</h3>
             <span className="badge badge-yellow">{pending.length}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="btn-secondary text-xs flex items-center gap-1"
-              onClick={() => refreshMutation.mutate()}
-              disabled={refreshMutation.isPending}
-              title="Re-analyze examples and generate new suggestions"
-            >
-              <RefreshCw size={12} className={refreshMutation.isPending ? 'animate-spin' : ''} />
-              Refresh
-            </button>
-            <button className="text-gray-400 hover:text-gray-600" onClick={onClose}>
-              <X size={20} />
-            </button>
-          </div>
+          <button className="text-gray-400 hover:text-gray-600" onClick={onClose}>
+            <X size={20} />
+          </button>
         </div>
 
         <div className="flex-1 overflow-auto p-4 space-y-4">
@@ -384,7 +366,7 @@ function ChecklistSuggestion({ content }: { content: Record<string, unknown> }) 
   }
   const actionColors: Record<string, string> = {
     remove: 'bg-red-100 text-red-700',
-    flag: 'bg-amber-100 text-amber-700',
+    warn: 'bg-amber-100 text-amber-700',
     continue: 'bg-gray-100 text-gray-600',
   }
 

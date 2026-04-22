@@ -8,6 +8,7 @@ import CommunitySettings from './pages/CommunitySettings'
 import CommunitySetup from './pages/CommunitySetup'
 import ExamplesPage from './pages/ExamplesPage'
 import UnlinkedOverridesPage from './pages/UnlinkedOverridesPage'
+import ToastContainer from './components/Toast'
 
 export default function App() {
   const [communityId, setCommunityId] = useState<string>(
@@ -24,24 +25,27 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/setup" element={<CommunitySetup onCommunityChange={handleCommunityChange} />} />
-        <Route
-          path="/"
-          element={
-            <Layout communityId={communityId} onCommunityChange={handleCommunityChange} />
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard communityId={communityId} />} />
-          <Route path="rules" element={<RuleEditor communityId={communityId} />} />
-          <Route path="examples" element={<ExamplesPage communityId={communityId} />} />
-          <Route path="decisions" element={<DecisionQueue communityId={communityId} />} />
-          <Route path="overrides" element={<UnlinkedOverridesPage communityId={communityId} />} />
-          <Route path="settings" element={<CommunitySettings communityId={communityId} />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+    <>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/setup" element={<CommunitySetup onCommunityChange={handleCommunityChange} />} />
+          <Route
+            path="/"
+            element={
+              <Layout communityId={communityId} onCommunityChange={handleCommunityChange} />
+            }
+          >
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="dashboard" element={<Dashboard communityId={communityId} />} />
+            <Route path="rules" element={<RuleEditor communityId={communityId} />} />
+            <Route path="examples" element={<ExamplesPage communityId={communityId} />} />
+            <Route path="decisions" element={<DecisionQueue communityId={communityId} />} />
+            <Route path="overrides" element={<UnlinkedOverridesPage communityId={communityId} />} />
+            <Route path="settings" element={<CommunitySettings communityId={communityId} />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+      <ToastContainer />
+    </>
   )
 }

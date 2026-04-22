@@ -16,7 +16,7 @@ function TypeBadge({ itemType }: { itemType: string | undefined }) {
 
 function ActionBadge({ action }: { action: string | undefined }) {
   if (action === 'remove') return <span className="badge badge-red">REMOVE</span>
-  if (action === 'flag') return <span className="badge badge-yellow">FLAG</span>
+  if (action === 'warn') return <span className="badge badge-yellow">WARN</span>
   if (action === 'continue') return <span className="badge badge-gray">continue</span>
   return null
 }
