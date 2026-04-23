@@ -50,10 +50,6 @@ def _get_engine(db: AsyncSession = Depends(get_db)) -> EvaluationEngine:
     return EvaluationEngine(db=db, client=client, settings=settings)
 
 
-class AtmosphereGenerateResponse(BaseModel):
-    community: CommunityRead
-
-
 def get_compiler() -> RuleCompiler:
     client = get_anthropic_client()
     return RuleCompiler(client, settings)
@@ -484,95 +480,6 @@ async def import_sample_post_from_url(
     return CommunitySamplePostRead.model_validate(post)
 
 
-# ── Atmosphere Generation ──────────────────────────────────────────────────────
-
-@router.post("/communities/{community_id}/atmosphere/generate", response_model=AtmosphereGenerateResponse)
-async def generate_atmosphere(
-    community_id: str,
-    db: AsyncSession = Depends(get_db),
-    compiler: RuleCompiler = Depends(get_compiler),
-) -> AtmosphereGenerateResponse:
-    """Generate a community atmosphere profile from existing decisions, sample posts, and crawled Reddit posts."""
-    result = await db.execute(select(Community).where(Community.id == community_id))
-    community = result.scalar_one_or_none()
-    if not community:
-        raise HTTPException(status_code=404, detail="Community not found")
-
-    # Collect approved decisions
-    approved_result = await db.execute(
-        select(Decision)
-        .where(
-            Decision.community_id == community_id,
-            Decision.moderator_verdict == "approve",
-        )
-        .order_by(Decision.created_at.desc())
-        .limit(10)
-    )
-    approved_decisions = approved_result.scalars().all()
-
-    # Collect removed decisions
-    removed_result = await db.execute(
-        select(Decision)
-        .where(
-            Decision.community_id == community_id,
-            Decision.moderator_verdict == "remove",
-        )
-        .order_by(Decision.created_at.desc())
-        .limit(10)
-    )
-    removed_decisions = removed_result.scalars().all()
-
-    # Collect sample posts — user-added first (higher priority), then auto-crawled
-    sample_result = await db.execute(
-        select(CommunitySamplePost)
-        .where(CommunitySamplePost.community_id == community_id)
-        .order_by(
-            # User-added posts first (note != auto-crawl marker), then crawled
-            (CommunitySamplePost.note == "Auto-crawled from subreddit").asc(),
-            CommunitySamplePost.created_at.desc(),
-        )
-        .limit(30)
-    )
-    sample_posts = sample_result.scalars().all()
-
-    acceptable_posts = (
-        [{"content": p.content, "label": "acceptable", "note": p.note} for p in sample_posts if p.label == "acceptable"]
-        + [{"content": d.post_content, "label": "acceptable"} for d in approved_decisions]
-    )
-
-    unacceptable_posts = (
-        [{"content": p.content, "label": "unacceptable", "note": p.note} for p in sample_posts if p.label == "unacceptable"]
-        + [{"content": d.post_content, "label": "unacceptable"} for d in removed_decisions]
-    )
-
-    if not acceptable_posts and not unacceptable_posts:
-        raise HTTPException(
-            status_code=422,
-            detail="No posts available. Add sample posts or resolve some moderation decisions first.",
-        )
-
-    # Fetch active rules to give the atmosphere generator context on what the community enforces
-    rules_result = await db.execute(
-        select(Rule)
-        .where(Rule.community_id == community_id, Rule.is_active == True)  # noqa: E712
-        .order_by(Rule.priority.asc())
-    )
-    active_rules = list(rules_result.scalars().all())
-
-    atmosphere = await compiler.generate_community_atmosphere(
-        community=community,
-        acceptable_posts=acceptable_posts,
-        unacceptable_posts=unacceptable_posts,
-        other_rules=active_rules or None,
-    )
-    community.atmosphere = atmosphere
-    await db.commit()
-    await db.refresh(community)
-    return AtmosphereGenerateResponse(
-        community=CommunityRead.model_validate(community),
-    )
-
-
 # ── Context Samples ───────────────────────────────────────────────────────────
 
 
@@ -834,8 +741,9 @@ async def preview_context_impact(
                 community=community,
                 base_checklist_dicts=rule.base_checklist_json,
                 community_context=draft_context,
-                community_atmosphere=community.atmosphere,
                 current_checklist_dicts=current_dicts,
+                relevant_context=rule.relevant_context,
+                custom_context_notes=rule.custom_context_notes,
             )
             if summary:
                 impacts.append(ContextPreviewImpactItem(
@@ -908,8 +816,9 @@ async def reapply_context(
                 community=community,
                 base_checklist_dicts=rule.base_checklist_json,
                 community_context=community.community_context,
-                community_atmosphere=community.atmosphere,
                 pinned_items=pinned_items,
+                relevant_context=rule.relevant_context,
+                custom_context_notes=rule.custom_context_notes,
             )
 
             # Replace existing checklist items

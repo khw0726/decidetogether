@@ -238,7 +238,7 @@ Output:
       "action": "remove",
       "children": [],
       "context_influenced": true,
-      "context_note": "Community purpose is casual mobile gaming fun → threshold lowered to 0.55 because even mild soap-boxing undermines the lighthearted atmosphere."
+      "context_note": "Community purpose is casual mobile gaming fun → threshold lowered to 0.55 because even mild soap-boxing undermines the lighthearted tone."
     },
     {
       "description": "Is the post or comment irrelevant to the Pikmin Bloom game?",
@@ -281,7 +281,7 @@ Output:
         "context": {"channel": "r/PikminBloomApp", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
         "timestamp": "2026-01-01T00:00:00Z"
       },
-      "relevance_note": "Game-related but venting/negative in tone — could be borderline soap-boxing depending on how strictly the community enforces the 'keep it light' atmosphere",
+      "relevance_note": "Game-related but venting/negative in tone — could be borderline soap-boxing depending on how strictly the community enforces the 'keep it light' tone",
       "related_checklist_item_description": "Does the post or the comment contain political, religious, or soap-boxing content?"
     },
     {
@@ -310,7 +310,6 @@ def build_compile_prompt(
     other_rules_summary: str,
     existing_checklist: Optional[list] = None,
     existing_examples: Optional[list] = None,
-    community_atmosphere: Optional[dict] = None,
     community_context: Optional[dict] = None,
     community_posts_sample: Optional[list] = None,
 ) -> str:
@@ -337,22 +336,6 @@ def build_compile_prompt(
                     ctx_lines.append(f"    - {text}{tag_suffix}")
         if ctx_lines:
             context_section = "\n\nCommunity context for calibration:\n" + "\n".join(ctx_lines)
-
-    atmosphere_section = ""
-    if community_atmosphere:
-        atm = community_atmosphere
-        lines = []
-        if atm.get("tone"):
-            lines.append(f"  Tone: {atm['tone']}")
-        if atm.get("typical_content"):
-            lines.append(f"  Typical content: {atm['typical_content']}")
-        if atm.get("what_belongs"):
-            lines.append(f"  What belongs: {atm['what_belongs']}")
-        if atm.get("what_doesnt_belong"):
-            lines.append(f"  What doesn't belong: {atm['what_doesnt_belong']}")
-        if atm.get("moderation_style"):
-            lines.append(f"  Moderation style: {atm['moderation_style']}")
-        atmosphere_section = "\n\nCommunication patterns (auto-inferred):\n" + "\n".join(lines)
 
     posts_section = ""
     if community_posts_sample:
@@ -389,7 +372,7 @@ def build_compile_prompt(
 Now compile the following rule for the "{community_name}" community on {platform}.
 
 Community context (other rules, for background):
-{other_rules_summary if other_rules_summary else "No other rules yet."}{context_section}{atmosphere_section}{posts_section}
+{other_rules_summary if other_rules_summary else "No other rules yet."}{context_section}{posts_section}
 {existing_context}
 
 Rule to compile:
@@ -582,7 +565,6 @@ def build_community_norms_prompt(
     community_name: str,
     rules_summary: str,
     recent_decisions: list[dict],
-    community_atmosphere: Optional[dict] = None,
     community_context: Optional[dict] = None,
 ) -> str:
     import json
@@ -624,9 +606,6 @@ Community rules summary:
 {decisions_str}
 {context_str}
 
-{"Community atmosphere:" if community_atmosphere else ""}
-{json.dumps(community_atmosphere, indent=2) if community_atmosphere else ""}
-
 {content_label.capitalize()} to evaluate:
 {post_str}
 {thread_context_str}
@@ -643,46 +622,6 @@ Return JSON in exactly this format:
   "violates_norms": true | false,
   "confidence": 0.0-1.0,
   "reasoning": "Explanation of why this {content_label} does or doesn't fit community norms"
-}}"""
-
-
-# ── Community Atmosphere Generation ───────────────────────────────────────────
-
-GENERATE_ATMOSPHERE_SYSTEM = """You are a community culture analyst. Given a sample of posts from a community (labeled as acceptable or removed/unacceptable), infer the community's atmosphere, tone, and norms.
-
-Return ONLY valid JSON with no markdown formatting or code blocks."""
-
-
-def build_generate_atmosphere_prompt(
-    community_name: str,
-    platform: str,
-    acceptable_posts: list[dict],
-    unacceptable_posts: list[dict],
-    rules_summary: Optional[str] = None,
-) -> str:
-    import json
-
-    rules_section = ""
-    if rules_summary:
-        rules_section = f"\nCommunity rules (for context on what the community explicitly enforces):\n{rules_summary}\n"
-
-    return f"""Analyze these sample posts from the "{community_name}" community on {platform} and infer the community's atmosphere and norms.
-{rules_section}
-Acceptable posts (approved by moderators or marked as good examples):
-{json.dumps(acceptable_posts, indent=2)}
-
-Removed/unacceptable posts (removed by moderators or marked as bad examples):
-{json.dumps(unacceptable_posts, indent=2)}
-
-Based on the rules and post samples, characterize the community's culture and moderation standards. Go beyond what the rules literally say — infer tone, style, and the unwritten norms that the post samples reveal.
-
-Return JSON in exactly this format:
-{{
-  "tone": "Short description of the community's tone and vibe (e.g. 'casual, wholesome, family-friendly')",
-  "typical_content": "What kinds of posts are typical and welcome here",
-  "what_belongs": "A sentence describing what content fits this community",
-  "what_doesnt_belong": "A sentence describing what content doesn't fit, even if not explicitly rule-violating",
-  "moderation_style": "How strict or lenient moderators tend to be, and what they prioritize"
 }}"""
 
 
@@ -981,10 +920,10 @@ def build_context_adjust_prompt(
     platform: str,
     base_checklist: list[dict],
     community_context: dict,
-    community_atmosphere: Optional[dict] = None,
     community_posts_sample: Optional[list] = None,
     pinned_items: Optional[list[dict]] = None,
     current_checklist: Optional[list[dict]] = None,
+    custom_context_notes: Optional[list[dict]] = None,
 ) -> str:
     import json
 
@@ -1001,21 +940,21 @@ def build_context_adjust_prompt(
                 ctx_lines.append(f"    - {text}{tag_suffix}")
     context_section = "\n".join(ctx_lines)
 
-    atmosphere_section = ""
-    if community_atmosphere:
-        atm = community_atmosphere
-        lines = []
-        if atm.get("tone"):
-            lines.append(f"  Tone: {atm['tone']}")
-        if atm.get("typical_content"):
-            lines.append(f"  Typical content: {atm['typical_content']}")
-        if atm.get("what_belongs"):
-            lines.append(f"  What belongs: {atm['what_belongs']}")
-        if atm.get("what_doesnt_belong"):
-            lines.append(f"  What doesn't belong: {atm['what_doesnt_belong']}")
-        if atm.get("moderation_style"):
-            lines.append(f"  Moderation style: {atm['moderation_style']}")
-        atmosphere_section = "\n\nCommunication patterns (auto-inferred):\n" + "\n".join(lines)
+    custom_notes_section = ""
+    if custom_context_notes:
+        custom_lines = []
+        for note in custom_context_notes:
+            text, tag = _extract_note(note)
+            if not text:
+                continue
+            tag_suffix = f" [{tag}]" if tag else ""
+            custom_lines.append(f"    - {text}{tag_suffix}")
+        if custom_lines:
+            custom_notes_section = (
+                "\n\nRULE-SPECIFIC CALIBRATION NOTES (these apply only to THIS rule and override "
+                "community defaults where they conflict — moderator added these as explicit "
+                "guidance):\n" + "\n".join(custom_lines)
+            )
 
     posts_section = ""
     if community_posts_sample:
@@ -1070,8 +1009,7 @@ current live version, do NOT mention it in the summary."""
 Rule: {rule_title}: {rule_text}
 
 Community context:
-{context_section}
-{atmosphere_section}{posts_section}{pinned_section}
+{context_section}{custom_notes_section}{posts_section}{pinned_section}
 
 Base checklist (compiled from rule text only, no context):
 {json.dumps(base_checklist, indent=2)}

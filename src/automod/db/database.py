@@ -77,30 +77,6 @@ async def _migrate_example_checklist_item_links(conn) -> None:
     await conn.execute(text("DROP TABLE _ecil_old"))
 
 
-async def _migrate_community_atmosphere(conn) -> None:
-    """Add atmosphere column to communities table if missing."""
-    cols_result = await conn.execute(text("PRAGMA table_info(communities)"))
-    col_names = {row[1] for row in cols_result.fetchall()}
-    if "atmosphere" not in col_names and col_names:
-        await conn.execute(text("ALTER TABLE communities ADD COLUMN atmosphere JSON"))
-
-
-async def _migrate_checklist_atmosphere_fields(conn) -> None:
-    """Add atmosphere_influenced and atmosphere_note to checklist_items if missing."""
-    cols_result = await conn.execute(text("PRAGMA table_info(checklist_items)"))
-    col_names = {row[1] for row in cols_result.fetchall()}
-    if not col_names:
-        return  # Table doesn't exist yet
-    if "atmosphere_influenced" not in col_names:
-        await conn.execute(text(
-            "ALTER TABLE checklist_items ADD COLUMN atmosphere_influenced BOOLEAN NOT NULL DEFAULT 0"
-        ))
-    if "atmosphere_note" not in col_names:
-        await conn.execute(text(
-            "ALTER TABLE checklist_items ADD COLUMN atmosphere_note TEXT"
-        ))
-
-
 async def _migrate_community_context_field(conn) -> None:
     """Add community_context column to communities table if missing."""
     cols_result = await conn.execute(text("PRAGMA table_info(communities)"))
@@ -279,6 +255,79 @@ async def _migrate_checklist_base_description(conn) -> None:
         ))
 
 
+async def _migrate_drop_atmosphere(conn) -> None:
+    """Drop legacy atmosphere columns: communities.atmosphere and the renamed
+    checklist_items.atmosphere_influenced / atmosphere_note (data already moved
+    to context_influenced / context_note by _migrate_checklist_context_rename)."""
+    # Communities: drop atmosphere column if it exists
+    cols = await conn.execute(text("PRAGMA table_info(communities)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if "atmosphere" in col_names:
+        await conn.execute(text("ALTER TABLE communities DROP COLUMN atmosphere"))
+
+    # Checklist items: drop the old atmosphere_* columns if both they and their context_* replacements exist
+    cols = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if "atmosphere_influenced" in col_names and "context_influenced" in col_names:
+        await conn.execute(text("ALTER TABLE checklist_items DROP COLUMN atmosphere_influenced"))
+    if "atmosphere_note" in col_names and "context_note" in col_names:
+        await conn.execute(text("ALTER TABLE checklist_items DROP COLUMN atmosphere_note"))
+
+
+async def _migrate_rule_relevant_context(conn) -> None:
+    """Add relevant_context and custom_context_notes columns to rules if missing."""
+    cols = await conn.execute(text("PRAGMA table_info(rules)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if not col_names:
+        return
+    if "relevant_context" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN relevant_context JSON DEFAULT NULL"
+        ))
+    if "custom_context_notes" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN custom_context_notes JSON DEFAULT NULL"
+        ))
+
+
+async def _migrate_checklist_pinned_tags(conn) -> None:
+    """Add pinned_tags column to checklist_items if missing."""
+    cols = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if "pinned_tags" not in col_names and col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN pinned_tags JSON DEFAULT NULL"
+        ))
+
+
+async def _migrate_rule_pending_preview(conn) -> None:
+    """Add pending_* preview columns to rules if missing."""
+    cols = await conn.execute(text("PRAGMA table_info(rules)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if not col_names:
+        return
+    if "pending_checklist_json" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN pending_checklist_json JSON DEFAULT NULL"
+        ))
+    if "pending_context_adjustment_summary" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN pending_context_adjustment_summary JSON DEFAULT NULL"
+        ))
+    if "pending_relevant_context" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN pending_relevant_context JSON DEFAULT NULL"
+        ))
+    if "pending_custom_context_notes" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN pending_custom_context_notes JSON DEFAULT NULL"
+        ))
+    if "pending_generated_at" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN pending_generated_at DATETIME DEFAULT NULL"
+        ))
+
+
 async def _migrate_flag_to_warn(conn) -> None:
     """Rename action='flag' to 'warn' in checklist_items and verdict='review' to 'warn' in decisions."""
     # Checklist items
@@ -295,12 +344,11 @@ async def init_db() -> None:
     async with engine.begin() as conn:
         from . import models  # noqa: F401 - ensure models are imported
         await _migrate_example_checklist_item_links(conn)
-        await _migrate_community_atmosphere(conn)
-        await _migrate_checklist_atmosphere_fields(conn)
         await _migrate_decision_tag_field(conn)
         await _migrate_rule_override_count(conn)
         await _migrate_community_context_field(conn)
         await _migrate_checklist_context_rename(conn)
+        await _migrate_drop_atmosphere(conn)
         await _migrate_community_context_samples(conn)
         await _migrate_rule_two_pass_fields(conn)
         await _migrate_checklist_context_pin_fields(conn)
@@ -308,6 +356,9 @@ async def init_db() -> None:
         await _migrate_community_context_prose_to_notes(conn)
         await _migrate_checklist_context_change_types(conn)
         await _migrate_checklist_base_description(conn)
+        await _migrate_rule_relevant_context(conn)
+        await _migrate_checklist_pinned_tags(conn)
+        await _migrate_rule_pending_preview(conn)
         await _migrate_flag_to_warn(conn)
         await conn.run_sync(Base.metadata.create_all)
 

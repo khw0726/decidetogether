@@ -56,7 +56,6 @@ class CommunityRead(BaseModel):
     name: str
     platform: str
     platform_config: Optional[dict[str, Any]] = None
-    atmosphere: Optional[dict[str, Any]] = None
     community_context: Optional[dict[str, Any]] = None
     context_samples: Optional[dict[str, Any]] = None
     created_at: datetime
@@ -85,11 +84,19 @@ class CommunitySamplePostRead(BaseModel):
 
 # ── Rule ───────────────────────────────────────────────────────────────────────
 
+class RuleContextTag(BaseModel):
+    """A reference to one (dimension, tag) bundle from community context."""
+    dimension: str  # purpose | participants | stakes | tone
+    tag: str
+
+
 class RuleCreate(BaseModel):
     title: str
     text: str
     priority: int = 0
     applies_to: str = "both"
+    relevant_context: Optional[list[RuleContextTag]] = None
+    custom_context_notes: list[CommunityContextNote] = []
 
 
 class RuleUpdate(BaseModel):
@@ -98,6 +105,8 @@ class RuleUpdate(BaseModel):
     priority: Optional[int] = None
     is_active: Optional[bool] = None
     applies_to: Optional[str] = None
+    relevant_context: Optional[list[RuleContextTag]] = None
+    custom_context_notes: Optional[list[CommunityContextNote]] = None
 
 
 class RuleRead(BaseModel):
@@ -113,10 +122,30 @@ class RuleRead(BaseModel):
     override_count: int = 0
     base_checklist_json: Optional[list[dict[str, Any]]] = None
     context_adjustment_summary: Optional[list[str]] = None
+    relevant_context: Optional[list[RuleContextTag]] = None
+    custom_context_notes: list[CommunityContextNote] = []
+    pending_checklist_json: Optional[list[dict[str, Any]]] = None
+    pending_context_adjustment_summary: Optional[list[str]] = None
+    pending_relevant_context: Optional[dict[str, Any]] = None
+    pending_custom_context_notes: Optional[list[CommunityContextNote]] = None
+    pending_generated_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
+    @field_validator('custom_context_notes', mode='before')
+    @classmethod
+    def _default_custom_notes(cls, v):
+        return v or []
+
     model_config = {"from_attributes": True}
+
+
+class ContextPreviewResponse(BaseModel):
+    """Result of POST /rules/{rule_id}/context-preview — the proposed Pass 2 output."""
+    preview_items: list[dict[str, Any]]
+    summary: Optional[list[str]] = None
+    generated_at: datetime
+    current_items: list["ChecklistItemRead"]
 
 
 class RulePriorityUpdate(BaseModel):
@@ -146,6 +175,7 @@ class ChecklistItemRead(BaseModel):
     base_description: Optional[str] = None
     context_pinned: bool = False
     context_override_note: Optional[str] = None
+    pinned_tags: Optional[list[RuleContextTag]] = None
     updated_at: datetime
     children: list["ChecklistItemRead"] = []
 
@@ -381,6 +411,7 @@ class DecisionStats(BaseModel):
 
 # Allow forward references in ChecklistItemRead
 ChecklistItemRead.model_rebuild()
+ContextPreviewResponse.model_rebuild()
 
 
 # ── Reddit Import ───────────────────────────────────────────────────────────────

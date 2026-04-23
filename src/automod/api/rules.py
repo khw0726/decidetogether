@@ -3,6 +3,8 @@
 import asyncio
 import logging
 import re
+import uuid
+from datetime import datetime
 from typing import Optional
 
 import httpx
@@ -16,6 +18,7 @@ from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
 from ..db.models import ChecklistItem, CommunitySamplePost, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import (
+    ContextPreviewResponse,
     RuleBatchImportRequest,
     RuleBatchImportResponse,
     RuleBatchImportResult,
@@ -113,7 +116,6 @@ async def _compile_rule_read_and_llm(
         )
         existing_items = list(existing_result.scalars().all())
 
-        community_atmosphere = community.atmosphere
         community_context = community.community_context
 
         approved_result = await db.execute(
@@ -156,8 +158,9 @@ async def _compile_rule_read_and_llm(
                 community=community,
                 other_rules=other_rules,
                 community_context=community_context,
-                community_atmosphere=community_atmosphere,
                 community_posts_sample=community_posts_sample or None,
+                relevant_context=rule.relevant_context,
+                custom_context_notes=rule.custom_context_notes,
             )
         return {
             "mode": "compile",
@@ -251,6 +254,130 @@ async def _compile_rule_background(
             await _compile_rule_persist(result)
     except Exception as e:
         logger.error(f"Compilation failed for rule {rule_id}: {e}")
+
+
+def _serialize_adjusted_items(items: list[ChecklistItem]) -> list[dict]:
+    """Serialize Pass 2 output (unsaved ORM instances) to JSON-safe flat dicts.
+
+    parent_id references are preserved by ID so the tree can be reconstructed on commit.
+    """
+    return [
+        {
+            "id": item.id,
+            "order": item.order,
+            "parent_id": item.parent_id,
+            "description": item.description,
+            "rule_text_anchor": item.rule_text_anchor,
+            "item_type": item.item_type,
+            "logic": item.logic,
+            "action": item.action,
+            "context_influenced": item.context_influenced,
+            "context_note": item.context_note,
+            "context_change_types": item.context_change_types,
+            "base_description": item.base_description,
+            "context_pinned": item.context_pinned,
+            "context_override_note": item.context_override_note,
+            "pinned_tags": item.pinned_tags,
+        }
+        for item in items
+    ]
+
+
+def _rehydrate_checklist_items(dicts: list[dict], rule_id: str) -> list[ChecklistItem]:
+    """Create fresh ChecklistItem ORM instances from stashed dicts.
+
+    Generates new IDs and remaps parent_id references so the structure is preserved.
+    """
+    old_to_new: dict[str, str] = {d["id"]: str(uuid.uuid4()) for d in dicts if d.get("id")}
+    items: list[ChecklistItem] = []
+    for d in dicts:
+        parent_old = d.get("parent_id")
+        parent_new = old_to_new.get(parent_old) if parent_old else None
+        items.append(ChecklistItem(
+            id=old_to_new.get(d.get("id")) or str(uuid.uuid4()),
+            rule_id=rule_id,
+            order=d.get("order", 0),
+            parent_id=parent_new,
+            description=d.get("description", ""),
+            rule_text_anchor=d.get("rule_text_anchor"),
+            item_type=d.get("item_type", "subjective"),
+            logic=d.get("logic") or {},
+            action=d.get("action", "warn"),
+            context_influenced=d.get("context_influenced", False),
+            context_note=d.get("context_note"),
+            context_change_types=d.get("context_change_types"),
+            base_description=d.get("base_description"),
+            context_pinned=d.get("context_pinned", False),
+            context_override_note=d.get("context_override_note"),
+            pinned_tags=d.get("pinned_tags"),
+        ))
+    return items
+
+
+def _nest_preview_items(flat: list[dict]) -> list[dict]:
+    """Convert a flat list of stashed item dicts into a nested tree for frontend rendering.
+
+    Each node gets a `children` key holding nested child dicts.
+    """
+    nodes: dict[str, dict] = {}
+    for d in flat:
+        nodes[d["id"]] = {**d, "children": []}
+    roots: list[dict] = []
+    for d in sorted(flat, key=lambda x: x.get("order", 0)):
+        node = nodes[d["id"]]
+        parent_id = d.get("parent_id")
+        if parent_id and parent_id in nodes:
+            nodes[parent_id]["children"].append(node)
+        else:
+            roots.append(node)
+    return roots
+
+
+async def _run_pass2(rule_id: str) -> Optional[tuple[list[dict], list[str]]]:
+    """Run Pass 2 (context adjustment) against the rule's current base checklist and context.
+
+    Returns (serialized items, summary) or None if the rule is not eligible.
+    Does not touch the DB — callers decide whether to stash or persist.
+    """
+    from ..db.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+        rule = rule_result.scalar_one_or_none()
+        if not rule or not rule.base_checklist_json:
+            return None
+        community_result = await db.execute(
+            select(Community).where(Community.id == rule.community_id)
+        )
+        community = community_result.scalar_one_or_none()
+        if not community or not community.community_context:
+            return None
+
+        pinned_result = await db.execute(
+            select(ChecklistItem).where(
+                ChecklistItem.rule_id == rule.id,
+                ChecklistItem.context_pinned == True,  # noqa: E712
+            )
+        )
+        pinned_items = [
+            {"description": p.description, "context_override_note": p.context_override_note}
+            for p in pinned_result.scalars().all()
+        ] or None
+
+    compiler = get_compiler()
+    adjusted_items, summary = await compiler.adjust_for_context(
+        rule=rule,
+        community=community,
+        base_checklist_dicts=rule.base_checklist_json,
+        community_context=community.community_context,
+        pinned_items=pinned_items,
+        relevant_context=rule.relevant_context,
+        custom_context_notes=rule.custom_context_notes,
+    )
+    # Compiler returns "" for summary when there's no context to apply; normalize to list.
+    if isinstance(summary, str):
+        summary = [s.strip() for s in summary.split(". ") if s.strip()]
+    return _serialize_adjusted_items(adjusted_items), summary
 
 
 async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
@@ -436,8 +563,8 @@ async def _apply_diff_operations(
                         item_type=child_data.get("item_type", "subjective"),
                         logic=child_data.get("logic", {}),
                         action=child_data.get("action", "warn"),
-                        context_influenced=child_data.get("context_influenced", child_data.get("atmosphere_influenced", False)),
-                        context_note=child_data.get("context_note", child_data.get("atmosphere_note")),
+                        context_influenced=child_data.get("context_influenced", False),
+                        context_note=child_data.get("context_note"),
                         context_change_types=child_data.get("context_change_types"),
                     ))
 
@@ -491,8 +618,8 @@ async def _apply_diff_operations(
                 item_type=op.get("item_type", "subjective"),
                 logic=op.get("logic", {}),
                 action=op.get("action", "warn"),
-                context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", False)),
-                context_note=op.get("context_note", op.get("atmosphere_note")),
+                context_influenced=op.get("context_influenced", False),
+                context_note=op.get("context_note"),
                 context_change_types=op.get("context_change_types"),
             )
             db.add(new_item)
@@ -507,8 +634,8 @@ async def _apply_diff_operations(
                     item_type=child_data.get("item_type", "subjective"),
                     logic=child_data.get("logic", {}),
                     action=child_data.get("action", "warn"),
-                    context_influenced=child_data.get("context_influenced", child_data.get("atmosphere_influenced", False)),
-                    context_note=child_data.get("context_note", child_data.get("atmosphere_note")),
+                    context_influenced=child_data.get("context_influenced", False),
+                    context_note=child_data.get("context_note"),
                     context_change_types=child_data.get("context_change_types"),
                 ))
 
@@ -535,6 +662,11 @@ async def create_rule(
         title=body.title,
         text=body.text,
         priority=body.priority,
+        relevant_context=(
+            [e.model_dump() for e in body.relevant_context]
+            if body.relevant_context is not None else None
+        ),
+        custom_context_notes=[n.model_dump() for n in body.custom_context_notes],
     )
     db.add(rule)
     await db.commit()
@@ -729,6 +861,30 @@ async def update_rule(
     if body.applies_to is not None:
         rule.applies_to = body.applies_to
 
+    context_changed = False
+    fields_set = body.model_fields_set
+    if "relevant_context" in fields_set:
+        rule.relevant_context = (
+            [e.model_dump() for e in body.relevant_context]
+            if body.relevant_context is not None else None
+        )
+        context_changed = True
+    if "custom_context_notes" in fields_set:
+        rule.custom_context_notes = (
+            [n.model_dump() for n in body.custom_context_notes]
+            if body.custom_context_notes is not None else []
+        )
+        context_changed = True
+
+    # Any text or context change invalidates a pending preview — clear it so the
+    # moderator has to regenerate before committing.
+    if body.text is not None or context_changed:
+        rule.pending_checklist_json = None
+        rule.pending_context_adjustment_summary = None
+        rule.pending_relevant_context = None
+        rule.pending_custom_context_notes = None
+        rule.pending_generated_at = None
+
     # If text changed, re-triage and queue recompile
     if body.text is not None:
         comm_result = await db.execute(
@@ -748,6 +904,131 @@ async def update_rule(
         if rule.rule_type == "actionable":
             background_tasks.add_task(_compile_rule_background, rule.id, rule.community_id)
 
+    await db.commit()
+    await db.refresh(rule)
+    return RuleRead.model_validate(rule)
+
+
+def _current_context_inputs(rule: Rule) -> tuple[dict, list]:
+    """Snapshot the rule's current context selection for staleness detection."""
+    return (
+        {"value": rule.relevant_context},  # None-vs-empty-list distinguishable
+        list(rule.custom_context_notes or []),
+    )
+
+
+@router.post("/rules/{rule_id}/context-preview", response_model=ContextPreviewResponse)
+async def preview_context_adjustment(
+    rule_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> ContextPreviewResponse:
+    """Run Pass 2 synchronously and stash the result on the rule without persisting
+    checklist changes. Moderator reviews the stash, then commits or discards it.
+    """
+    result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    if rule.rule_type != "actionable":
+        raise HTTPException(status_code=400, detail="Only actionable rules support context adjustment")
+    if not rule.base_checklist_json:
+        raise HTTPException(status_code=400, detail="Rule has no base checklist to adjust")
+
+    pass2 = await _run_pass2(rule_id)
+    if pass2 is None:
+        raise HTTPException(status_code=400, detail="Rule is not eligible for context adjustment")
+    preview_flat, summary = pass2
+
+    rel_snap, notes_snap = _current_context_inputs(rule)
+    rule.pending_checklist_json = preview_flat
+    rule.pending_context_adjustment_summary = summary
+    rule.pending_relevant_context = rel_snap
+    rule.pending_custom_context_notes = notes_snap
+    rule.pending_generated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(rule)
+
+    # Fetch current (live) checklist for side-by-side display.
+    current_result = await db.execute(
+        select(ChecklistItem)
+        .where(ChecklistItem.rule_id == rule_id)
+        .order_by(ChecklistItem.order.asc())
+    )
+    current_items = list(current_result.scalars().all())
+
+    # Import locally to avoid a circular import with checklist.py → rules helpers.
+    from .checklist import _build_tree
+
+    return ContextPreviewResponse(
+        preview_items=_nest_preview_items(preview_flat),
+        summary=summary,
+        generated_at=rule.pending_generated_at,
+        current_items=_build_tree(current_items),
+    )
+
+
+@router.post("/rules/{rule_id}/context-commit", response_model=RuleRead)
+async def commit_context_adjustment(
+    rule_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> RuleRead:
+    """Apply the stashed Pass 2 preview: replace checklist items, move summary, clear stash."""
+    result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    if not rule.pending_checklist_json:
+        raise HTTPException(status_code=400, detail="No pending preview to commit")
+
+    # Staleness check: current context must match what was used to generate the preview.
+    current_rel, current_notes = _current_context_inputs(rule)
+    if rule.pending_relevant_context != current_rel or rule.pending_custom_context_notes != current_notes:
+        raise HTTPException(
+            status_code=409,
+            detail="Preview is stale — context selection has changed since it was generated. Regenerate the preview.",
+        )
+
+    stashed_items = rule.pending_checklist_json
+    stashed_summary = rule.pending_context_adjustment_summary
+
+    try:
+        await db.execute(sa_delete(ChecklistItem).where(ChecklistItem.rule_id == rule_id))
+        for item in _rehydrate_checklist_items(stashed_items, rule_id):
+            db.add(item)
+        rule.context_adjustment_summary = stashed_summary
+        rule.pending_checklist_json = None
+        rule.pending_context_adjustment_summary = None
+        rule.pending_relevant_context = None
+        rule.pending_custom_context_notes = None
+        rule.pending_generated_at = None
+        await db.commit()
+        await _re_resolve_checklist_links(db, rule_id)
+        await db.commit()
+    except Exception as e:
+        logger.error(f"Commit preview failed for rule {rule_id}: {e}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to commit preview")
+
+    await db.refresh(rule)
+    return RuleRead.model_validate(rule)
+
+
+@router.delete("/rules/{rule_id}/context-preview", response_model=RuleRead)
+async def discard_context_preview(
+    rule_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> RuleRead:
+    """Clear any stashed preview without applying it."""
+    result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    rule.pending_checklist_json = None
+    rule.pending_context_adjustment_summary = None
+    rule.pending_relevant_context = None
+    rule.pending_custom_context_notes = None
+    rule.pending_generated_at = None
     await db.commit()
     await db.refresh(rule)
     return RuleRead.model_validate(rule)

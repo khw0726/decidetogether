@@ -11,6 +11,48 @@ from . import prompts
 
 logger = logging.getLogger(__name__)
 
+
+def _filter_context_by_relevant(
+    community_context: Optional[dict],
+    relevant_context: Optional[list[dict]],
+) -> Optional[dict]:
+    """Filter a community context dict to only the (dimension, tag) bundles selected for a rule.
+
+    relevant_context semantics:
+    - None → return context unchanged (all bundles apply, the default).
+    - [] → return empty dict (moderator explicitly opted out of all community context).
+    - [{dimension, tag}, ...] → keep only notes whose (dimension, tag) appears in the list.
+    """
+    if not community_context:
+        return community_context
+    if relevant_context is None:
+        return community_context
+    if not relevant_context:
+        return {}
+
+    allowed: dict[str, set[str]] = {}
+    for entry in relevant_context:
+        dim = entry.get("dimension") if isinstance(entry, dict) else getattr(entry, "dimension", None)
+        tag = entry.get("tag") if isinstance(entry, dict) else getattr(entry, "tag", None)
+        if dim and tag:
+            allowed.setdefault(dim, set()).add(tag)
+
+    filtered: dict = {}
+    for dim in ["purpose", "participants", "stakes", "tone"]:
+        d = community_context.get(dim, {}) or {}
+        notes = d.get("notes", []) or []
+        kept_notes = []
+        for note in notes:
+            tag = note.get("tag", "") if isinstance(note, dict) else ""
+            if tag and tag in allowed.get(dim, set()):
+                kept_notes.append(note)
+        if kept_notes:
+            filtered[dim] = {"notes": kept_notes}
+            if "manually_edited" in d:
+                filtered[dim]["manually_edited"] = d["manually_edited"]
+    return filtered
+
+
 _TRIAGE_TOOL = {
     "name": "submit_triage",
     "description": "Submit rule classification result",
@@ -254,22 +296,6 @@ _DIAGNOSE_TOOL = {
             },
         },
         "required": ["diagnoses", "new_items"],
-    },
-}
-
-_GENERATE_ATMOSPHERE_TOOL = {
-    "name": "submit_community_atmosphere",
-    "description": "Submit a structured community atmosphere profile inferred from post samples",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "tone": {"type": "string"},
-            "typical_content": {"type": "string"},
-            "what_belongs": {"type": "string"},
-            "what_doesnt_belong": {"type": "string"},
-            "moderation_style": {"type": "string"},
-        },
-        "required": ["tone", "typical_content", "what_belongs", "what_doesnt_belong", "moderation_style"],
     },
 }
 
@@ -539,7 +565,6 @@ class RuleCompiler:
         other_rules: list[Rule],
         existing_items: Optional[list[ChecklistItem]] = None,
         existing_examples: Optional[list[Example]] = None,
-        community_atmosphere: Optional[dict] = None,
         community_context: Optional[dict] = None,
         community_posts_sample: Optional[list[dict]] = None,
     ) -> tuple[list[ChecklistItem], list[dict]]:
@@ -569,7 +594,6 @@ class RuleCompiler:
             other_rules_summary=other_rules_summary,
             existing_checklist=existing_checklist_dicts,
             existing_examples=existing_example_dicts,
-            community_atmosphere=community_atmosphere,
             community_context=community_context,
             community_posts_sample=community_posts_sample,
         )
@@ -679,10 +703,11 @@ class RuleCompiler:
         community: Community,
         base_checklist_dicts: list[dict],
         community_context: dict,
-        community_atmosphere: Optional[dict] = None,
         community_posts_sample: Optional[list] = None,
         pinned_items: Optional[list[dict]] = None,
         current_checklist_dicts: Optional[list[dict]] = None,
+        relevant_context: Optional[list[dict]] = None,
+        custom_context_notes: Optional[list[dict]] = None,
     ) -> tuple[list[ChecklistItem], str]:
         """Pass 2: Adjust a base checklist using community context.
 
@@ -691,11 +716,18 @@ class RuleCompiler:
                           These items' calibration must be preserved as-is.
             current_checklist_dicts: If provided, the LLM will describe changes
                           relative to these (the live checklist) instead of the base.
+            relevant_context: Per-rule filter. If None, all community context bundles
+                          apply. If a list of {dimension, tag}, context is narrowed
+                          to only those bundles. Empty list = no community context.
+            custom_context_notes: Rule-specific calibration notes ([{text, tag}]) appended
+                          to the community context for this rule only.
 
         Returns (adjusted_items, adjustment_summary).
         If no community_context is provided, returns base items unchanged.
         """
-        if not community_context:
+        filtered_context = _filter_context_by_relevant(community_context, relevant_context)
+
+        if not filtered_context and not custom_context_notes:
             items = self._parse_flat_items(base_checklist_dicts, rule.id)
             return items, ""
 
@@ -707,11 +739,11 @@ class RuleCompiler:
             community_name=community.name,
             platform=community.platform,
             base_checklist=base_checklist_dicts,
-            community_context=community_context,
-            community_atmosphere=community_atmosphere,
+            community_context=filtered_context or {},
             community_posts_sample=community_posts_sample,
             pinned_items=pinned_items,
             current_checklist=current_checklist_dicts,
+            custom_context_notes=custom_context_notes,
         )
 
         result = await self._call_claude(
@@ -738,8 +770,9 @@ class RuleCompiler:
         existing_items: Optional[list[ChecklistItem]] = None,
         existing_examples: Optional[list[Example]] = None,
         community_context: Optional[dict] = None,
-        community_atmosphere: Optional[dict] = None,
         community_posts_sample: Optional[list] = None,
+        relevant_context: Optional[list[dict]] = None,
+        custom_context_notes: Optional[list[dict]] = None,
     ) -> tuple[list[ChecklistItem], list[dict], list[dict], str]:
         """Two-pass compilation: base compile then context adjustment.
 
@@ -752,47 +785,19 @@ class RuleCompiler:
 
         base_checklist_dicts = self._items_to_nested_dicts(base_items)
 
-        # Pass 2: adjust for context
-        if community_context:
+        # Pass 2: adjust for context (filtered per-rule)
+        filtered_context = _filter_context_by_relevant(community_context, relevant_context)
+        if filtered_context or custom_context_notes:
             adjusted_items, summary = await self.adjust_for_context(
-                rule, community, base_checklist_dicts, community_context,
-                community_atmosphere, community_posts_sample,
+                rule, community, base_checklist_dicts, filtered_context or {},
+                community_posts_sample,
+                custom_context_notes=custom_context_notes,
             )
         else:
             adjusted_items = base_items
             summary = ""
 
         return adjusted_items, examples, base_checklist_dicts, summary
-
-    async def generate_community_atmosphere(
-        self,
-        community: Community,
-        acceptable_posts: list[dict],
-        unacceptable_posts: list[dict],
-        other_rules: Optional[list[Rule]] = None,
-    ) -> dict:
-        """Generate a structured community atmosphere profile from representative posts."""
-        logger.info(f"Generating atmosphere profile for community '{community.name}'")
-        rules_summary = self._make_other_rules_summary(other_rules) if other_rules else None
-        user_prompt = prompts.build_generate_atmosphere_prompt(
-            community_name=community.name,
-            platform=community.platform,
-            acceptable_posts=acceptable_posts,
-            unacceptable_posts=unacceptable_posts,
-            rules_summary=rules_summary,
-        )
-        result = await self._call_claude(
-            prompts.GENERATE_ATMOSPHERE_SYSTEM,
-            user_prompt,
-            tool=_GENERATE_ATMOSPHERE_TOOL,
-        )
-        return {
-            "tone": result.get("tone", ""),
-            "typical_content": result.get("typical_content", ""),
-            "what_belongs": result.get("what_belongs", ""),
-            "what_doesnt_belong": result.get("what_doesnt_belong", ""),
-            "moderation_style": result.get("moderation_style", ""),
-        }
 
     async def generate_community_context(
         self,
@@ -862,8 +867,8 @@ class RuleCompiler:
                 item_type=item_data.get("item_type", "subjective"),
                 logic=item_data.get("logic", {}),
                 action=item_data.get("action", "warn"),
-                context_influenced=item_data.get("context_influenced", item_data.get("atmosphere_influenced", False)),
-                context_note=item_data.get("context_note", item_data.get("atmosphere_note")),
+                context_influenced=item_data.get("context_influenced", False),
+                context_note=item_data.get("context_note"),
                 context_change_types=item_data.get("context_change_types"),
                 base_description=item_data.get("base_description"),
             )

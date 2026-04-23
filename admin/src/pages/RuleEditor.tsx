@@ -11,23 +11,33 @@ import {
   updateRulePriority,
   overrideRuleType,
   getChecklist,
+  getCommunity,
   recompileRule,
   previewRecompile,
   listSuggestions,
   batchImportRules,
   evaluatePost,
   evaluateExamplesWithDraft,
+  previewContextAdjustment,
+  commitContextAdjustment,
+  discardContextPreview,
   BatchImportRuleItem,
   BatchImportResponse,
+  ContextPreviewResponse,
   PreviewRecompileResult,
+  PreviewChecklistItem,
   DraftEvaluationResult,
   Rule,
   ChecklistItem,
+  CommunityContextNote,
+  RuleContextTag,
   Decision,
 } from '../api/client'
 import ChecklistTree from '../components/ChecklistTree'
 import ChecklistPreview from '../components/ChecklistPreview'
+import ChecklistDiff from '../components/ChecklistDiff'
 import ExamplesPanel from '../components/ExamplesPanel'
+import RuleContextPicker from '../components/RuleContextPicker'
 import SuggestionDiff from '../components/SuggestionDiff'
 import { showErrorToast } from '../components/Toast'
 
@@ -66,6 +76,53 @@ const RULE_TYPE_COLORS: Record<string, string> = {
   informational: 'badge-gray',
 }
 
+function sameTagSet(
+  a: RuleContextTag[] | null | undefined,
+  b: RuleContextTag[] | null | undefined,
+): boolean {
+  if (!a && !b) return true
+  if (!a || !b) return false
+  if (a.length !== b.length) return false
+  const mk = (t: RuleContextTag) => `${t.dimension}::${t.tag}`
+  const sa = new Set(a.map(mk))
+  return b.every(t => sa.has(mk(t)))
+}
+
+function sameNotes(
+  a: CommunityContextNote[] | null | undefined,
+  b: CommunityContextNote[] | null | undefined,
+): boolean {
+  const na = a ?? []
+  const nb = b ?? []
+  if (na.length !== nb.length) return false
+  for (let i = 0; i < na.length; i++) {
+    if ((na[i].text || '') !== (nb[i].text || '')) return false
+    if ((na[i].tag || '') !== (nb[i].tag || '')) return false
+  }
+  return true
+}
+
+function nestPreviewItems(flat: Record<string, unknown>[]): PreviewChecklistItem[] {
+  const nodes = new Map<string, PreviewChecklistItem>()
+  for (const d of flat) {
+    const id = String(d.id)
+    nodes.set(id, { ...(d as unknown as PreviewChecklistItem), children: [] })
+  }
+  const roots: PreviewChecklistItem[] = []
+  const sorted = [...flat].sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
+  for (const d of sorted) {
+    const id = String(d.id)
+    const node = nodes.get(id)!
+    const parentId = d.parent_id ? String(d.parent_id) : null
+    if (parentId && nodes.has(parentId)) {
+      nodes.get(parentId)!.children.push(node)
+    } else {
+      roots.push(node)
+    }
+  }
+  return roots
+}
+
 interface RuleEditorProps {
   communityId: string
 }
@@ -78,7 +135,8 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
   const [editingText, setEditingText] = useState('')
   const [editingTitle, setEditingTitle] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [isEditingRuleText, setIsEditingRuleText] = useState(false)
+  // editMode unlocks: rule text textarea, Override Type, Applies To, and the context picker.
+  // Entering edit mode shows the textarea; exiting discards any unsaved text/context edits.
   const [hoveredAnchor, setHoveredAnchor] = useState<string | null>(null)
   const [selectedChecklistItemId, setSelectedChecklistItemId] = useState<string | null>(null)
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
@@ -96,7 +154,17 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     enabled: !!communityId,
   })
 
+  const { data: community } = useQuery({
+    queryKey: ['community', communityId],
+    queryFn: () => getCommunity(communityId),
+    enabled: !!communityId,
+  })
+
   const selectedRule = rules.find(r => r.id === selectedRuleId) || null
+  const [savingContextPreview, setSavingContextPreview] = useState(false)
+  const [committingContext, setCommittingContext] = useState(false)
+  const [contextPreview, setContextPreview] = useState<ContextPreviewResponse | null>(null)
+  const [editMode, setEditMode] = useState(false)
 
   const { data: checklist = [] } = useQuery({
     queryKey: ['checklist', selectedRuleId],
@@ -143,11 +211,20 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
     setSelectedRuleId(rule.id)
     setEditingText(rule.text)
     setEditingTitle(rule.title)
-    setIsEditingRuleText(false)
     setPreviewResult(null)
     setDraftEvalResults(null)
     setHoveredAnchor(null)
     setSelectedChecklistItemId(null)
+    setContextPreview(null)
+    setEditMode(false)
+  }
+
+  const exitEditMode = () => {
+    // Discard any unsaved rule-text edits when locking — matches the existing Discard button behavior.
+    if (selectedRule) setEditingText(selectedRule.text)
+    setPreviewResult(null)
+    setDraftEvalResults(null)
+    setEditMode(false)
   }
 
   const handlePreviewChanges = async () => {
@@ -166,14 +243,12 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
 
   const handleConfirmSave = async () => {
     await handleSaveRule()
-    setIsEditingRuleText(false)
     setPreviewResult(null)
     setDraftEvalResults(null)
   }
 
   const handleDiscardEdit = () => {
     if (selectedRule) setEditingText(selectedRule.text)
-    setIsEditingRuleText(false)
     setPreviewResult(null)
     setDraftEvalResults(null)
   }
@@ -225,6 +300,20 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
   }
 
   const pendingSuggestions = suggestions.filter(s => s.status === 'pending')
+
+  const effectiveContextPreview: ContextPreviewResponse | null = useMemo(() => {
+    if (contextPreview) return contextPreview
+    if (!selectedRule?.pending_checklist_json) return null
+    const pendingRel = selectedRule.pending_relevant_context?.value ?? null
+    if (!sameTagSet(pendingRel, selectedRule.relevant_context)) return null
+    if (!sameNotes(selectedRule.pending_custom_context_notes, selectedRule.custom_context_notes)) return null
+    return {
+      preview_items: nestPreviewItems(selectedRule.pending_checklist_json as Record<string, unknown>[]),
+      summary: selectedRule.pending_context_adjustment_summary ?? null,
+      generated_at: selectedRule.pending_generated_at ?? '',
+      current_items: checklist,
+    }
+  }, [contextPreview, selectedRule, checklist])
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -370,7 +459,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
 
                 {/* Text editor */}
                 <div className="flex-1 p-4 overflow-hidden flex flex-col">
-                  {isEditingRuleText ? (
+                  {editMode ? (
                     <div className="flex-1 flex flex-col gap-2 min-h-0">
                       <textarea
                         className="flex-1 resize-none border border-indigo-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
@@ -380,8 +469,8 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                         autoFocus
                       />
                       <div className="flex gap-2 justify-end flex-shrink-0">
-                        <button className="btn-secondary text-xs" onClick={handleDiscardEdit}>
-                          <X size={12} /> Discard
+                        <button className="btn-secondary text-xs" onClick={handleDiscardEdit} disabled={editingText === selectedRule?.text}>
+                          <X size={12} /> Discard text edits
                         </button>
                         {previewResult ? (
                           <button className="btn-primary text-xs" onClick={handleConfirmSave} disabled={isSaving}>
@@ -414,55 +503,133 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                       <div className="w-full h-full border border-gray-200 rounded-lg p-3 text-sm font-mono overflow-auto bg-gray-50 whitespace-pre-wrap text-gray-700 leading-relaxed">
                         {renderTextWithHighlight(editingText, hoveredAnchor)}
                       </div>
-                      <button
-                        className="absolute top-2 right-2 btn-secondary text-xs py-1"
-                        onClick={() => setIsEditingRuleText(true)}
-                        title="Edit rule text"
-                      >
-                        <Edit2 size={12} /> Edit
-                      </button>
                     </div>
                   )}
                 </div>
 
-                {/* Override rule type */}
-                <div className="px-4 pb-3 flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs text-gray-500">Override type:</span>
-                  {['actionable', 'procedural', 'meta', 'informational'].map(type => (
+                {/* Rule metadata (context + type + scope) — gated behind a single edit toggle */}
+                <div className="border-t border-gray-100 flex-shrink-0 flex flex-col overflow-hidden min-h-0 max-h-[50%]">
+                  <div className="flex items-center justify-between px-4 pt-2 pb-1 flex-shrink-0">
+                    <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                      Rule settings
+                    </span>
                     <button
-                      key={type}
-                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${selectedRule.rule_type === type
-                        ? 'bg-indigo-600 text-white border-indigo-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                        }`}
-                      onClick={async () => {
-                        await overrideRuleType(selectedRule.id, type)
-                        queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
-                      }}
+                      className="btn-secondary text-xs py-0.5"
+                      onClick={() => (editMode ? exitEditMode() : setEditMode(true))}
+                      title={editMode ? 'Lock rule' : 'Edit rule'}
                     >
-                      {type}
+                      {editMode ? <><Check size={11} /> Done</> : <><Edit2 size={11} /> Edit</>}
                     </button>
-                  ))}
-                </div>
+                  </div>
 
-                {/* Applies to (content scope) */}
-                <div className="px-4 pb-3 flex items-center gap-2 flex-shrink-0">
-                  <span className="text-xs text-gray-500">Applies to:</span>
-                  {(['posts', 'comments', 'both'] as const).map(target => (
-                    <button
-                      key={target}
-                      className={`text-xs px-2 py-0.5 rounded border transition-colors ${(selectedRule.applies_to || 'both') === target
-                        ? 'bg-emerald-600 text-white border-emerald-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                        }`}
-                      onClick={async () => {
-                        await updateRule(selectedRule.id, { applies_to: target })
-                        queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
-                      }}
-                    >
-                      {target}
-                    </button>
-                  ))}
+                  {/* Per-rule context selection */}
+                  {selectedRule.rule_type === 'actionable' && (
+                    <div className="px-4 pb-3 overflow-auto min-h-0 flex-1">
+                      <RuleContextPicker
+                        rule={selectedRule}
+                        community_context={community?.community_context ?? null}
+                        readOnly={!editMode}
+                        isSavingPreview={savingContextPreview}
+                        isCommitting={committingContext}
+                        onSavePreview={async ({ relevant_context, custom_context_notes }) => {
+                          setSavingContextPreview(true)
+                          try {
+                            await updateRule(selectedRule.id, {
+                              relevant_context,
+                              custom_context_notes,
+                            })
+                            const preview = await previewContextAdjustment(selectedRule.id)
+                            setContextPreview(preview)
+                            queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+                          } catch (e) {
+                            showErrorToast(extractErrorMessage(e))
+                          } finally {
+                            setSavingContextPreview(false)
+                          }
+                        }}
+                        onCommit={async () => {
+                          setCommittingContext(true)
+                          try {
+                            await commitContextAdjustment(selectedRule.id)
+                            setContextPreview(null)
+                            queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+                            queryClient.invalidateQueries({ queryKey: ['checklist', selectedRule.id] })
+                          } catch (e) {
+                            showErrorToast(extractErrorMessage(e))
+                          } finally {
+                            setCommittingContext(false)
+                          }
+                        }}
+                        onDiscard={async () => {
+                          try {
+                            await discardContextPreview(selectedRule.id)
+                            setContextPreview(null)
+                            queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+                          } catch (e) {
+                            showErrorToast(extractErrorMessage(e))
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Override rule type */}
+                  <div className="px-4 pb-2 flex items-center gap-2 flex-shrink-0 flex-wrap">
+                    <span className="text-xs text-gray-500">Override type:</span>
+                    {['actionable', 'procedural', 'meta', 'informational'].map(type => {
+                      const active = selectedRule.rule_type === type
+                      return (
+                        <button
+                          key={type}
+                          disabled={!editMode}
+                          className={`text-xs px-2 py-0.5 rounded border ${
+                            !editMode
+                              ? active
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-600 cursor-default'
+                                : 'bg-white border-gray-200 text-gray-400 cursor-default'
+                              : active
+                              ? 'bg-indigo-600 text-white border-indigo-600 transition-colors'
+                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors'
+                          }`}
+                          onClick={async () => {
+                            await overrideRuleType(selectedRule.id, type)
+                            queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+                          }}
+                        >
+                          {type}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Applies to (content scope) */}
+                  <div className="px-4 pb-3 flex items-center gap-2 flex-shrink-0 flex-wrap">
+                    <span className="text-xs text-gray-500">Applies to:</span>
+                    {(['posts', 'comments', 'both'] as const).map(target => {
+                      const active = (selectedRule.applies_to || 'both') === target
+                      return (
+                        <button
+                          key={target}
+                          disabled={!editMode}
+                          className={`text-xs px-2 py-0.5 rounded border ${
+                            !editMode
+                              ? active
+                                ? 'bg-emerald-50 border-emerald-200 text-emerald-600 cursor-default'
+                                : 'bg-white border-gray-200 text-gray-400 cursor-default'
+                              : active
+                              ? 'bg-emerald-600 text-white border-emerald-600 transition-colors'
+                              : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors'
+                          }`}
+                          onClick={async () => {
+                            await updateRule(selectedRule.id, { applies_to: target })
+                            queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+                          }}
+                        >
+                          {target}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </>
             ) : (
@@ -477,11 +644,13 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
           <div className="w-[35%] flex-shrink-0 flex flex-col border-r border-gray-200 bg-white overflow-hidden">
             <div className="px-3 py-2 border-b border-gray-100 flex-shrink-0 flex items-center justify-between">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Automoderator Logic</h3>
-              {previewResult && (
-                <span className="text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">Preview</span>
+              {(previewResult || effectiveContextPreview) && (
+                <span className="text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
+                  {effectiveContextPreview ? 'Context Preview' : 'Preview'}
+                </span>
               )}
             </div>
-            {!previewResult && selectedRule && (selectedRule.override_count ?? 0) >= 3 && (
+            {!previewResult && !effectiveContextPreview && selectedRule && (selectedRule.override_count ?? 0) >= 3 && (
               <div className="mx-3 mt-2 mb-1 flex-shrink-0 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
                 <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-500" />
                 <span>
@@ -496,7 +665,7 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
                 </span>
               </div>
             )}
-            {!previewResult && selectedRule?.context_adjustment_summary && selectedRule.context_adjustment_summary.length > 0 && (
+            {!previewResult && !effectiveContextPreview && selectedRule?.context_adjustment_summary && selectedRule.context_adjustment_summary.length > 0 && (
               <details className="mx-3 mt-2 mb-1 flex-shrink-0 bg-teal-50 border border-teal-200 rounded-lg text-xs text-teal-800">
                 <summary className="px-3 py-2 cursor-pointer select-none font-semibold hover:bg-teal-100 rounded-lg transition-colors">
                   Context adjustments
@@ -523,6 +692,12 @@ export default function RuleEditor({ communityId }: RuleEditorProps) {
             <div className="flex-1 overflow-auto p-3">
               {previewResult ? (
                 <ChecklistPreview operations={previewResult.operations} existingItems={checklist} />
+              ) : effectiveContextPreview ? (
+                <ChecklistDiff
+                  current={effectiveContextPreview.current_items}
+                  preview={effectiveContextPreview.preview_items}
+                  summary={effectiveContextPreview.summary}
+                />
               ) : selectedRuleId ? (
                 selectedRule?.rule_type === 'actionable' ? (
                   checklist.length === 0 ? (

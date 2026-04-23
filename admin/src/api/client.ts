@@ -9,14 +9,6 @@ const api = axios.create({
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-export interface CommunityAtmosphere {
-  tone: string
-  typical_content: string
-  what_belongs: string
-  what_doesnt_belong: string
-  moderation_style: string
-}
-
 export interface CommunityContextNote {
   text: string
   tag: string
@@ -54,14 +46,9 @@ export interface Community {
   name: string
   platform: string
   platform_config: Record<string, unknown> | null
-  atmosphere: CommunityAtmosphere | null
   community_context: CommunityContext | null
   context_samples: ContextSamples | null
   created_at: string
-}
-
-export interface AtmosphereGenerateResponse {
-  community: Community
 }
 
 export interface CommunitySamplePost {
@@ -71,6 +58,11 @@ export interface CommunitySamplePost {
   label: 'acceptable' | 'unacceptable'
   note: string | null
   created_at: string
+}
+
+export interface RuleContextTag {
+  dimension: string  // "purpose" | "participants" | "stakes" | "tone"
+  tag: string
 }
 
 export interface Rule {
@@ -86,8 +78,41 @@ export interface Rule {
   override_count: number
   base_checklist_json: Record<string, unknown> | null
   context_adjustment_summary: string[] | null
+  relevant_context: RuleContextTag[] | null
+  custom_context_notes: CommunityContextNote[]
+  pending_checklist_json: Array<Record<string, unknown>> | null
+  pending_context_adjustment_summary: string[] | null
+  pending_relevant_context: { value: RuleContextTag[] | null } | null
+  pending_custom_context_notes: CommunityContextNote[] | null
+  pending_generated_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface PreviewChecklistItem {
+  id: string
+  order: number
+  parent_id: string | null
+  description: string
+  rule_text_anchor: string | null
+  item_type: 'deterministic' | 'structural' | 'subjective'
+  logic: Record<string, unknown>
+  action: string
+  context_influenced: boolean
+  context_note: string | null
+  context_change_types: string[] | null
+  base_description: string | null
+  context_pinned: boolean
+  context_override_note: string | null
+  pinned_tags: RuleContextTag[] | null
+  children: PreviewChecklistItem[]
+}
+
+export interface ContextPreviewResponse {
+  preview_items: PreviewChecklistItem[]
+  summary: string[] | null
+  generated_at: string
+  current_items: ChecklistItem[]
 }
 
 export interface ChecklistItem {
@@ -106,6 +131,7 @@ export interface ChecklistItem {
   base_description: string | null
   context_pinned: boolean
   context_override_note: string | null
+  pinned_tags: RuleContextTag[] | null
   updated_at: string
   children: ChecklistItem[]
 }
@@ -235,9 +261,6 @@ export const getCommunity = (id: string) =>
 export const deleteCommunity = (id: string) =>
   api.delete(`/communities/${id}`)
 
-export const generateAtmosphere = (communityId: string) =>
-  api.post<AtmosphereGenerateResponse>(`/communities/${communityId}/atmosphere/generate`).then(r => r.data)
-
 export const getCommunityContext = (communityId: string) =>
   api.get<CommunityContext>(`/communities/${communityId}/context`).then(r => r.data)
 
@@ -327,6 +350,15 @@ export const overrideRuleType = (ruleId: string, ruleType: string, reasoning?: s
 export const deactivateRule = (ruleId: string) =>
   api.delete(`/rules/${ruleId}`)
 
+export const previewContextAdjustment = (ruleId: string) =>
+  api.post<ContextPreviewResponse>(`/rules/${ruleId}/context-preview`).then(r => r.data)
+
+export const commitContextAdjustment = (ruleId: string) =>
+  api.post<Rule>(`/rules/${ruleId}/context-commit`).then(r => r.data)
+
+export const discardContextPreview = (ruleId: string) =>
+  api.delete<Rule>(`/rules/${ruleId}/context-preview`).then(r => r.data)
+
 export interface BatchImportRuleItem {
   title: string
   text: string
@@ -372,10 +404,16 @@ export const createChecklistItem = (ruleId: string, data: {
 export const updateChecklistItem = (itemId: string, data: Partial<ChecklistItem>) =>
   api.put<ChecklistItem>(`/checklist-items/${itemId}`, data).then(r => r.data)
 
-export const setContextOverride = (itemId: string, pinned: boolean, overrideNote?: string) =>
+export const setContextOverride = (
+  itemId: string,
+  pinned: boolean,
+  overrideNote?: string,
+  pinnedTags?: RuleContextTag[],
+) =>
   api.patch<ChecklistItem>(`/checklist-items/${itemId}/context-override`, {
     pinned,
     override_note: overrideNote,
+    pinned_tags: pinnedTags,
   }).then(r => r.data)
 
 export const deleteChecklistItem = (itemId: string) =>

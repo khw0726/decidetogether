@@ -261,6 +261,7 @@ def _item_to_read(item: ChecklistItem) -> ChecklistItemRead:
         base_description=item.base_description,
         context_pinned=item.context_pinned,
         context_override_note=item.context_override_note,
+        pinned_tags=item.pinned_tags,
         updated_at=item.updated_at,
         children=[],
     )
@@ -432,9 +433,15 @@ async def update_checklist_item(
     return _item_to_read(item)
 
 
+class PinnedTagEntry(BaseModel):
+    dimension: str
+    tag: str
+
+
 class ContextOverrideBody(BaseModel):
     pinned: bool
     override_note: str | None = None
+    pinned_tags: list[PinnedTagEntry] | None = None
 
 
 @router.patch("/checklist-items/{item_id}/context-override", response_model=ChecklistItemRead)
@@ -443,7 +450,13 @@ async def set_context_override(
     body: ContextOverrideBody,
     db: AsyncSession = Depends(get_db),
 ) -> ChecklistItemRead:
-    """Pin or unpin a checklist item's context calibration."""
+    """Pin or unpin a checklist item's context calibration.
+
+    When pinning, `pinned_tags` records which (dimension, tag) bundles justify
+    the pin. On context regeneration, a pin whose tags all still exist is
+    preserved silently; a pin whose tags have been removed is flagged as orphaned
+    so the moderator can decide what to do.
+    """
     result = await db.execute(select(ChecklistItem).where(ChecklistItem.id == item_id))
     item = result.scalar_one_or_none()
     if not item:
@@ -451,6 +464,13 @@ async def set_context_override(
 
     item.context_pinned = body.pinned
     item.context_override_note = body.override_note
+    if body.pinned:
+        item.pinned_tags = (
+            [t.model_dump() for t in body.pinned_tags]
+            if body.pinned_tags is not None else None
+        )
+    else:
+        item.pinned_tags = None
     await db.commit()
     await db.refresh(item)
     return _item_to_read(item)

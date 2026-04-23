@@ -348,8 +348,8 @@ def _apply_diff_to_checklist(
                 item_type=op.get("item_type") or item.item_type,
                 logic=op.get("logic") or item.logic,
                 action=op.get("action") or item.action,
-                context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", item.context_influenced)),
-                context_note=op.get("context_note", op.get("atmosphere_note", item.context_note)),
+                context_influenced=op.get("context_influenced", item.context_influenced),
+                context_note=op.get("context_note", item.context_note),
                 context_change_types=op.get("context_change_types", item.context_change_types),
             ))
         else:
@@ -368,8 +368,8 @@ def _apply_diff_to_checklist(
                 item_type=op.get("item_type", "subjective"),
                 logic=op.get("logic") or {},
                 action=op.get("action", "warn"),
-                context_influenced=op.get("context_influenced", op.get("atmosphere_influenced", False)),
-                context_note=op.get("context_note", op.get("atmosphere_note")),
+                context_influenced=op.get("context_influenced", False),
+                context_note=op.get("context_note"),
                 context_change_types=op.get("context_change_types"),
             ))
 

@@ -31,7 +31,6 @@ class Community(Base):
     platform_config: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    atmosphere: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     community_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     context_samples: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
@@ -57,6 +56,20 @@ class Rule(Base):
     override_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     base_checklist_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     context_adjustment_summary: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Per-rule context bundle selection. None = all bundles apply (default).
+    # Non-None = filtered list of {dimension, tag} entries to include in context calibration.
+    relevant_context: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Rule-specific calibration notes (e.g., inversions or extras not captured by community tags).
+    custom_context_notes: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Pending Pass 2 preview — stashed when moderator previews a context adjustment
+    # but hasn't committed yet. Cleared on commit, discard, or when the inputs change.
+    pending_checklist_json: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    pending_context_adjustment_summary: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # Snapshot of the inputs used to generate the preview, for staleness detection.
+    # Wrapped as {"value": <list|null>} so "None=use-all" is distinguishable from "column missing".
+    pending_relevant_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    pending_custom_context_notes: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    pending_generated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -97,6 +110,9 @@ class ChecklistItem(Base):
     # item it was derived from — used to look up base threshold / rubric for diffing.
     context_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     context_override_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # When pinned: which (dimension, tag) bundles justified preserving this calibration.
+    # Used for orphan detection on context regeneration.
+    pinned_tags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     rule: Mapped["Rule"] = relationship("Rule", back_populates="checklist_items", foreign_keys=[rule_id])
