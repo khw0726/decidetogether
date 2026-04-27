@@ -419,7 +419,18 @@ ContextPreviewResponse.model_rebuild()
 class RedditImportRequest(BaseModel):
     subreddit: str
     limit: int = 25
+    sort: str = "new"
     time_filter: str = "month"
+    include_comments: bool = True
+    comments_limit: int = 25
+
+    @field_validator("sort")
+    @classmethod
+    def validate_sort(cls, v: str) -> str:
+        valid = {"new", "top"}
+        if v not in valid:
+            raise ValueError(f"sort must be one of {valid}")
+        return v
 
     @field_validator("time_filter")
     @classmethod
@@ -429,11 +440,11 @@ class RedditImportRequest(BaseModel):
             raise ValueError(f"time_filter must be one of {valid}")
         return v
 
-    @field_validator("limit")
+    @field_validator("limit", "comments_limit")
     @classmethod
     def validate_limit(cls, v: int) -> int:
-        if not (1 <= v <= 100):
-            raise ValueError("limit must be between 1 and 100")
+        if not (0 <= v <= 100):
+            raise ValueError("limit must be between 0 and 100")
         return v
 
 

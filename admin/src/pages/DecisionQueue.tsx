@@ -284,7 +284,10 @@ function RedditImportModal({
   const defaultSubreddit = communityName.replace(/^r\//i, '')
   const [subreddit, setSubreddit] = useState(defaultSubreddit)
   const [limit, setLimit] = useState(25)
+  const [sort, setSort] = useState<'new' | 'top'>('new')
   const [timeFilter, setTimeFilter] = useState('month')
+  const [includeComments, setIncludeComments] = useState(true)
+  const [commentsLimit, setCommentsLimit] = useState(25)
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<RedditImportResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -297,7 +300,10 @@ function RedditImportModal({
       const res = await importRedditPosts(communityId, {
         subreddit: subreddit.trim(),
         limit,
+        sort,
         time_filter: timeFilter,
+        include_comments: includeComments,
+        comments_limit: commentsLimit,
       })
       setResult(res)
       onImported()
@@ -338,22 +344,34 @@ function RedditImportModal({
 
               <div className="flex gap-4">
                 <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Sort</label>
+                  <select
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={sort}
+                    onChange={e => setSort(e.target.value as 'new' | 'top')}
+                  >
+                    <option value="new">New</option>
+                    <option value="top">Top</option>
+                  </select>
+                </div>
+                <div className="flex-1">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Posts to fetch</label>
                   <input
                     type="number"
                     className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     value={limit}
-                    onChange={e => setLimit(Math.max(1, Math.min(100, Number(e.target.value))))}
-                    min={1}
+                    onChange={e => setLimit(Math.max(0, Math.min(100, Number(e.target.value))))}
+                    min={0}
                     max={100}
                   />
                 </div>
                 <div className="flex-1">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Time filter</label>
                   <select
-                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
                     value={timeFilter}
                     onChange={e => setTimeFilter(e.target.value)}
+                    disabled={sort !== 'top'}
                   >
                     <option value="hour">Past hour</option>
                     <option value="day">Past day</option>
@@ -362,6 +380,30 @@ function RedditImportModal({
                     <option value="year">Past year</option>
                     <option value="all">All time</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="flex items-end gap-4">
+                <label className="flex items-center gap-2 text-xs font-medium text-gray-700 flex-1">
+                  <input
+                    type="checkbox"
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    checked={includeComments}
+                    onChange={e => setIncludeComments(e.target.checked)}
+                  />
+                  Include recent comments
+                </label>
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Comments to fetch</label>
+                  <input
+                    type="number"
+                    className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
+                    value={commentsLimit}
+                    onChange={e => setCommentsLimit(Math.max(0, Math.min(100, Number(e.target.value))))}
+                    min={0}
+                    max={100}
+                    disabled={!includeComments}
+                  />
                 </div>
               </div>
 

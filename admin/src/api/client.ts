@@ -489,7 +489,17 @@ export const suggestRuleFromDecisions = (communityId: string, decisionIds: strin
 
 // ── Decisions ──────────────────────────────────────────────────────────────────
 
-export const listDecisions = (communityId: string, params?: { status?: string; verdict?: string; limit?: number; offset?: number }) =>
+export const listDecisions = (
+  communityId: string,
+  params?: {
+    status?: string
+    verdict?: string
+    rule_id?: string
+    checklist_item_id?: string
+    limit?: number
+    offset?: number
+  },
+) =>
   api.get<Decision[]>(`/communities/${communityId}/decisions`, { params }).then(r => r.data)
 
 export const resolveDecision = (decisionId: string, data: { verdict: string; reasoning_category?: string; notes?: string; tag?: string; rule_ids?: string[] }) =>
@@ -545,13 +555,19 @@ export interface ItemHealthMetrics {
   missed_violations: ErrorCase[]
 }
 
+export interface RuleHealthOverall {
+  total_decisions: number
+  override_rate: number
+  covered_by_examples: number
+  wrongly_flagged_count: number
+  wrongly_flagged_rate: number
+  missed_count: number
+  missed_rate: number
+}
+
 export interface RuleHealth {
   rule_id: string
-  overall: {
-    total_decisions: number
-    override_rate: number
-    covered_by_examples: number
-  }
+  overall: RuleHealthOverall
   items: ItemHealthMetrics[]
   uncovered_violations: ExampleSummary[]
 }
@@ -603,6 +619,34 @@ export interface ImpactPreviewResult {
 export const previewFixes = (ruleId: string) =>
   api.post<ImpactPreviewResult>(`/rules/${ruleId}/preview-fixes`).then(r => r.data)
 
+// ── Preview Decisions ──────────────────────────────────────────────────────────
+
+export interface DecisionPreviewResult {
+  decision_id: string
+  post_title: string
+  moderator_verdict: string
+  old_verdict: string
+  old_confidence: number
+  new_verdict: string
+  new_confidence: number
+  old_triggered_items: string[]
+  new_triggered_items: string[]
+}
+
+export interface PreviewDecisionsResponse {
+  results: DecisionPreviewResult[]
+}
+
+export const previewDecisions = (
+  ruleId: string,
+  body: {
+    rule_text?: string
+    checklist_override_operations?: Record<string, unknown>[]
+    limit?: number
+  },
+) =>
+  api.post<PreviewDecisionsResponse>(`/rules/${ruleId}/preview-decisions`, body).then(r => r.data)
+
 // ── Evaluation ─────────────────────────────────────────────────────────────────
 
 export const evaluatePost = (communityId: string, post_content: PostContent) =>
@@ -636,7 +680,10 @@ export const populateQueue = (communityId: string) =>
 export interface RedditImportRequest {
   subreddit: string
   limit?: number
+  sort?: 'new' | 'top'
   time_filter?: string
+  include_comments?: boolean
+  comments_limit?: number
 }
 
 export interface RedditImportResponse {

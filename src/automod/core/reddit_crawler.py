@@ -209,7 +209,7 @@ async def crawl_subreddit_comments(
         return []
 
 
-async def crawl_subreddit_top_posts(
+async def crawl_subreddit_posts(
     subreddit: str,
     client_id: str,
     client_secret: str,
@@ -217,12 +217,14 @@ async def crawl_subreddit_top_posts(
     username: str = "",
     password: str = "",
     limit: int = 20,
+    sort: str = "new",
     time_filter: str = "month",
 ) -> list[dict]:
-    """Fetch top posts from a public subreddit via the Reddit API.
+    """Fetch posts from a public subreddit via the Reddit API.
 
-    Returns an empty list on any error (network failure, private subreddit,
-    rate limit, invalid credentials, etc.) so callers can proceed gracefully.
+    `sort` selects the listing: "new" (recent posts, ignores time_filter) or
+    "top" (uses time_filter). Returns an empty list on any error so callers
+    can proceed gracefully.
     """
     try:
         async with asyncpraw.Reddit(
@@ -234,13 +236,17 @@ async def crawl_subreddit_top_posts(
         ) as reddit:
             sub = await reddit.subreddit(subreddit)
             posts = []
-            async for post in sub.top(time_filter=time_filter, limit=limit):
+            if sort == "top":
+                listing = sub.top(time_filter=time_filter, limit=limit)
+            else:
+                listing = sub.new(limit=limit)
+            async for post in listing:
                 if post.stickied:
                     continue
                 if not post.title.strip():
                     continue
                 posts.append(_map_praw_post(post, subreddit))
-        logger.info("Crawled %d posts from r/%s", len(posts), subreddit)
+        logger.info("Crawled %d %s posts from r/%s", len(posts), sort, subreddit)
         return posts
     except Exception as exc:
         logger.warning("Failed to crawl r/%s: %s", subreddit, exc)

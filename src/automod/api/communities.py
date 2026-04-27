@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..compiler.compiler import RuleCompiler
 from ..config import get_anthropic_client, settings
 from ..core.engine import EvaluationEngine
-from ..core.reddit_crawler import crawl_subreddit_top_posts
+from ..core.reddit_crawler import crawl_subreddit_comments, crawl_subreddit_posts
 from ..db.database import AsyncSessionLocal, get_db
 from ..db.models import (
     ChecklistItem,
@@ -294,7 +294,7 @@ async def crawl_sample_posts(
     if not m:
         raise HTTPException(status_code=422, detail="Community name must be in r/subreddit format for auto-crawl")
 
-    crawled_posts = await crawl_subreddit_top_posts(
+    crawled_posts = await crawl_subreddit_posts(
         m.group(1),
         client_id=settings.reddit_client_id,
         client_secret=settings.reddit_client_secret,
@@ -302,6 +302,7 @@ async def crawl_sample_posts(
         username=settings.reddit_username,
         password=settings.reddit_password,
         limit=15,
+        sort="top",
         time_filter="month",
     )
 
@@ -899,7 +900,7 @@ async def _populate_queue_background(community_id: str, subreddit: str) -> None:
     from ..db.database import AsyncSessionLocal
 
     try:
-        raw_posts = await crawl_subreddit_top_posts(
+        raw_posts = await crawl_subreddit_posts(
             subreddit=subreddit,
             client_id=settings.reddit_client_id,
             client_secret=settings.reddit_client_secret,
@@ -907,6 +908,7 @@ async def _populate_queue_background(community_id: str, subreddit: str) -> None:
             username=settings.reddit_username,
             password=settings.reddit_password,
             limit=25,
+            sort="top",
             time_filter="week",
         )
 
@@ -962,16 +964,31 @@ async def import_reddit_posts(
     if not settings.reddit_client_id:
         raise HTTPException(status_code=422, detail="Reddit credentials are not configured")
 
-    raw_posts = await crawl_subreddit_top_posts(
-        subreddit=body.subreddit,
-        client_id=settings.reddit_client_id,
-        client_secret=settings.reddit_client_secret,
-        user_agent=settings.reddit_user_agent,
-        username=settings.reddit_username,
-        password=settings.reddit_password,
-        limit=body.limit,
-        time_filter=body.time_filter,
-    )
+    raw_posts: list[dict] = []
+    if body.limit > 0:
+        raw_posts = await crawl_subreddit_posts(
+            subreddit=body.subreddit,
+            client_id=settings.reddit_client_id,
+            client_secret=settings.reddit_client_secret,
+            user_agent=settings.reddit_user_agent,
+            username=settings.reddit_username,
+            password=settings.reddit_password,
+            limit=body.limit,
+            sort=body.sort,
+            time_filter=body.time_filter,
+        )
+
+    if body.include_comments and body.comments_limit > 0:
+        raw_comments = await crawl_subreddit_comments(
+            subreddit=body.subreddit,
+            client_id=settings.reddit_client_id,
+            client_secret=settings.reddit_client_secret,
+            user_agent=settings.reddit_user_agent,
+            username=settings.reddit_username,
+            password=settings.reddit_password,
+            limit=body.comments_limit,
+        )
+        raw_posts.extend(raw_comments)
 
     platform_ids = [p["id"] for p in raw_posts]
     if platform_ids:

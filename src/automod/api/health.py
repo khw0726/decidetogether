@@ -69,6 +69,26 @@ async def get_rules_health_summary(
     )
     all_resolved = list(decisions_result.scalars().all())
 
+    # Rule-level FN: examples linked to a rule by the moderator where the agent
+    # did not trigger that rule. Mirrors get_rule_health's rule_fn_count.
+    decisions_by_post_id = {d.post_platform_id: d for d in all_resolved if d.post_platform_id}
+    fn_rows_result = await db.execute(
+        select(ExampleRuleLink.rule_id, Example.content)
+        .select_from(ExampleRuleLink)
+        .join(Example, Example.id == ExampleRuleLink.example_id)
+        .where(ExampleRuleLink.rule_id.in_(rule_ids))
+        .where(Example.source == "moderator_decision")
+        .where(Example.label.in_(["violating", "borderline"]))
+    )
+    rule_fn_by_rule: dict[str, int] = defaultdict(int)
+    for rid_fn, content in fn_rows_result.all():
+        post_id = (content or {}).get("id", "")
+        if not post_id:
+            continue
+        decision = decisions_by_post_id.get(post_id)
+        if decision and rid_fn not in (decision.triggered_rules or []):
+            rule_fn_by_rule[rid_fn] += 1
+
     summaries = []
     for rule in rules:
         rid = rule.id
@@ -103,11 +123,17 @@ async def get_rules_health_summary(
                 elif not triggered and mod_verdict in ("remove", "warn") and any_item_triggered:
                     error_count += 1
 
+        # Rule-level FN: mod explicitly linked this rule to a violation the agent missed.
+        # Match get_rule_health: denominator grows with these cases too.
+        rule_fn = rule_fn_by_rule.get(rid, 0)
+        error_count += rule_fn
+        denom = decision_count + rule_fn
+
         summaries.append({
             "rule_id": rid,
             "decision_count": decision_count,
             "error_count": error_count,
-            "error_rate": error_count / decision_count if decision_count > 0 else 0.0,
+            "error_rate": error_count / denom if denom > 0 else 0.0,
         })
 
     return summaries
@@ -159,6 +185,8 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
 
     total_decisions = len(rule_decisions)
     override_count = 0
+    rule_fp_count = 0  # rule triggered but mod approved
+    rule_fn_count = 0  # rule didn't trigger but mod removed (and rule looks relevant)
 
     for decision in rule_decisions:
         reasoning = decision.agent_reasoning.get(rule_id, {})
@@ -171,6 +199,8 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
         mod_would_act = mod_verdict in ("remove", "warn")
         if rule_would_act != mod_would_act:
             override_count += 1
+        if rule_would_act and mod_verdict == "approve":
+            rule_fp_count += 1
 
         # Determine if at least one item on this rule triggered for this decision.
         # A "missed" (FN) only makes sense for an item when the rule was relevant
@@ -224,6 +254,24 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
                     })
             else:
                 item_conf_correct[item_id].append(confidence)
+
+    # Rule-level FN: examples auto-linked to this rule from a moderator decision where
+    # the agent did NOT trigger this rule (moderator flagged it as a miss).
+    decisions_by_post_id = {d.post_platform_id: d for d in all_resolved if d.post_platform_id}
+    fn_candidates_result = await db.execute(
+        select(Example)
+        .join(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
+        .where(ExampleRuleLink.rule_id == rule_id)
+        .where(Example.source == "moderator_decision")
+        .where(Example.label.in_(["violating", "borderline"]))
+    )
+    for ex in fn_candidates_result.scalars().all():
+        post_id = (ex.content or {}).get("id", "")
+        if not post_id:
+            continue
+        decision = decisions_by_post_id.get(post_id)
+        if decision and rule_id not in (decision.triggered_rules or []):
+            rule_fn_count += 1
 
     # Fetch examples linked to this rule
     example_ids_result = await db.execute(
@@ -324,12 +372,18 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
     )
     covered_pct = items_with_examples / len(all_items) if all_items else 0.0
 
+    fn_denominator = total_decisions + rule_fn_count
+
     return {
         "rule_id": rule_id,
         "overall": {
             "total_decisions": total_decisions,
             "override_rate": override_count / total_decisions if total_decisions > 0 else 0.0,
             "covered_by_examples": covered_pct,
+            "wrongly_flagged_count": rule_fp_count,
+            "wrongly_flagged_rate": rule_fp_count / total_decisions if total_decisions > 0 else 0.0,
+            "missed_count": rule_fn_count,
+            "missed_rate": rule_fn_count / fn_denominator if fn_denominator > 0 else 0.0,
         },
         "items": item_metrics,
         "uncovered_violations": uncovered_violations,

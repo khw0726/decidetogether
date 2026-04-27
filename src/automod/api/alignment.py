@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import get_anthropic_client, settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import SuggestionRead
 from ..core.subjective import SubjectiveEvaluator
 from ..core.tree_evaluator import TreeEvaluator
@@ -376,16 +376,15 @@ def _apply_diff_to_checklist(
     return hypothetical
 
 
-@router.post("/rules/{rule_id}/evaluate-examples-with-draft")
-async def evaluate_examples_with_draft(
+async def _build_draft_checklist(
     rule_id: str,
-    body: PreviewRecompileRequest,
-    db: AsyncSession = Depends(get_db),
-) -> list[dict[str, Any]]:
-    """Evaluate linked examples against a hypothetical checklist built from the draft rule text.
+    rule_text: str,
+    db: AsyncSession,
+) -> tuple[Rule, Community, list[ChecklistItem]]:
+    """Compile a hypothetical checklist from a draft rule text without persisting anything.
 
-    Returns per-example: old label and new verdict, so the UI can highlight verdict flips.
-    Does NOT save anything to the database.
+    Shared by `evaluate-examples-with-draft` and `preview-decisions`.
+    Returns (draft_rule, community, hypothetical_checklist_items).
     """
     rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
     rule = rule_result.scalar_one_or_none()
@@ -406,7 +405,6 @@ async def evaluate_examples_with_draft(
     )
     other_rules = list(other_rules_result.scalars().all())
 
-    # Fetch root items for the compiler diff
     root_result = await db.execute(
         select(ChecklistItem).where(
             ChecklistItem.rule_id == rule_id,
@@ -415,7 +413,6 @@ async def evaluate_examples_with_draft(
     )
     root_items = list(root_result.scalars().all())
 
-    # Fetch ALL checklist items (including children)
     all_result = await db.execute(
         select(ChecklistItem)
         .where(ChecklistItem.rule_id == rule_id)
@@ -427,7 +424,7 @@ async def evaluate_examples_with_draft(
         id=rule.id,
         community_id=rule.community_id,
         title=rule.title,
-        text=body.rule_text,
+        text=rule_text,
         priority=rule.priority,
         rule_type=rule.rule_type,
     )
@@ -441,6 +438,21 @@ async def evaluate_examples_with_draft(
     )
 
     hypothetical = _apply_diff_to_checklist(all_existing, operations, rule_id)
+    return draft_rule, community, hypothetical
+
+
+@router.post("/rules/{rule_id}/evaluate-examples-with-draft")
+async def evaluate_examples_with_draft(
+    rule_id: str,
+    body: PreviewRecompileRequest,
+    db: AsyncSession = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Evaluate linked examples against a hypothetical checklist built from the draft rule text.
+
+    Returns per-example: old label and new verdict, so the UI can highlight verdict flips.
+    Does NOT save anything to the database.
+    """
+    draft_rule, community, hypothetical = await _build_draft_checklist(rule_id, body.rule_text, db)
     if not hypothetical:
         return []
 
@@ -486,6 +498,127 @@ async def evaluate_examples_with_draft(
         })
 
     return results
+
+
+class PreviewDecisionsRequest(BaseModel):
+    rule_text: str | None = None
+    # If provided, skip compiling from rule_text and evaluate against these ops directly.
+    checklist_override_operations: list[dict[str, Any]] | None = None
+    limit: int = 50
+
+
+@router.post("/rules/{rule_id}/preview-decisions")
+async def preview_decisions(
+    rule_id: str,
+    body: PreviewDecisionsRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Re-evaluate recent decisions against a hypothetical checklist.
+
+    Source of the draft checklist (exactly one):
+    - `rule_text`: compile from draft rule text (same path as evaluate-examples-with-draft).
+    - `checklist_override_operations`: apply these diff ops to the current checklist
+      (for Analyze-style previews where fix operations are already shaped).
+
+    Returns per-decision old vs new verdict/confidence so the UI can preview how
+    the change would affect past decisions.
+    """
+    empty = {"results": []}
+
+    if bool(body.rule_text) == bool(body.checklist_override_operations):
+        raise HTTPException(
+            status_code=400,
+            detail="Exactly one of rule_text or checklist_override_operations is required.",
+        )
+
+    rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = rule_result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    if body.rule_text is not None:
+        draft_rule, community, hypothetical = await _build_draft_checklist(
+            rule_id, body.rule_text, db
+        )
+    else:
+        comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+        community = comm_result.scalar_one_or_none()
+        if not community:
+            raise HTTPException(status_code=404, detail="Community not found")
+        all_result = await db.execute(
+            select(ChecklistItem)
+            .where(ChecklistItem.rule_id == rule_id)
+            .order_by(ChecklistItem.order.asc())
+        )
+        all_existing = list(all_result.scalars().all())
+        hypothetical = _apply_diff_to_checklist(
+            all_existing, body.checklist_override_operations or [], rule_id
+        )
+        draft_rule = rule
+
+    if not hypothetical:
+        return empty
+
+    # Fetch recent resolved decisions where this rule was evaluated
+    decisions_result = await db.execute(
+        select(Decision)
+        .where(
+            Decision.community_id == rule.community_id,
+            Decision.moderator_verdict != "pending",
+        )
+        .order_by(Decision.resolved_at.desc())
+        .limit(body.limit * 4)
+    )
+    candidates = list(decisions_result.scalars().all())
+    decisions = [d for d in candidates if rule_id in (d.agent_reasoning or {})][: body.limit]
+    if not decisions:
+        return empty
+
+    client = get_anthropic_client()
+    subjective_evaluator = SubjectiveEvaluator(client, settings)
+    tree_evaluator = TreeEvaluator(subjective_evaluator)
+
+    results: list[dict[str, Any]] = []
+    for decision in decisions:
+        old_rule_reasoning = (decision.agent_reasoning or {}).get(rule_id, {})
+        old_verdict = old_rule_reasoning.get("verdict", "approve")
+        old_confidence = old_rule_reasoning.get("confidence", 0.0)
+        old_triggered_items = list(old_rule_reasoning.get("triggered_items") or [])
+
+        try:
+            new_result = await tree_evaluator.evaluate_rule(
+                rule=draft_rule,
+                checklist=hypothetical,
+                post=decision.post_content or {},
+                community_name=community.name,
+                examples=[],
+            )
+            new_verdict = new_result["verdict"]
+            new_confidence = new_result["confidence"]
+            new_triggered_items = list(new_result.get("triggered_items") or [])
+        except Exception as e:
+            logger.warning(f"Preview-decisions evaluation failed for {decision.id}: {e}")
+            new_verdict = "error"
+            new_confidence = 0.0
+            new_triggered_items = []
+
+        post = decision.post_content or {}
+        inner = post.get("content", {}) if isinstance(post, dict) else {}
+        post_title = (inner.get("title") if isinstance(inner, dict) else "") or "(no title)"
+
+        results.append({
+            "decision_id": decision.id,
+            "post_title": post_title,
+            "moderator_verdict": decision.moderator_verdict,
+            "old_verdict": old_verdict,
+            "old_confidence": round(float(old_confidence), 3),
+            "new_verdict": new_verdict,
+            "new_confidence": round(float(new_confidence), 3),
+            "old_triggered_items": old_triggered_items,
+            "new_triggered_items": new_triggered_items,
+        })
+
+    return {"results": results}
 
 
 @router.post("/suggestions/{suggestion_id}/dismiss", response_model=SuggestionRead)

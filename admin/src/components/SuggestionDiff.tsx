@@ -33,6 +33,7 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
   })
 
   const pending = suggestions.filter(s => s.status === 'pending')
+  const hasChecklistSuggestion = pending.some(s => s.suggestion_type === 'checklist')
 
   if (pending.length === 0) {
     return null
@@ -51,6 +52,17 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
             <X size={20} />
           </button>
         </div>
+
+        {hasChecklistSuggestion && (
+          <div className="mx-4 mt-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
+            <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-500" />
+            <span>
+              Accepting a checklist update will automatically{' '}
+              <strong>re-evaluate pending items in the moderation queue</strong>{' '}
+              against the new logic.
+            </span>
+          </div>
+        )}
 
         <div className="flex-1 overflow-auto p-4 space-y-4">
           {pending.map(suggestion => (

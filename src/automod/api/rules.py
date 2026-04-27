@@ -247,11 +247,20 @@ async def _compile_rule_background(
     rule_id: str,
     community_id: str,
 ) -> None:
-    """Background task to compile (or recompile) a single rule."""
+    """Background task to compile (or recompile) a single rule.
+
+    On a successful recompile (mode == "recompile"), spawn a debounced re-eval
+    of pending queue items so the moderation queue reflects the new logic. New
+    rules (mode == "compile") have no prior pending decisions referencing them,
+    so we skip the re-eval there.
+    """
     try:
         result = await _compile_rule_read_and_llm(rule_id, community_id)
         if result:
             await _compile_rule_persist(result)
+            if result.get("mode") == "recompile":
+                from .checklist import spawn_pending_queue_reeval
+                spawn_pending_queue_reeval(rule_id)
     except Exception as e:
         logger.error(f"Compilation failed for rule {rule_id}: {e}")
 

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_anthropic_client, settings
@@ -33,6 +33,7 @@ async def list_decisions(
     community_id: str,
     status: str | None = None,
     rule_id: str | None = None,
+    checklist_item_id: str | None = None,
     verdict: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -44,11 +45,14 @@ async def list_decisions(
     if not comm_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Community not found")
 
+    # Over-fetch when post-filtering in Python for checklist_item_id.
+    effective_limit = limit * 4 if checklist_item_id else limit
+
     query = (
         select(Decision)
         .where(Decision.community_id == community_id)
         .order_by(Decision.agent_confidence.asc())  # Lowest confidence first
-        .limit(limit)
+        .limit(effective_limit)
         .offset(offset)
     )
 
@@ -62,11 +66,55 @@ async def list_decisions(
 
     # Filter by rule_id (check JSON column)
     if rule_id:
-        # SQLite JSON: filter decisions where triggered_rules contains rule_id
-        query = query.where(Decision.triggered_rules.contains([rule_id]))
+        # Include decisions where:
+        #   (a) the agent triggered this rule (triggered_rules contains rule_id), OR
+        #   (b) the moderator linked this rule when resolving the override
+        #       (Example from moderator_decision → ExampleRuleLink to this rule,
+        #        where example.content.id == decision.post_platform_id).
+        linked_post_ids_result = await db.execute(
+            select(Example.content)
+            .join(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
+            .where(ExampleRuleLink.rule_id == rule_id)
+            .where(Example.source == "moderator_decision")
+            .where(Example.community_id == community_id)
+        )
+        linked_post_ids = {
+            (content or {}).get("id")
+            for (content,) in linked_post_ids_result.all()
+            if (content or {}).get("id")
+        }
+        triggered_clause = Decision.triggered_rules.contains([rule_id])
+        if linked_post_ids:
+            query = query.where(
+                or_(triggered_clause, Decision.post_platform_id.in_(linked_post_ids))
+            )
+        else:
+            query = query.where(triggered_clause)
 
     result = await db.execute(query)
-    decisions = result.scalars().all()
+    decisions = list(result.scalars().all())
+
+    # Post-filter by checklist_item_id: keep decisions where this item triggered
+    # under any (or the specified) rule in agent_reasoning.
+    if checklist_item_id:
+        filtered: list[Decision] = []
+        for d in decisions:
+            reasoning = d.agent_reasoning or {}
+            rule_scopes = [reasoning.get(rule_id, {})] if rule_id else reasoning.values()
+            for scope in rule_scopes:
+                if not isinstance(scope, dict):
+                    continue
+                triggered_items = scope.get("triggered_items") or []
+                if checklist_item_id in triggered_items:
+                    filtered.append(d)
+                    break
+                item_reasoning = scope.get("item_reasoning") or {}
+                item_data = item_reasoning.get(checklist_item_id)
+                if isinstance(item_data, dict) and item_data.get("triggered"):
+                    filtered.append(d)
+                    break
+        decisions = filtered[:limit]
+
     return [DecisionRead.model_validate(d) for d in decisions]
 
 

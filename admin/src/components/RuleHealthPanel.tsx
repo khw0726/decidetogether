@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Zap, Eye, Check } from 'lucide-react'
 import { showErrorToast } from './Toast'
@@ -391,12 +391,22 @@ function SuggestedFixesPanel({
 function ItemHealthCard({
   item,
   depth = 0,
+  highlighted = false,
 }: {
   item: ItemHealthMetrics
   depth?: number
+  highlighted?: boolean
 }) {
-  const [expanded, setExpanded] = useState(isUnhealthy(item))
+  const [expanded, setExpanded] = useState(isUnhealthy(item) || highlighted)
+  const cardRef = useRef<HTMLDivElement | null>(null)
   const unhealthy = isUnhealthy(item)
+
+  useEffect(() => {
+    if (highlighted) {
+      setExpanded(true)
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [highlighted])
   const totalExamples = [
     ...item.examples.compliant,
     ...item.examples.violating,
@@ -405,7 +415,8 @@ function ItemHealthCard({
 
   return (
     <div
-      className={`border rounded-lg ${unhealthy ? 'border-amber-200' : 'border-gray-200'} ${depth > 0 ? 'border-l-2 border-l-gray-300' : ''}`}
+      ref={cardRef}
+      className={`border rounded-lg ${highlighted ? 'border-indigo-400 ring-1 ring-indigo-200' : unhealthy ? 'border-amber-200' : 'border-gray-200'} ${depth > 0 ? 'border-l-2 border-l-gray-300' : ''}`}
       style={depth > 0 ? { marginLeft: depth * 20 } : undefined}
     >
       {/* Header */}
@@ -510,36 +521,19 @@ function UncoveredViolations({ violations }: { violations: ExampleSummary[] }) {
   )
 }
 
-// ── Tree helpers ───────────────────────────────────────────────────────────────
-
-function renderItemTree(items: ItemHealthMetrics[]) {
-  const childrenOf = new Map<string | null, ItemHealthMetrics[]>()
-  for (const item of items) {
-    const pid = item.parent_id ?? null
-    if (!childrenOf.has(pid)) childrenOf.set(pid, [])
-    childrenOf.get(pid)!.push(item)
-  }
-
-  const elements: JSX.Element[] = []
-
-  function walk(parentId: string | null, depth: number) {
-    const children = childrenOf.get(parentId)
-    if (!children) return
-    for (const item of children) {
-      elements.push(
-        <ItemHealthCard key={item.item_id} item={item} depth={depth} />
-      )
-      walk(item.item_id, depth + 1)
-    }
-  }
-
-  walk(null, 0)
-  return elements
-}
-
 // ── RuleHealthPanel ─────────────────────────────────────────────────────────────
 
-export default function RuleHealthPanel({ ruleId }: { ruleId: string }) {
+interface RuleHealthPanelProps {
+  ruleId: string
+  highlightItemId?: string | null
+  onHealthSuggestionsChange?: (suggestions: Suggestion[]) => void
+}
+
+export default function RuleHealthPanel({
+  ruleId,
+  highlightItemId = null,
+  onHealthSuggestionsChange,
+}: RuleHealthPanelProps) {
   const queryClient = useQueryClient()
 
   const { data: health, isLoading: healthLoading } = useQuery({
@@ -561,10 +555,18 @@ export default function RuleHealthPanel({ ruleId }: { ruleId: string }) {
   })
 
   // Filter to health-type suggestions (by action in content)
-  const healthSuggestions = (suggestions || []).filter(s => {
-    const action = (s.content as Record<string, unknown>).action as string | undefined
-    return s.suggestion_type === 'checklist' && action && HEALTH_ACTIONS.has(action)
-  })
+  const healthSuggestions = useMemo(
+    () =>
+      (suggestions || []).filter(s => {
+        const action = (s.content as Record<string, unknown>).action as string | undefined
+        return s.suggestion_type === 'checklist' && action && HEALTH_ACTIONS.has(action)
+      }),
+    [suggestions],
+  )
+
+  useEffect(() => {
+    onHealthSuggestionsChange?.(healthSuggestions)
+  }, [healthSuggestions, onHealthSuggestionsChange])
 
   if (healthLoading) {
     return (
@@ -582,69 +584,97 @@ export default function RuleHealthPanel({ ruleId }: { ruleId: string }) {
 
   const { overall, items, uncovered_violations } = health
   const unhealthyCount = items.filter(isUnhealthy).length
+  const selectedItem = highlightItemId
+    ? items.find(i => i.item_id === highlightItemId) || null
+    : null
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4">
-      {/* Overall summary bar */}
-      <div className="flex items-center gap-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm">
-        <div className="flex-1 space-y-0.5">
-          <div className="flex items-center gap-3 text-xs text-gray-600">
-            <span><span className="font-semibold text-gray-800">{overall.total_decisions}</span> decisions</span>
-            <span><span className="font-semibold text-gray-800">{pct(overall.override_rate)}</span> override rate</span>
-            <span><span className="font-semibold text-gray-800">{pct(overall.covered_by_examples)}</span> items with examples</span>
-            {unhealthyCount > 0 && (
-              <span className="text-amber-600 font-semibold flex items-center gap-1">
-                <AlertTriangle size={12} />
-                {unhealthyCount} item{unhealthyCount !== 1 ? 's' : ''} need attention
-              </span>
-            )}
-            {unhealthyCount === 0 && overall.total_decisions > 0 && (
-              <span className="text-green-600 font-semibold flex items-center gap-1">
-                <CheckCircle size={12} />
-                All items healthy
-              </span>
-            )}
+      {/* Rule-wide health — bordered to distinguish from per-item health */}
+      <div className="border border-gray-300 rounded-lg p-3 space-y-2 bg-white">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Rule-wide Health</p>
+          <button
+            className="btn-primary text-xs flex items-center gap-1.5"
+            onClick={() => analyzeMutation.mutate()}
+            disabled={analyzeMutation.isPending}
+            title="Run LLM analysis to diagnose issues and generate fix suggestions"
+          >
+            {analyzeMutation.isPending
+              ? <Loader2 size={12} className="animate-spin" />
+              : <Zap size={12} />
+            }
+            {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze'}
+          </button>
+        </div>
+
+        {/* Rule-level FP/FN metrics */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-red-50 border border-red-100 rounded p-2">
+            <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wider">Wrongly Flagged</p>
+            <p className="text-lg font-bold text-red-700 leading-tight">{pct(overall.wrongly_flagged_rate)}</p>
+            <p className="text-[10px] text-red-400">{overall.wrongly_flagged_count}/{overall.total_decisions}</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-100 rounded p-2">
+            <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wider">Missed</p>
+            <p className="text-lg font-bold text-amber-700 leading-tight">{pct(overall.missed_rate)}</p>
+            <p className="text-[10px] text-amber-500">{overall.missed_count}</p>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded p-2">
+            <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Decisions</p>
+            <p className="text-lg font-bold text-gray-700 leading-tight">{overall.total_decisions}</p>
+            <p className="text-[10px] text-gray-400">{pct(overall.override_rate)} override</p>
           </div>
         </div>
-        <button
-          className="btn-primary text-xs flex items-center gap-1.5 flex-shrink-0"
-          onClick={() => analyzeMutation.mutate()}
-          disabled={analyzeMutation.isPending}
-          title="Run LLM analysis to diagnose issues and generate fix suggestions"
-        >
-          {analyzeMutation.isPending
-            ? <Loader2 size={12} className="animate-spin" />
-            : <Zap size={12} />
-          }
-          {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze'}
-        </button>
+
+        <div className="flex items-center gap-3 text-[11px] text-gray-500">
+          <span><span className="font-semibold text-gray-700">{pct(overall.covered_by_examples)}</span> items with examples</span>
+          {unhealthyCount > 0 && (
+            <span className="text-amber-600 font-semibold flex items-center gap-1">
+              <AlertTriangle size={11} />
+              {unhealthyCount} item{unhealthyCount !== 1 ? 's' : ''} need attention
+            </span>
+          )}
+          {unhealthyCount === 0 && overall.total_decisions > 0 && (
+            <span className="text-green-600 font-semibold flex items-center gap-1">
+              <CheckCircle size={11} />
+              All items healthy
+            </span>
+          )}
+        </div>
+
+        {overall.total_decisions === 0 && (
+          <p className="text-sm text-gray-400 text-center py-2">
+            No resolved decisions yet. Evaluate some posts and resolve them to see health metrics.
+          </p>
+        )}
+
+        {/* Suggested Fixes panel */}
+        {healthSuggestions.length > 0 && (
+          <SuggestedFixesPanel
+            suggestions={healthSuggestions}
+            ruleId={ruleId}
+            items={items}
+          />
+        )}
+
+        {/* Uncovered violations */}
+        <UncoveredViolations violations={uncovered_violations} />
       </div>
 
-      {overall.total_decisions === 0 && (
-        <p className="text-sm text-gray-400 text-center py-4">
-          No resolved decisions yet. Evaluate some posts and resolve them to see health metrics.
-        </p>
-      )}
-
-      {/* Suggested Fixes panel */}
-      {healthSuggestions.length > 0 && (
-        <SuggestedFixesPanel
-          suggestions={healthSuggestions}
-          ruleId={ruleId}
-          items={items}
-        />
-      )}
-
-      {/* Item cards — rendered hierarchically */}
+      {/* Item-specific health — only when a checklist item is selected */}
       {items.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Item Health</p>
-          {renderItemTree(items)}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Selected Item Health</p>
+          {selectedItem ? (
+            <ItemHealthCard item={selectedItem} depth={0} highlighted={true} />
+          ) : (
+            <p className="text-xs text-gray-400 italic px-1">
+              Select a checklist item on the left to see its health.
+            </p>
+          )}
         </div>
       )}
-
-      {/* Uncovered violations */}
-      <UncoveredViolations violations={uncovered_violations} />
     </div>
   )
 }

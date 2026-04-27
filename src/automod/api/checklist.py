@@ -27,8 +27,15 @@ router = APIRouter(tags=["checklist"])
 # waits a short period then only proceeds if no newer request arrived.
 _link_generation: dict[str, int] = {}
 _reeval_generation: dict[str, int] = {}
+_pending_reeval_generation: dict[str, int] = {}
 _LINK_DEBOUNCE_SECONDS = 5
 _REEVAL_DEBOUNCE_SECONDS = 5
+_PENDING_REEVAL_DEBOUNCE_SECONDS = 5
+
+# Keep references to detached re-eval tasks so the asyncio loop doesn't GC them
+# mid-flight when they're spawned from a fire-and-forget context (e.g. inside
+# another background task).
+_detached_reeval_tasks: set[asyncio.Task] = set()
 
 
 async def _link_uncovered_violations(rule_id: str, generation: int) -> None:
@@ -241,6 +248,141 @@ async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
         except Exception as e:
             logger.error(f"Failed to re-evaluate error cases for rule {rule_id}: {e}")
             await db.rollback()
+
+
+async def _reevaluate_pending_queue(rule_id: str, generation: int) -> None:
+    """Background task: re-evaluate PENDING queue decisions against the rule's
+    updated checklist so the moderation queue reflects the new logic.
+
+    Updates Decision.agent_reasoning[rule_id] and recomputes the top-level
+    Decision.agent_verdict / agent_confidence / triggered_rules from the merged
+    per-rule reasoning. Debounced — rapid edits collapse into a single pass.
+    """
+    await asyncio.sleep(_PENDING_REEVAL_DEBOUNCE_SECONDS)
+
+    if _pending_reeval_generation.get(rule_id, 0) != generation:
+        logger.debug(f"Skipping debounced pending-queue re-eval for rule {rule_id} (superseded)")
+        return
+
+    from ..core.actions import resolve_verdict
+    from ..db.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        try:
+            rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+            rule = rule_result.scalar_one_or_none()
+            if not rule:
+                return
+
+            comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+            community = comm_result.scalar_one_or_none()
+            community_name = community.name if community else ""
+
+            items_result = await db.execute(
+                select(ChecklistItem)
+                .where(ChecklistItem.rule_id == rule_id)
+                .order_by(ChecklistItem.order.asc())
+            )
+            checklist = list(items_result.scalars().all())
+            if not checklist:
+                return
+
+            decisions_result = await db.execute(
+                select(Decision).where(
+                    Decision.community_id == rule.community_id,
+                    Decision.moderator_verdict == "pending",
+                )
+            )
+            decisions = [
+                d for d in decisions_result.scalars().all()
+                if rule_id in (d.agent_reasoning or {})
+            ]
+
+            if not decisions:
+                logger.info(f"No pending decisions to re-evaluate for rule {rule_id}")
+                return
+
+            client = get_anthropic_client()
+            subjective_evaluator = SubjectiveEvaluator(client, settings)
+            tree_evaluator = TreeEvaluator(subjective_evaluator)
+
+            updated = 0
+            for decision in decisions:
+                try:
+                    new_result = await tree_evaluator.evaluate_rule(
+                        rule=rule,
+                        checklist=checklist,
+                        post=decision.post_content or {},
+                        community_name=community_name,
+                        examples=[],
+                    )
+
+                    reasoning = dict(decision.agent_reasoning or {})
+                    old_rule = reasoning.get(rule_id, {})
+                    reasoning[rule_id] = {
+                        "rule_title": old_rule.get("rule_title", rule.title),
+                        "verdict": new_result["verdict"],
+                        "confidence": new_result["confidence"],
+                        "item_reasoning": new_result["reasoning"],
+                        "triggered_items": new_result["triggered_items"],
+                    }
+                    decision.agent_reasoning = reasoning
+                    flag_modified(decision, "agent_reasoning")
+
+                    rule_results = [
+                        {"verdict": v.get("verdict", "approve"), "confidence": v.get("confidence", 0.5)}
+                        for k, v in reasoning.items()
+                        if k != "__community_norms__"
+                    ]
+                    if rule_results:
+                        agg_verdict, agg_confidence = resolve_verdict(rule_results)
+                    else:
+                        agg_verdict, agg_confidence = "approve", 1.0
+
+                    norms = reasoning.get("__community_norms__")
+                    if norms and agg_verdict == "approve":
+                        agg_verdict = "review"
+                        agg_confidence = norms.get("confidence", agg_confidence)
+
+                    decision.agent_verdict = agg_verdict
+                    decision.agent_confidence = agg_confidence
+                    decision.triggered_rules = [
+                        rid for rid, r in reasoning.items()
+                        if rid != "__community_norms__" and r.get("verdict") in ("remove", "warn")
+                    ]
+                    flag_modified(decision, "triggered_rules")
+                    updated += 1
+                except Exception as e:
+                    logger.warning(f"Pending-queue re-eval failed for decision {decision.id}: {e}")
+
+            await db.commit()
+            logger.info(f"Re-evaluated {updated} pending decision(s) for rule {rule_id}")
+
+        except Exception as e:
+            logger.error(f"Failed to re-evaluate pending queue for rule {rule_id}: {e}")
+            await db.rollback()
+
+
+def schedule_pending_queue_reeval(rule_id: str) -> int:
+    """Bump the per-rule generation counter and return the new value.
+
+    Callers schedule `_reevaluate_pending_queue(rule_id, gen)` with this value;
+    the debounce inside the task means only the latest generation runs.
+    """
+    gen = _pending_reeval_generation.get(rule_id, 0) + 1
+    _pending_reeval_generation[rule_id] = gen
+    return gen
+
+
+def spawn_pending_queue_reeval(rule_id: str) -> None:
+    """Fire-and-forget variant for callers without a FastAPI BackgroundTasks
+    handle (e.g. nested background work). Holds a strong reference to the
+    spawned task so the asyncio loop doesn't garbage-collect it mid-flight.
+    """
+    gen = schedule_pending_queue_reeval(rule_id)
+    task = asyncio.create_task(_reevaluate_pending_queue(rule_id, gen))
+    _detached_reeval_tasks.add(task)
+    task.add_done_callback(_detached_reeval_tasks.discard)
 
 
 def _item_to_read(item: ChecklistItem) -> ChecklistItemRead:
@@ -633,5 +775,10 @@ async def accept_recompile(
     reeval_gen = _reeval_generation.get(rule_id, 0) + 1
     _reeval_generation[rule_id] = reeval_gen
     background_tasks.add_task(_reevaluate_error_cases, rule_id, reeval_gen)
+
+    # Re-evaluate PENDING queue decisions so the moderation queue reflects the
+    # new logic (debounced).
+    pending_gen = schedule_pending_queue_reeval(rule_id)
+    background_tasks.add_task(_reevaluate_pending_queue, rule_id, pending_gen)
 
     return {"status": "accepted", "operations_applied": len(operations)}
