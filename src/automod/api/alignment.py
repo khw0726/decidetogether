@@ -621,6 +621,54 @@ async def preview_decisions(
     return {"results": results}
 
 
+@router.post("/suggestions/{suggestion_id}/revert", response_model=SuggestionRead)
+async def revert_suggestion(
+    suggestion_id: str, db: AsyncSession = Depends(get_db)
+) -> SuggestionRead:
+    """Reset a suggestion to pending and clean up any examples created from acceptance.
+
+    Used when a moderator wants to undo a calibration choice.
+    """
+    result = await db.execute(
+        select(Suggestion).where(Suggestion.id == suggestion_id)
+    )
+    suggestion = result.scalar_one_or_none()
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+
+    if suggestion.status == "pending":
+        return SuggestionRead.model_validate(suggestion)
+
+    # If this was an accepted "example" suggestion, remove the example we created.
+    if suggestion.status == "accepted" and suggestion.suggestion_type == "example" and suggestion.rule_id:
+        ex_content = (suggestion.content or {}).get("content", {})
+        if ex_content:
+            link_result = await db.execute(
+                select(ExampleRuleLink).where(ExampleRuleLink.rule_id == suggestion.rule_id)
+            )
+            for link in link_result.scalars().all():
+                ex_result = await db.execute(select(Example).where(Example.id == link.example_id))
+                example = ex_result.scalar_one_or_none()
+                if example and example.source == "generated" and example.content == ex_content:
+                    await db.execute(
+                        ExampleChecklistItemLink.__table__.delete().where(
+                            ExampleChecklistItemLink.example_id == example.id
+                        )
+                    )
+                    await db.execute(
+                        ExampleRuleLink.__table__.delete().where(
+                            ExampleRuleLink.example_id == example.id
+                        )
+                    )
+                    await db.delete(example)
+                    break
+
+    suggestion.status = "pending"
+    await db.commit()
+    await db.refresh(suggestion)
+    return SuggestionRead.model_validate(suggestion)
+
+
 @router.post("/suggestions/{suggestion_id}/dismiss", response_model=SuggestionRead)
 async def dismiss_suggestion(
     suggestion_id: str, db: AsyncSession = Depends(get_db)

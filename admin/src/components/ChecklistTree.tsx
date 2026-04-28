@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus, Sparkles, Pin, PinOff, Loader2, Gauge, FileText, Type, Zap, PlusCircle, Search } from 'lucide-react'
-import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem, setContextOverride, Rule } from '../api/client'
+import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem, setContextOverride, Rule, ItemHealthMetrics } from '../api/client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 // ── Change Type Icons ────────────────────────────────────────────────────────
@@ -264,9 +264,10 @@ interface ChecklistTreeProps {
   selectedItemId?: string | null
   onItemSelect?: (itemId: string | null) => void
   highlightedItemId?: string | null
+  itemHealthById?: Record<string, ItemHealthMetrics>
 }
 
-export default function ChecklistTree({ items, ruleId, rule, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId }: ChecklistTreeProps) {
+export default function ChecklistTree({ items, ruleId, rule, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId, itemHealthById }: ChecklistTreeProps) {
   const [adding, setAdding] = useState(false)
   const [showGhosts, setShowGhosts] = useState(false)
 
@@ -309,6 +310,7 @@ export default function ChecklistTree({ items, ruleId, rule, onAnchorHover, sele
           onItemSelect={onItemSelect}
           highlightedItemId={highlightedItemId}
           baseItemMap={baseItemMap}
+          itemHealthById={itemHealthById}
         />
       ))}
       {showGhosts && ghostItems.map((ghost, i) => (
@@ -602,7 +604,7 @@ function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: s
 
 // ── ChecklistNode ─────────────────────────────────────────────────────────────
 
-function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId, baseItemMap }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void; selectedItemId?: string | null; onItemSelect?: (itemId: string | null) => void; highlightedItemId?: string | null; baseItemMap: BaseItemMap }) {
+function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId, baseItemMap, itemHealthById }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void; selectedItemId?: string | null; onItemSelect?: (itemId: string | null) => void; highlightedItemId?: string | null; baseItemMap: BaseItemMap; itemHealthById?: Record<string, ItemHealthMetrics> }) {
   const [expanded, setExpanded] = useState(true)
   const [editing, setEditing] = useState(false)
   const [showLogic, setShowLogic] = useState(false)
@@ -656,6 +658,12 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
   const effectiveChangeTypes = inferChangeTypes(item, baseItemMap)
   const isContextAdded = effectiveChangeTypes.includes('new_item')
 
+  const healthMetrics = itemHealthById?.[item.id]
+  const errorRate = healthMetrics
+    ? Math.max(healthMetrics.false_positive_rate, healthMetrics.false_negative_rate)
+    : 0
+  const isUnhealthy = !!healthMetrics && healthMetrics.decision_count > 0 && errorRate > 0.15
+
   // Look up base threshold for this item by description match
   const currentThreshold = item.item_type === 'subjective' ? (item.logic as Record<string, unknown>).threshold as number | null : null
   const baseThreshold = getBaseThreshold(baseItemMap, item)
@@ -670,6 +678,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
             ? 'bg-emerald-50/30 border-dashed border-emerald-300 hover:border-emerald-400'
             : isSelected ? 'bg-white border-indigo-400 ring-1 ring-indigo-300'
             : isHighlighted ? 'bg-amber-50 border-amber-400 ring-1 ring-amber-300'
+            : isUnhealthy ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400'
             : 'bg-white border-gray-200 hover:border-gray-300'
         }`}
         onMouseEnter={() => onAnchorHover?.(item.rule_text_anchor || null)}
@@ -695,6 +704,14 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {typeBadge}
+              {isUnhealthy && healthMetrics && (
+                <span
+                  className="badge bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1"
+                  title={`${healthMetrics.false_positive_count} wrongly flagged, ${healthMetrics.false_negative_count} missed (of ${healthMetrics.decision_count})`}
+                >
+                  ⚠ {Math.round(errorRate * 100)}% error
+                </span>
+              )}
               {!editing && (
                 <span className="text-sm font-medium text-gray-800">{item.description}</span>
               )}
@@ -826,7 +843,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
       {expanded && (item.children.length > 0 || addingChild) && (
         <div className="mt-1 space-y-1">
           {item.children.map(child => (
-            <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} baseItemMap={baseItemMap} />
+            <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} baseItemMap={baseItemMap} itemHealthById={itemHealthById} />
           ))}
           {addingChild && (
             <AddItemForm ruleId={ruleId} parentId={item.id} onDone={() => setAddingChild(false)} />

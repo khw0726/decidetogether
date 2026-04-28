@@ -138,3 +138,49 @@ Priority order and rough scope. First slice is I1 + the backend primitive it sha
 - **Deep-link:** clicking "Open in context editor" from the banner lands on `ContextDimensionsView` with the draft note pre-filled and editable.
 - **Drift (S5):** simulate 60 days of rising override rates; confirm the drift indicator appears on `CommunitySettings`.
 - **Imported default (S6):** create a rule with `relevant_context=None`; confirm the editor banner appears; populating `relevant_context` and recompiling clears it.
+
+### Scenarios (For reference)
+
+S1 — Whack-a-mole across rules (prioritized)
+
+Mod opens rule health for Rule A (low-effort posts) and sees 40% override rate. Alignment dashboard shows Rules B
+(rule-breaking titles) and C (off-topic) spiking too. All three trace to overrides on beginner-introduction posts.
+Fixing each rule's rubric individually is brittle — next month a new rule inherits the same blindness. Right lever:
+add participants: newcomers welcomed / encouraged to post basics to community context. Pass 2 softens thresholds
+across all three at once.
+
+S2 — Missing stakes raising thresholds too high (not prioritized)
+
+Rule on medical-advice misinformation has high false negatives. Error cases all involve subtle, plausible-sounding
+drug-interaction claims. The rule's logic is fine; it's calibrated for a general community. Fix: add stakes:
+medication interactions have high permanence / vulnerable readers → Pass 2 tightens confidence thresholds on this
+and sibling rules.
+
+S3 — Tone/rubric mismatch (prioritized)
+
+Harassment rule flags a lot of roast-style banter. Mods consistently approve. The rule text is correct; the
+subjective rubric language carries general-purpose assumptions. Fix: tone: roasting is affectionate, high in-group
+humor tolerance → rubric examples regenerate with the community's register.
+
+S4 — Borderline decisions without errors (not prioritized)
+
+Rule X isn't being overridden, but throws a high fraction of BORDERLINE verdicts (Haiku escalates to Sonnet a lot).
+Pattern: the ambiguity is always about who the author is, not what the post says. Fix: participants: experts and
+newcomers coexist → sharper rubric that checks expertise signals before pattern-matching post content.
+
+S5 — Community drift (prioritized)
+
+Override rate creeps up across many rules over months. Nothing on any one rule explains it. The context was
+generated a year ago; the community has shifted. Health surface should show this as an aggregate signal and prompt a
+  context regeneration from recent posts, preserving manually_edited: true dimensions.
+
+S6 — Correct rule, wrong community (prioritized)
+
+A rule imported from another community (or a default template) looks logically sound but is miscalibrated at every
+threshold. Individual rule fixes would be enormous churn. Fix: ensure relevant_context is populated, so Pass 2 can
+do the adjustment in one move.
+
+Shared shape. In all six, the error pattern isn't "this rule is wrong" — it's "this rule doesn't know something
+about the community that many rules need to know." S2 and S4 are the same idea, just on the stakes/participants
+dimensions rather than purpose/tone — we dropped them from the design-for list because you said they're not active
+pain, but they'd fall out for free once the I1 detector can cluster on those dimensions too.

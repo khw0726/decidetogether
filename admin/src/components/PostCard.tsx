@@ -1,4 +1,4 @@
-import { ExternalLink, User, Clock, Tag } from 'lucide-react'
+import { ExternalLink, User, Clock, Tag, FileText, MessageSquare } from 'lucide-react'
 
 interface PostCardProps {
   post: Record<string, unknown>
@@ -23,10 +23,23 @@ export default function PostCard({ post, compact = false }: PostCardProps) {
   const permalink = platformMeta.permalink as string | undefined
   const postUrl = permalink ? (permalink.startsWith('http') ? permalink : `https://www.reddit.com${permalink}`) : undefined
 
+  const isComment = postType === 'comment'
+  const typeChipClass = isComment
+    ? 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border border-purple-200 bg-purple-50 text-purple-700'
+    : 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border border-blue-200 bg-blue-50 text-blue-700'
+  const typeIcon = isComment ? <MessageSquare size={10} /> : <FileText size={10} />
+  const typeLabel = isComment ? 'comment' : (postType === 'link' ? 'link post' : 'post')
+
   return (
     <div className="space-y-2">
       {/* Header */}
       <div className="flex items-center gap-2 text-xs text-gray-500 flex-wrap">
+        {postType && (
+          <span className={typeChipClass}>
+            {typeIcon}
+            {typeLabel}
+          </span>
+        )}
         {channel && (
           <span className="font-medium text-gray-700">{channel}</span>
         )}
@@ -36,7 +49,6 @@ export default function PostCard({ post, compact = false }: PostCardProps) {
             {flair}
           </span>
         )}
-        {postType && <span className="badge badge-gray">{postType}</span>}
       </div>
 
       {/* Title */}
@@ -53,9 +65,21 @@ export default function PostCard({ post, compact = false }: PostCardProps) {
 
       {/* Body */}
       {body && (
-        <p className={`text-gray-600 ${compact ? 'text-xs line-clamp-3' : 'text-sm'}`}>
-          {body}
-        </p>
+        isComment && postUrl ? (
+          <a
+            href={postUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`block text-gray-600 hover:text-indigo-600 hover:bg-indigo-50/40 -mx-1 px-1 rounded transition-colors ${compact ? 'text-xs line-clamp-3' : 'text-sm'}`}
+          >
+            {body}
+            <ExternalLink size={compact ? 11 : 12} className="inline-block ml-1 -mt-0.5 text-gray-400" />
+          </a>
+        ) : (
+          <p className={`text-gray-600 ${compact ? 'text-xs line-clamp-3' : 'text-sm'}`}>
+            {body}
+          </p>
+        )
       )}
 
       {/* Links */}

@@ -1,4 +1,4 @@
-import { Gauge, FileText, Type, Zap, PlusCircle, Search, ArrowRight } from 'lucide-react'
+import { Gauge, FileText, Type, Zap, PlusCircle, Search } from 'lucide-react'
 import type { ChecklistItem, PreviewChecklistItem } from '../api/client'
 
 const CHANGE_TYPE_META: Record<string, { icon: typeof Gauge; label: string; color: string }> = {
@@ -26,8 +26,8 @@ type AnyItem = {
 
 interface Row {
   status: DiffStatus
-  current: (AnyItem & { children: Row[] }) | null
-  preview: (AnyItem & { children: Row[] }) | null
+  current: AnyItem | null
+  preview: AnyItem | null
 }
 
 function flatten<T extends { children?: T[] | null }>(items: T[]): T[] {
@@ -66,9 +66,7 @@ function buildRows(
   const curFlat = flatten(current)
   const prevFlat = flatten(preview)
   const prevByKey = new Map<string, PreviewChecklistItem>()
-  for (const p of prevFlat) {
-    prevByKey.set(matchKey(p), p)
-  }
+  for (const p of prevFlat) prevByKey.set(matchKey(p), p)
   const usedPreview = new Set<string>()
 
   const rows: Row[] = []
@@ -79,24 +77,16 @@ function buildRows(
       usedPreview.add(p.id)
       rows.push({
         status: diffStatus(c, p),
-        current: { ...toAny(c), children: [] },
-        preview: { ...toAny(p), children: [] },
+        current: toAny(c),
+        preview: toAny(p),
       })
     } else {
-      rows.push({
-        status: 'removed',
-        current: { ...toAny(c), children: [] },
-        preview: null,
-      })
+      rows.push({ status: 'removed', current: toAny(c), preview: null })
     }
   }
   for (const p of prevFlat) {
     if (usedPreview.has(p.id)) continue
-    rows.push({
-      status: 'added',
-      current: null,
-      preview: { ...toAny(p), children: [] },
-    })
+    rows.push({ status: 'added', current: null, preview: toAny(p) })
   }
   return rows
 }
@@ -130,7 +120,7 @@ function ActionBadge({ action }: { action: string }) {
 function ChangeChips({ types }: { types: string[] | null }) {
   if (!types || types.length === 0) return null
   return (
-    <div className="inline-flex items-center gap-0.5">
+    <span className="inline-flex items-center gap-0.5">
       {types.map(t => {
         const meta = CHANGE_TYPE_META[t]
         if (!meta) return null
@@ -141,73 +131,105 @@ function ChangeChips({ types }: { types: string[] | null }) {
           </span>
         )
       })}
-    </div>
+    </span>
   )
 }
 
-function ItemCard({
-  item,
-  status,
-  side,
-}: {
-  item: AnyItem | null
-  status: DiffStatus
-  side: 'current' | 'preview'
-}) {
-  if (!item) {
-    const tone =
-      side === 'current'
-        ? 'border-emerald-200 bg-emerald-50/40 text-emerald-700'
-        : 'border-red-200 bg-red-50/40 text-red-700'
-    const label = side === 'current' ? 'will be added' : 'will be removed'
-    return (
-      <div className={`border border-dashed rounded px-2 py-1.5 text-[11px] italic ${tone}`}>
-        {label}
-      </div>
-    )
-  }
-  const logic = item.logic as Record<string, unknown>
+const STATUS_META: Record<DiffStatus, { wrapper: string; pill: string; pillText: string }> = {
+  unchanged: {
+    wrapper: 'border-gray-200 bg-white opacity-60',
+    pill: 'bg-gray-100 text-gray-500',
+    pillText: 'unchanged',
+  },
+  modified: {
+    wrapper: 'border-amber-300 bg-amber-50',
+    pill: 'bg-amber-100 text-amber-800',
+    pillText: '✎ modified',
+  },
+  added: {
+    wrapper: 'border-emerald-300 bg-emerald-50',
+    pill: 'bg-emerald-100 text-emerald-800',
+    pillText: '+ added',
+  },
+  removed: {
+    wrapper: 'border-red-300 bg-red-50',
+    pill: 'bg-red-100 text-red-800',
+    pillText: '✕ removed',
+  },
+}
+
+function InlineRow({ row }: { row: Row }) {
+  const meta = STATUS_META[row.status]
+  const item = row.preview ?? row.current!
+  const before = row.current
+  const after = row.preview
+  const logic = (after?.logic ?? item.logic) as Record<string, unknown>
   const threshold = typeof logic?.threshold === 'number' ? (logic.threshold as number) : null
   const rubric = typeof logic?.rubric === 'string' ? (logic.rubric as string) : null
-  const tone =
-    status === 'unchanged'
-      ? 'border-gray-200 bg-white'
-      : status === 'modified'
-      ? 'border-blue-200 bg-blue-50/40'
-      : status === 'added'
-      ? 'border-emerald-200 bg-emerald-50/40'
-      : 'border-red-200 bg-red-50/40'
+
+  // Inline before→after for description and action changes
+  const descChanged = !!(before && after && before.description !== after.description)
+  const actionChanged = !!(before && after && before.action !== after.action)
+  const logicChanged = !!(before && after && JSON.stringify(before.logic) !== JSON.stringify(after.logic))
+  const beforeThreshold =
+    before && typeof (before.logic as Record<string, unknown>)?.threshold === 'number'
+      ? ((before.logic as Record<string, unknown>).threshold as number)
+      : null
+  const thresholdChanged = beforeThreshold !== null && threshold !== null && beforeThreshold !== threshold
+
+  const descClass =
+    row.status === 'removed' ? 'line-through text-red-700'
+    : row.status === 'unchanged' ? 'text-gray-500'
+    : 'text-gray-800'
+
   return (
-    <div className={`border rounded px-2 py-1.5 text-xs ${tone}`}>
-      <div className="flex items-start gap-1.5 flex-wrap">
-        <TypeBadge type={item.item_type} />
-        <span className="font-medium text-gray-800 leading-snug flex-1 min-w-0">
-          {item.description}
-        </span>
+    <div className={`border rounded-lg p-3 ${meta.wrapper}`}>
+      <div className="flex items-start gap-2">
+        <div className="w-4 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <TypeBadge type={item.item_type} />
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${meta.pill}`}>
+              {meta.pillText}
+            </span>
+            {row.status === 'modified' && <ChangeChips types={after?.context_change_types ?? null} />}
+            <span className={`text-sm font-medium ${descClass}`}>
+              {after?.description ?? item.description}
+            </span>
+          </div>
+          {descChanged && before && (
+            <p className="mt-1 text-[11px] text-gray-400 line-through leading-snug">
+              was: {before.description}
+            </p>
+          )}
+          {(thresholdChanged || logicChanged) && before && (
+            <p className="mt-1 text-[11px] text-gray-500 leading-snug">
+              {thresholdChanged && (
+                <span className="font-mono mr-2">
+                  thr {beforeThreshold!.toFixed(2)} → {threshold!.toFixed(2)}
+                </span>
+              )}
+            </p>
+          )}
+          {rubric && (
+            <p className="mt-1 text-[11px] text-gray-500 leading-snug line-clamp-2">{rubric}</p>
+          )}
+        </div>
+        <div className="flex-shrink-0 w-20 flex flex-col items-end text-xs text-gray-400">
+          <span>if yes →</span>
+          <div className="flex items-center gap-1">
+            {actionChanged && before && (
+              <span className="text-[10px] line-through text-gray-400">{before.action}</span>
+            )}
+            <ActionBadge action={after?.action ?? item.action} />
+          </div>
+          {threshold !== null && !thresholdChanged && (
+            <span className="text-[10px] font-mono mt-0.5">thr {threshold.toFixed(2)}</span>
+          )}
+        </div>
       </div>
-      <div className="flex items-center gap-2 mt-1">
-        <ActionBadge action={item.action} />
-        {threshold !== null && (
-          <span className="text-[10px] font-mono text-gray-500">thr {threshold.toFixed(2)}</span>
-        )}
-        {side === 'preview' && <ChangeChips types={item.context_change_types} />}
-      </div>
-      {rubric && (
-        <p className="mt-1 text-[11px] text-gray-500 leading-snug line-clamp-2">{rubric}</p>
-      )}
     </div>
   )
-}
-
-function StatusLabel({ status }: { status: DiffStatus }) {
-  const map: Record<DiffStatus, { text: string; cls: string }> = {
-    unchanged: { text: 'unchanged', cls: 'text-gray-400' },
-    modified: { text: 'modified', cls: 'text-blue-600' },
-    added: { text: 'added', cls: 'text-emerald-600' },
-    removed: { text: 'removed', cls: 'text-red-600' },
-  }
-  const { text, cls } = map[status]
-  return <span className={`text-[10px] uppercase tracking-wider font-semibold ${cls}`}>{text}</span>
 }
 
 interface Props {
@@ -219,10 +241,7 @@ interface Props {
 export default function ChecklistDiff({ current, preview, summary }: Props) {
   const rows = buildRows(current, preview)
   const counts = rows.reduce(
-    (acc, r) => {
-      acc[r.status] += 1
-      return acc
-    },
+    (acc, r) => { acc[r.status] += 1; return acc },
     { unchanged: 0, modified: 0, added: 0, removed: 0 } as Record<DiffStatus, number>,
   )
 
@@ -241,42 +260,18 @@ export default function ChecklistDiff({ current, preview, summary }: Props) {
           </ul>
         </div>
       )}
-      <div className="flex items-center gap-2 text-[11px] text-gray-500">
-        <span>
-          <span className="font-semibold text-blue-600">{counts.modified}</span> modified
-        </span>
+      <div className="flex items-center gap-2 text-[11px] text-gray-500 px-1">
+        <span><span className="font-semibold text-amber-700">{counts.modified}</span> modified</span>
         <span>·</span>
-        <span>
-          <span className="font-semibold text-emerald-600">{counts.added}</span> added
-        </span>
+        <span><span className="font-semibold text-emerald-700">{counts.added}</span> added</span>
         <span>·</span>
-        <span>
-          <span className="font-semibold text-red-600">{counts.removed}</span> removed
-        </span>
+        <span><span className="font-semibold text-red-700">{counts.removed}</span> removed</span>
         <span>·</span>
-        <span>
-          <span className="font-semibold text-gray-400">{counts.unchanged}</span> unchanged
-        </span>
-      </div>
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-1">
-        <span>Current</span>
-        <span className="w-3" />
-        <span>Preview</span>
+        <span><span className="font-semibold text-gray-400">{counts.unchanged}</span> unchanged</span>
       </div>
       <div className="space-y-1.5">
         {rows.map((row, i) => (
-          <div key={i} className="space-y-0.5">
-            <div className="flex items-center gap-1.5 px-1">
-              <StatusLabel status={row.status} />
-            </div>
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-1 items-stretch">
-              <ItemCard item={row.current} status={row.status} side="current" />
-              <div className="flex items-center justify-center text-gray-300">
-                <ArrowRight size={12} />
-              </div>
-              <ItemCard item={row.preview} status={row.status} side="preview" />
-            </div>
-          </div>
+          <InlineRow key={i} row={row} />
         ))}
       </div>
     </div>

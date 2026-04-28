@@ -604,7 +604,7 @@ export default function RuleHealthPanel({
               ? <Loader2 size={12} className="animate-spin" />
               : <Zap size={12} />
             }
-            {analyzeMutation.isPending ? 'Analyzing...' : 'Analyze'}
+            {analyzeMutation.isPending ? 'Analyzing…' : 'Analyze Error Patterns'}
           </button>
         </div>
 

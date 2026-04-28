@@ -194,14 +194,6 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
         mod_verdict = decision.moderator_verdict  # approve | remove | review
         rule_verdict = reasoning.get("verdict", "approve")
 
-        # Per-rule override: this rule's verdict disagrees with the moderator
-        rule_would_act = rule_verdict in ("remove", "warn", "review")
-        mod_would_act = mod_verdict in ("remove", "warn")
-        if rule_would_act != mod_would_act:
-            override_count += 1
-        if rule_would_act and mod_verdict == "approve":
-            rule_fp_count += 1
-
         # Determine if at least one item on this rule triggered for this decision.
         # A "missed" (FN) only makes sense for an item when the rule was relevant
         # to the post — i.e. some sibling item triggered, proving the rule applied.
@@ -212,6 +204,18 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
             for iid, ir in item_reasoning.items()
             if iid in items_by_id
         )
+
+        # Per-rule override: this rule's verdict disagrees with the moderator.
+        # Treat the rule as "wanting to act" if either the tree resolved to an action
+        # OR any item flagged — the latter aligns the rule-level FP count with the
+        # per-item FP counts shown in the health panel (otherwise 2 items can be
+        # marked unhealthy while the rule-level box reads 0).
+        rule_would_act = rule_verdict in ("remove", "warn", "review") or any_item_triggered
+        mod_would_act = mod_verdict in ("remove", "warn")
+        if rule_would_act != mod_would_act:
+            override_count += 1
+        if rule_would_act and mod_verdict == "approve":
+            rule_fp_count += 1
 
         post = decision.post_content or {}
         inner = post.get("content", {})
@@ -633,15 +637,17 @@ async def preview_fixes(
 
         mod_verdict = decision.moderator_verdict
         error_type = case["error_type"]
-        if error_type == "wrongly_flagged":
-            fixed = new_verdict == "approve"
-        else:
-            fixed = new_verdict in ("remove", "warn", "review")
 
         old_aligned = (old_verdict == "approve" and mod_verdict == "approve") or \
                       (old_verdict in ("remove", "warn", "review") and mod_verdict in ("remove", "warn"))
         new_aligned = (new_verdict == "approve" and mod_verdict == "approve") or \
                       (new_verdict in ("remove", "warn", "review") and mod_verdict in ("remove", "warn"))
+
+        # A case counts as "fixed" only if the rule-level verdict actually moved
+        # from misaligned to aligned with the moderator. If old_verdict was already
+        # aligned (e.g. an item-level FP that the tree absorbed into "approve"),
+        # treat the case as unchanged — not "fixed" — to avoid inflating the count.
+        fixed = (not old_aligned) and new_aligned
         regressed = old_aligned and not new_aligned
 
         if fixed:

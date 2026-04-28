@@ -49,16 +49,16 @@ natural-language rule into a precise, structured decision tree that an automated
 Each node in the tree is a YES/NO question where YES = a potential violation is detected.
 
 Each checklist item must have:
-- description: A short, concise yes/no question framed so that YES = violation signal (e.g. "Does the post contain spam keywords?")
-- rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred). Keep the exact punctuation and wording. 
+- description: A terse yes/no question, ≤12 words, framed so YES = violation. No preamble or hedging. (e.g. "Contains spam keywords?")
+- rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred). Keep the exact punctuation and wording.
 - item_type: "deterministic" (regex), "structural" (metadata), or "subjective" (LLM judgment)
-- logic: Type-specific schema (see below)
+- logic: Type-specific schema (see below). For subjective items, keep `prompt_template` to one sentence and `rubric` to ≤2 short sentences listing the signals to weigh — no preamble, no restatement of the description.
 - action: "remove", "warn", or "continue"
   - Leaf nodes (no children): use "remove" or "warn" to set the consequence. "continue" is not allowed for leaf nodes.
   - Non-leaf nodes (has children): MUST always be "continue". The verdict comes entirely from the children.
 - children: Sub-items evaluated when this item says YES (empty list for leaf nodes)
 - context_influenced: true if the community context (purpose, participants, stakes, tone) shaped how this item was framed, calibrated, or phrased. Set false when the item derives purely from the rule text.
-- context_note: If context_influenced is true, a one-sentence explanation tracing the reasoning: "[situational fact] → [calibration decision]" (e.g. "Vulnerable population seeking crisis support → threshold lowered to 0.6 to catch dismissive comments that could cause real harm"). Set null otherwise.
+- context_note: If context_influenced is true, a single clause ≤20 words: "[situational fact] → [calibration decision]" (e.g. "Crisis-support audience → threshold 0.6 to catch dismissive comments"). No hedging. Set null otherwise.
 
 COMMUNITY CONTEXT CALIBRATION:
 Community context reflects the community's own self-understanding and moderation priorities — not an outside \
@@ -110,7 +110,7 @@ Output:
 {
   "checklist_tree": [
     {
-      "description": "Does the content contain explicit promotional language or calls to action?",
+      "description": "Contains promotional language or calls to action?",
       "rule_text_anchor": "not advertise products or services",
       "item_type": "deterministic",
       "logic": {
@@ -127,7 +127,7 @@ Output:
       "context_note": null
     },
     {
-      "description": "Does the content contain known spam domains or URL shorteners?",
+      "description": "Contains known spam domains or URL shorteners?",
       "rule_text_anchor": "not advertise products or services",
       "item_type": "deterministic",
       "logic": {
@@ -144,13 +144,13 @@ Output:
       "context_note": null
     },
     {
-      "description": "Is this content primarily self-promotional, even without explicit keywords?",
+      "description": "Primarily self-promotional, even without keywords?",
       "rule_text_anchor": "Posts should contribute to the community",
       "item_type": "subjective",
       "logic": {
         "type": "subjective",
-        "prompt_template": "Evaluate whether this post is primarily self-promotional. Does it mainly serve to advertise the poster's product, service, channel, or brand rather than contribute useful information or discussion to the community or legitimately sharing their work?",
-        "rubric": "Consider: (1) Is the post centered on promoting something the author created or sells? (2) Does it include calls to action like 'check out my...', 'I made...', 'visit my...'? (3) Is there genuine value for readers beyond the promotional aspect? (4) Does the author disclose affiliation? Score higher (more promotional) when the post reads like an advertisement.",
+        "prompt_template": "Is this post primarily an advertisement for the author's product, service, or brand rather than a contribution to the community?",
+        "rubric": "Score higher when the post centers on something the author sells, includes calls to action ('check out my...'), or offers little value beyond promotion.",
         "threshold": 0.65,
         "examples_to_include": 5
       },
@@ -160,7 +160,7 @@ Output:
       "context_note": null
     },
     {
-      "description": "Is the account new, which is a spam signal?",
+      "description": "New account (spam signal)?",
       "rule_text_anchor": null,
       "item_type": "structural",
       "logic": {
@@ -225,29 +225,29 @@ Output:
 {
   "checklist_tree": [
     {
-      "description": "Does the post or the comment contain political, religious, or soap-boxing content?",
+      "description": "Political, religious, or soap-boxing content?",
       "rule_text_anchor": "This means that this is not the place for politics, religion, soap boxing of any kind",
       "item_type": "subjective",
       "logic": {
         "type": "subjective",
-        "prompt_template": "Evaluate whether this post or comment is political, religious, or soap-boxing. Does it mainly serve to express strong opinions on political or religious topics, or to lecture or preach to others, rather than contribute useful information or discussion to the community?",
-        "rubric": "Score higher (more likely to violate) when: (1) The post or comment promotes a political agenda (2) The post or comment promotes religious beliefs (3) The post or comment is preachy or lecturing",
+        "prompt_template": "Does this post or comment push a political/religious agenda or lecture others rather than contribute to the discussion?",
+        "rubric": "Score higher when content promotes a political agenda, promotes religious beliefs, or is preachy/lecturing.",
         "threshold": 0.65,
         "examples_to_include": 5
       },
       "action": "remove",
       "children": [],
       "context_influenced": true,
-      "context_note": "Community purpose is casual mobile gaming fun → threshold lowered to 0.55 because even mild soap-boxing undermines the lighthearted tone."
+      "context_note": "Casual mobile-gaming community → threshold 0.55 since mild soap-boxing breaks the lighthearted tone."
     },
     {
-      "description": "Is the post or comment irrelevant to the Pikmin Bloom game?",
+      "description": "Irrelevant to the Pikmin Bloom game?",
       "rule_text_anchor": "Pikmin Bloom posts only",
       "item_type": "subjective",
       "logic": {
         "type": "subjective",
-        "prompt_template": "Evaluate whether this post or comment is relevant to the Pikmin Bloom game. Does the post or comment have anything to do with the Pikmin Bloom game?",
-        "rubric": "Score high (more likely to violate) when: (1) The post or comment does not discuss the Pikmin Bloom game (2) The post or comment does not discuss any related topics",
+        "prompt_template": "Does this post or comment have anything to do with the Pikmin Bloom game?",
+        "rubric": "Score higher when the content does not discuss Pikmin Bloom or any related topic.",
         "threshold": 0.65,
         "examples_to_include": 5
       },
@@ -420,6 +420,8 @@ For each item, assess whether the post passes or fails the criterion. Be consist
 
 When thread context is provided (the original post and/or parent comments), use it to understand the conversation flow. A comment may only make sense — or only violate a rule — in the context of what it's replying to. Evaluate the TARGET content, not the thread context itself.
 
+REASONING STYLE: keep `reasoning` to ONE short sentence (≤25 words). Point at the specific signal that drove the call. No preamble ("This post..."), no restatement of the criterion, no hedging.
+
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
 
@@ -502,7 +504,7 @@ Return JSON in exactly this format:
       "item_id": "...",
       "triggered": true | false,
       "confidence": 0.0-1.0,
-      "reasoning": "Brief explanation of why the violation is or is not present"
+      "reasoning": "One short sentence (≤25 words) naming the signal that drove the call"
     }}
   ]
 }}
@@ -556,6 +558,8 @@ def build_infer_item_prompt(
 # ── Community Norms ────────────────────────────────────────────────────────────
 
 COMMUNITY_NORMS_SYSTEM = """You are a community culture evaluator. Your task is to assess whether a post "feels off" for a community even if it doesn't violate any explicit rule. This is a holistic judgment about cultural fit and community norms.
+
+REASONING STYLE: keep `reasoning` to ONE short sentence (≤25 words). Name the specific way it fits or doesn't (tone, topic, framing). No preamble, no restatement of the question, no hedging.
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -621,7 +625,7 @@ Return JSON in exactly this format:
 {{
   "violates_norms": true | false,
   "confidence": 0.0-1.0,
-  "reasoning": "Explanation of why this {content_label} does or doesn't fit community norms"
+  "reasoning": "One short sentence (≤25 words) naming the specific tone/topic/framing signal"
 }}"""
 
 
@@ -646,11 +650,14 @@ moderated?" — not "how would an outsider describe this community?"
 - The gap between stated rules and actual behavior tells you what the community REALLY enforces.
 
 For each of the four dimensions (purpose, participants, stakes, tone):
-1. Select 3-5 tags from the provided taxonomy that best characterize this community's moderation profile.
-2. For each selected tag, write a brief explanation (one sentence) of how that tag specifically applies \
-to THIS community — grounded in evidence from the posts, written from the moderator's perspective. \
-The explanation should help a moderator understand why this tag was chosen and what it means for \
-moderation decisions here.
+1. Select 2-4 tags from the taxonomy (prefer fewer, sharper tags — only the ones that materially \
+shape moderation here).
+2. For each selected tag, write a TERSE explanation: ≤15 words, a single short clause, no preamble, \
+no hedging, no rephrasing of the tag itself. Skim-readable. Should fit on one line.
+
+GOOD: "Memes celebrated; treat strict literalism as out-of-step."
+BAD:  "This community appears to value lighthearted humor and meme-based content, so moderators \
+should be careful not to overly enforce literal interpretations of rules."
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -725,10 +732,9 @@ COMMUNITY METADATA:
 {taxonomy_section}
 
 Based on ALL of the above, generate community context.
-For each dimension, SELECT 3-5 tags from the provided taxonomy that best characterize this community's \
-moderation profile. For EACH selected tag, write one short calibration note (one moderator-readable \
-sentence) explaining how THAT specific tag applies to this community — grounded in observed behavior \
-from the samples, not just stated rules.
+For each dimension, SELECT 2-4 tags (prefer fewer, sharper tags). For EACH selected tag, write one \
+TERSE calibration note (≤15 words, a single clause, no preamble or hedging) — grounded in observed \
+behavior, written for fast skimming.
 
 The tag is primary; the note is a per-tag explanation. Do NOT produce free-standing notes that aren't \
 tied to a specific tag, and do NOT produce a separate list of tags alongside prose notes. Every note \
@@ -793,10 +799,10 @@ or stakes. Produce a neutral, context-free checklist that any community with thi
 Each node in the tree is a YES/NO question where YES = a potential violation is detected.
 
 Each checklist item must have:
-- description: A short, concise yes/no question framed so that YES = violation signal
+- description: A terse yes/no question, ≤12 words, framed so YES = violation. No preamble or hedging.
 - rule_text_anchor: The exact phrase from the rule text this derives from (null if inferred)
 - item_type: "deterministic" (regex), "structural" (metadata), or "subjective" (LLM judgment)
-- logic: Type-specific schema (deterministic/structural/subjective as defined in compilation docs)
+- logic: Type-specific schema. For subjective items keep `prompt_template` to one sentence and `rubric` to ≤2 short sentences.
 - action: "remove", "warn", or "continue"
   - Leaf nodes (no children): use "remove" or "warn". "continue" is not allowed for leaf nodes.
   - Non-leaf nodes (has children): MUST always be "continue".

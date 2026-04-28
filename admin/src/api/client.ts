@@ -472,6 +472,9 @@ export const acceptSuggestionWithLabel = (suggestionId: string, labelOverride?: 
 export const dismissSuggestion = (suggestionId: string) =>
   api.post<Suggestion>(`/suggestions/${suggestionId}/dismiss`).then(r => r.data)
 
+export const revertSuggestion = (suggestionId: string) =>
+  api.post<Suggestion>(`/suggestions/${suggestionId}/revert`).then(r => r.data)
+
 export const listUnlinkedOverrides = (communityId: string) =>
   api.get<Example[]>(`/communities/${communityId}/unlinked-overrides`).then(r => r.data)
 

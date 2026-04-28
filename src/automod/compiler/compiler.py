@@ -309,7 +309,7 @@ _NOTE_ITEM_SCHEMA = {
         },
         "text": {
             "type": "string",
-            "description": "One-sentence moderator-readable explanation of how this tag applies here.",
+            "description": "Brief moderator-readable explanation (≤15 words, single short clause) of how this tag applies here. Be terse — no preamble, no hedging.",
         },
     },
     "required": ["tag", "text"],
@@ -321,7 +321,7 @@ _DIMENSION_SCHEMA = {
     "properties": {
         "notes": {
             "type": "array",
-            "description": "3-5 tagged notes. Do NOT include a separate 'tags' field — tags live inside each note.",
+            "description": "2-4 tagged notes (prefer fewer, sharper notes over more verbose ones). Do NOT include a separate 'tags' field — tags live inside each note.",
             "items": _NOTE_ITEM_SCHEMA,
         },
     },

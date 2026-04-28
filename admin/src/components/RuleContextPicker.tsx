@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Loader2, Plus, Trash2, Check, X, Eye } from 'lucide-react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react'
+import { Plus, Trash2, Check } from 'lucide-react'
 import type {
   CommunityContext,
   CommunityContextNote,
   Rule,
   RuleContextTag,
 } from '../api/client'
+
+export interface RuleContextPickerHandle {
+  savePreview: () => Promise<void>
+}
 
 interface Props {
   rule: Rule
@@ -14,10 +18,7 @@ interface Props {
     relevant_context: RuleContextTag[] | null
     custom_context_notes: CommunityContextNote[]
   }) => Promise<void>
-  onCommit: () => Promise<void>
-  onDiscard: () => Promise<void>
-  isSavingPreview?: boolean
-  isCommitting?: boolean
+  onDirtyChange?: (dirty: boolean) => void
   readOnly?: boolean
 }
 
@@ -32,42 +33,13 @@ function keyOf(dim: string, tag: string): string {
   return `${dim}::${tag}`
 }
 
-function sameTagSet(
-  a: RuleContextTag[] | null | undefined,
-  b: RuleContextTag[] | null | undefined,
-): boolean {
-  if (!a && !b) return true
-  if (!a || !b) return false
-  if (a.length !== b.length) return false
-  const makeKey = (t: RuleContextTag) => `${t.dimension}::${t.tag}`
-  const sa = new Set(a.map(makeKey))
-  return b.every(t => sa.has(makeKey(t)))
-}
-
-function sameNotes(
-  a: CommunityContextNote[] | null | undefined,
-  b: CommunityContextNote[] | null | undefined,
-): boolean {
-  const na = a ?? []
-  const nb = b ?? []
-  if (na.length !== nb.length) return false
-  for (let i = 0; i < na.length; i++) {
-    if ((na[i].text || '') !== (nb[i].text || '')) return false
-    if ((na[i].tag || '') !== (nb[i].tag || '')) return false
-  }
-  return true
-}
-
-export default function RuleContextPicker({
+const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function RuleContextPicker({
   rule,
   community_context,
   onSavePreview,
-  onCommit,
-  onDiscard,
-  isSavingPreview,
-  isCommitting,
+  onDirtyChange,
   readOnly,
-}: Props) {
+}, ref) {
   const allBundles = useMemo(() => {
     const out: { dim: keyof CommunityContext; tag: string; text: string }[] = []
     if (!community_context) return out
@@ -107,6 +79,10 @@ export default function RuleContextPicker({
     setDirty(false)
   }, [rule.id, defaultSelected, rule.relevant_context, rule.custom_context_notes])
 
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+
   const toggleBundle = (dim: keyof CommunityContext, tag: string) => {
     const k = keyOf(dim, tag)
     const next = new Set(selected)
@@ -145,6 +121,8 @@ export default function RuleContextPicker({
     setDirty(false)
   }
 
+  useImperativeHandle(ref, () => ({ savePreview: handleSavePreview }))
+
   if (!community_context || allBundles.length === 0) {
     return (
       <div className="text-xs text-gray-400 italic">
@@ -152,15 +130,6 @@ export default function RuleContextPicker({
       </div>
     )
   }
-
-  const hasPending = !!rule.pending_checklist_json
-  const pendingRel = rule.pending_relevant_context?.value ?? null
-  const pendingIsStale =
-    hasPending &&
-    (!sameTagSet(pendingRel, rule.relevant_context) ||
-      !sameNotes(rule.pending_custom_context_notes, rule.custom_context_notes))
-  const previewReady = hasPending && !pendingIsStale && !dirty
-  const anyLoading = !!(isSavingPreview || isCommitting)
 
   return (
     <div className="space-y-3">
@@ -300,48 +269,8 @@ export default function RuleContextPicker({
         </div>
       )}
 
-      {!readOnly && (
-        <div className="flex items-center justify-end gap-2 pt-1">
-          {dirty && hasPending && (
-            <span className="text-xs text-amber-600">Edits will replace the pending preview</span>
-          )}
-          {!dirty && pendingIsStale && (
-            <span className="text-xs text-amber-600">Preview is stale — regenerate</span>
-          )}
-          {previewReady ? (
-            <>
-              <button
-                className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
-                type="button"
-                onClick={onDiscard}
-                disabled={anyLoading}
-                title="Discard pending preview"
-              >
-                <X size={12} /> Discard
-              </button>
-              <button
-                className="btn-primary text-xs py-1"
-                type="button"
-                onClick={onCommit}
-                disabled={anyLoading}
-              >
-                {isCommitting ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                {isCommitting ? 'Applying…' : 'Apply preview'}
-              </button>
-            </>
-          ) : (
-            <button
-              className="btn-primary text-xs py-1"
-              type="button"
-              onClick={handleSavePreview}
-              disabled={anyLoading}
-            >
-              {isSavingPreview ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
-              {isSavingPreview ? 'Generating preview…' : 'Save & Preview'}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   )
-}
+})
+
+export default RuleContextPicker

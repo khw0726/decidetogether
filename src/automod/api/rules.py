@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-import httpx
+import asyncpraw
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import delete as sa_delete, select, update as sa_update
@@ -783,11 +783,6 @@ async def batch_import_rules(
     )
 
 
-_REDDIT_HEADERS = {
-    "User-Agent": "automod-agent/2.0 (community moderation tool)",
-}
-
-
 class RedditRuleItem(BaseModel):
     title: str
     text: str
@@ -800,34 +795,37 @@ class RedditRulesResponse(BaseModel):
 
 @router.get("/reddit-rules/{subreddit}", response_model=RedditRulesResponse)
 async def fetch_reddit_rules(subreddit: str) -> RedditRulesResponse:
-    """Fetch rules from a subreddit's rules.json endpoint."""
-    # Sanitize subreddit name
+    """Fetch rules from a subreddit via the authenticated Reddit API."""
     sub = re.sub(r"^r/", "", subreddit.strip(), flags=re.IGNORECASE)
     if not re.match(r"^[A-Za-z0-9_]+$", sub):
         raise HTTPException(status_code=422, detail="Invalid subreddit name")
 
-    url = f"https://www.reddit.com/r/{sub}/about/rules.json"
+    if not settings.reddit_client_id or not settings.reddit_client_secret:
+        raise HTTPException(
+            status_code=500,
+            detail="Reddit OAuth credentials not configured",
+        )
+
+    rules: list[RedditRuleItem] = []
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
-            resp = await client.get(url, headers=_REDDIT_HEADERS)
-            resp.raise_for_status()
-    except httpx.HTTPStatusError as e:
+        async with asyncpraw.Reddit(
+            client_id=settings.reddit_client_id,
+            client_secret=settings.reddit_client_secret,
+            user_agent=settings.reddit_user_agent,
+            username=settings.reddit_username or None,
+            password=settings.reddit_password or None,
+        ) as reddit:
+            subreddit_obj = await reddit.subreddit(sub)
+            async for r in subreddit_obj.rules:
+                title = (r.short_name or "").strip()
+                text = (r.description or "").strip()
+                if title:
+                    rules.append(RedditRuleItem(title=title, text=text or title))
+    except Exception as e:
         raise HTTPException(
             status_code=502,
-            detail=f"Reddit returned {e.response.status_code} for r/{sub}",
+            detail=f"Failed to fetch rules for r/{sub}: {e}",
         )
-    except httpx.RequestError as e:
-        raise HTTPException(status_code=502, detail=f"Failed to reach Reddit: {e}")
-
-    data = resp.json()
-    raw_rules = data.get("rules", [])
-
-    rules = []
-    for r in raw_rules:
-        title = r.get("short_name", "").strip()
-        text = r.get("description", "").strip()
-        if title:
-            rules.append(RedditRuleItem(title=title, text=text or title))
 
     return RedditRulesResponse(rules=rules, subreddit=sub)
 

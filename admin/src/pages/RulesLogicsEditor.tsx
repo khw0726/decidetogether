@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
@@ -15,6 +15,7 @@ import {
   CommunityContextNote,
   ContextPreviewResponse,
   DecisionPreviewResult,
+  ItemHealthMetrics,
   PreviewChecklistItem,
   PreviewRecompileResult,
   Rule,
@@ -26,6 +27,7 @@ import {
   discardContextPreview,
   getChecklist,
   getCommunity,
+  getRuleHealth,
   getRulesHealthSummary,
   listRules,
   overrideRuleType,
@@ -38,7 +40,7 @@ import ChecklistTree from '../components/ChecklistTree'
 import ChecklistPreview from '../components/ChecklistPreview'
 import ChecklistDiff from '../components/ChecklistDiff'
 import DecisionsPanel from '../components/DecisionsPanel'
-import RuleContextPicker from '../components/RuleContextPicker'
+import RuleContextPicker, { RuleContextPickerHandle } from '../components/RuleContextPicker'
 import RuleHealthPanel from '../components/RuleHealthPanel'
 import TestModal from '../components/TestModal'
 import { showErrorToast } from '../components/Toast'
@@ -166,6 +168,10 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   const [showTestModal, setShowTestModal] = useState(false)
   const [showNewRule, setShowNewRule] = useState(false)
 
+  const contextPickerRef = useRef<RuleContextPickerHandle>(null)
+  const [contextDirty, setContextDirty] = useState(false)
+  const [pickerResetKey, setPickerResetKey] = useState(0)
+
   const { data: rules = [], isLoading: rulesLoading } = useQuery({
     queryKey: ['rules', communityId],
     queryFn: () => listRules(communityId),
@@ -202,6 +208,18 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       return isActionable && (!items || items.length === 0) ? 3000 : false
     },
   })
+
+  const { data: ruleHealth } = useQuery({
+    queryKey: ['rule-health', selectedRuleId],
+    queryFn: () => getRuleHealth(selectedRuleId!),
+    enabled: !!selectedRuleId,
+  })
+
+  const itemHealthById = useMemo(() => {
+    const m: Record<string, ItemHealthMetrics> = {}
+    for (const it of ruleHealth?.items || []) m[it.item_id] = it
+    return m
+  }, [ruleHealth])
 
   const createRuleMutation = useMutation({
     mutationFn: ({ title, text }: { title: string; text: string }) =>
@@ -273,6 +291,55 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     if (selectedRule) setEditingText(selectedRule.text)
     setPreviewResult(null)
     setDecisionPreview(null)
+  }
+
+  const handleApplyContextPreview = async () => {
+    if (!selectedRule) return
+    setCommittingContext(true)
+    try {
+      await commitContextAdjustment(selectedRule.id)
+      setContextPreview(null)
+      setEditMode(false)
+      queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+      queryClient.invalidateQueries({ queryKey: ['checklist', selectedRule.id] })
+    } catch (e) {
+      showErrorToast(extractErrorMessage(e))
+    } finally {
+      setCommittingContext(false)
+    }
+  }
+
+  const handleUnifiedDiscard = async () => {
+    if (selectedRule) setEditingText(selectedRule.text)
+    setPreviewResult(null)
+    setDecisionPreview(null)
+    if (contextPreview || selectedRule?.pending_checklist_json) {
+      try {
+        await discardContextPreview(selectedRule!.id)
+        setContextPreview(null)
+        queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+      } catch (e) {
+        showErrorToast(extractErrorMessage(e))
+      }
+    }
+    setPickerResetKey(k => k + 1)
+  }
+
+  const handleUnifiedPreview = async () => {
+    const textDirty = !!selectedRule && editingText !== selectedRule.text
+    if (textDirty) {
+      await handlePreviewChanges()
+    } else if (contextDirty) {
+      await contextPickerRef.current?.savePreview()
+    }
+  }
+
+  const handleUnifiedApply = async () => {
+    if (previewResult) {
+      await handleConfirmSave()
+    } else if (effectiveContextPreview) {
+      await handleApplyContextPreview()
+    }
   }
 
   // Trigger decisions preview when rule-text preview becomes active.
@@ -439,7 +506,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 title="Test a hypothetical post against the automod"
               >
                 <Play size={12} />
-                Test
+                Test Rule with a Post
               </button>
             </div>
 
@@ -476,35 +543,53 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                         onChange={e => { setEditingText(e.target.value); setPreviewResult(null); setDecisionPreview(null) }}
                         placeholder="Rule text..."
                       />
-                      <div className="flex gap-2 justify-end flex-shrink-0">
-                        <button
-                          className="btn-secondary text-xs"
-                          onClick={handleDiscardEdit}
-                          disabled={editingText === selectedRule.text}
-                        >
-                          <X size={12} /> Discard edits
-                        </button>
-                        {previewResult ? (
-                          <button className="btn-primary text-xs" onClick={handleConfirmSave} disabled={isSaving}>
-                            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                            {isSaving ? 'Saving…' : 'Confirm & Save'}
-                          </button>
-                        ) : selectedRule.rule_type === 'actionable' ? (
-                          <button
-                            className="btn-primary text-xs"
-                            onClick={handlePreviewChanges}
-                            disabled={isPreviewLoading || editingText === selectedRule.text}
-                          >
-                            {isPreviewLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                            {isPreviewLoading ? 'Previewing…' : 'Preview'}
-                          </button>
-                        ) : (
-                          <button className="btn-primary text-xs" onClick={handleConfirmSave} disabled={isSaving}>
-                            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                            {isSaving ? 'Saving…' : 'Save'}
-                          </button>
-                        )}
-                      </div>
+                      {(() => {
+                        const textDirty = editingText !== selectedRule.text
+                        const anyDirty = textDirty || contextDirty
+                        const previewActive = !!previewResult || !!effectiveContextPreview
+                        const isActionable = selectedRule.rule_type === 'actionable'
+                        const previewBusy = isPreviewLoading || savingContextPreview
+                        const applyBusy = isSaving || committingContext
+                        return (
+                          <div className="flex gap-2 justify-end flex-shrink-0">
+                            <button
+                              className="btn-secondary text-xs"
+                              onClick={handleUnifiedDiscard}
+                              disabled={!anyDirty && !previewActive}
+                            >
+                              <X size={12} /> Discard edits
+                            </button>
+                            {previewActive ? (
+                              <button
+                                className="btn-primary text-xs"
+                                onClick={handleUnifiedApply}
+                                disabled={applyBusy}
+                              >
+                                {applyBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                {applyBusy ? 'Applying…' : 'Confirm & Save'}
+                              </button>
+                            ) : isActionable ? (
+                              <button
+                                className="btn-primary text-xs"
+                                onClick={handleUnifiedPreview}
+                                disabled={previewBusy || !anyDirty}
+                              >
+                                {previewBusy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                {previewBusy ? 'Previewing…' : 'Preview'}
+                              </button>
+                            ) : (
+                              <button
+                                className="btn-primary text-xs"
+                                onClick={handleConfirmSave}
+                                disabled={isSaving || !textDirty}
+                              >
+                                {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                {isSaving ? 'Saving…' : 'Save'}
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </>
                   ) : (
                     <div className="flex-1 border border-gray-200 rounded-lg p-3 text-sm font-mono overflow-auto bg-gray-50 whitespace-pre-wrap text-gray-700 leading-relaxed min-h-0">
@@ -517,11 +602,12 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                     {selectedRule.rule_type === 'actionable' && (
                       <div className="max-h-48 overflow-auto">
                         <RuleContextPicker
+                          key={`${selectedRule.id}-${pickerResetKey}`}
+                          ref={contextPickerRef}
                           rule={selectedRule}
                           community_context={community?.community_context ?? null}
                           readOnly={!editMode}
-                          isSavingPreview={savingContextPreview}
-                          isCommitting={committingContext}
+                          onDirtyChange={setContextDirty}
                           onSavePreview={async ({ relevant_context, custom_context_notes }) => {
                             setSavingContextPreview(true)
                             try {
@@ -536,28 +622,6 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                               showErrorToast(extractErrorMessage(e))
                             } finally {
                               setSavingContextPreview(false)
-                            }
-                          }}
-                          onCommit={async () => {
-                            setCommittingContext(true)
-                            try {
-                              await commitContextAdjustment(selectedRule.id)
-                              setContextPreview(null)
-                              queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
-                              queryClient.invalidateQueries({ queryKey: ['checklist', selectedRule.id] })
-                            } catch (e) {
-                              showErrorToast(extractErrorMessage(e))
-                            } finally {
-                              setCommittingContext(false)
-                            }
-                          }}
-                          onDiscard={async () => {
-                            try {
-                              await discardContextPreview(selectedRule.id)
-                              setContextPreview(null)
-                              queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
-                            } catch (e) {
-                              showErrorToast(extractErrorMessage(e))
                             }
                           }}
                         />
@@ -627,9 +691,37 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
               <div className="w-[35%] flex-shrink-0 flex flex-col border-r border-gray-200 bg-white overflow-hidden">
                 <PanelHeader title="Automoderator Logic">
                   {isAnyPreviewActive && (
-                    <span className="text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
-                      {effectiveContextPreview ? 'Context Preview' : previewResult ? 'Preview' : 'Analyze Preview'}
-                    </span>
+                    <>
+                      <span className="text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
+                        {effectiveContextPreview ? 'Context Preview' : previewResult ? 'Rule-Text Preview' : 'Error-Pattern Preview'}
+                      </span>
+                      <button
+                        className="btn-secondary text-xs py-0.5"
+                        title="Exit preview and return to the current logic view"
+                        onClick={async () => {
+                          if (previewResult) {
+                            handleDiscardEdit()
+                          }
+                          if (contextPreview) {
+                            setContextPreview(null)
+                          }
+                          if (selectedRule?.pending_checklist_json) {
+                            try {
+                              await discardContextPreview(selectedRule.id)
+                              queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+                            } catch (e) {
+                              showErrorToast(extractErrorMessage(e))
+                            }
+                          }
+                          if (healthSuggestions.length > 0) {
+                            setHealthSuggestions([])
+                          }
+                          setDecisionPreview(null)
+                        }}
+                      >
+                        <X size={11} /> Exit preview
+                      </button>
+                    </>
                   )}
                 </PanelHeader>
 
@@ -659,6 +751,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                         selectedItemId={selectedChecklistItemId}
                         onItemSelect={setSelectedChecklistItemId}
                         highlightedItemId={null}
+                        itemHealthById={itemHealthById}
                       />
                     )
                   ) : (
@@ -670,7 +763,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   <div className="mx-3 mb-2 flex-shrink-0 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
                     <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-500" />
                     <span>
-                      <strong>{selectedRule.override_count} overrides</strong> suggest this checklist may need updating. Try the Analyze button →
+                      <strong>{selectedRule.override_count} overrides</strong> suggest this checklist may need updating. Try the <em>Analyze Error Patterns</em> button →
                     </span>
                   </div>
                 )}

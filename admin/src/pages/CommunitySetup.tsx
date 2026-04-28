@@ -14,6 +14,7 @@ import {
   getSetupStatus,
   acceptSuggestionWithLabel,
   dismissSuggestion,
+  revertSuggestion,
   populateQueue,
   CommunityContext,
   CommunityContextDimension,
@@ -179,33 +180,34 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
   }, [communityId, name])
 
   const fetchRedditMutation = useMutation({
-    mutationFn: () => fetchRedditRules(redditSub.trim()),
-    onSuccess: (data) => {
-      setRedditPreview(data.rules)
+    mutationFn: async () => {
+      const data = await fetchRedditRules(redditSub.trim())
+      if (!data.rules || data.rules.length === 0) {
+        return { rules: data.rules, importResult: null }
+      }
+      const importResult = await batchImportRules(communityId, data.rules)
+      return { rules: data.rules, importResult }
+    },
+    onSuccess: ({ rules: fetched, importResult }) => {
+      setRedditPreview(fetched)
       setRedditError('')
-      setRedditResult('')
+      if (importResult) {
+        refetchRules()
+        const nonActionable = importResult.total - importResult.actionable_count
+        setRedditResult(
+          nonActionable > 0
+            ? `Imported ${importResult.total} rules (${importResult.actionable_count} actionable, ${nonActionable} informational/procedural).`
+            : `Imported ${importResult.total} actionable rules.`
+        )
+      } else {
+        setRedditResult('')
+      }
     },
     onError: (err: unknown) => {
       const axiosDetail = (err as any)?.response?.data?.detail
       setRedditError(typeof axiosDetail === 'string' ? axiosDetail : 'Failed to fetch rules from Reddit.')
       setRedditPreview(null)
     },
-  })
-
-  const redditImportMutation = useMutation({
-    mutationFn: () => batchImportRules(communityId, redditPreview!),
-    onSuccess: (result) => {
-      refetchRules()
-      setRedditPreview(null)
-      setRedditError('')
-      const nonActionable = result.total - result.actionable_count
-      setRedditResult(
-        nonActionable > 0
-          ? `Imported ${result.total} rules (${result.actionable_count} actionable, ${nonActionable} informational/procedural).`
-          : `Imported ${result.total} actionable rules.`
-      )
-    },
-    onError: () => setRedditError('Failed to import rules.'),
   })
 
   // -- Markdown import state --
@@ -260,7 +262,7 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
       populateMutation.mutate()
     }
     onCommunityChange(communityId)
-    navigate('/dashboard')
+    navigate('/decisions')
   }
 
   return (
@@ -499,12 +501,12 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
                         />
                       </div>
                       <button
-                        className="btn-secondary flex items-center gap-1.5 text-sm whitespace-nowrap"
+                        className="btn-primary flex items-center gap-1.5 text-sm whitespace-nowrap"
                         disabled={!redditSub.trim() || fetchRedditMutation.isPending}
                         onClick={() => fetchRedditMutation.mutate()}
                       >
-                        {fetchRedditMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : null}
-                        Fetch rules
+                        {fetchRedditMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                        Fetch & Import
                       </button>
                     </div>
                     {redditError && <p className="text-sm text-red-600">{redditError}</p>}
@@ -516,7 +518,7 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
                     )}
                     {redditPreview && redditPreview.length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-xs font-medium text-gray-600">Found {redditPreview.length} rules:</p>
+                        <p className="text-xs font-medium text-gray-600">Imported {redditPreview.length} rules:</p>
                         <div className="rounded border border-gray-200 divide-y divide-gray-100 max-h-64 overflow-y-auto">
                           {redditPreview.map((r, i) => (
                             <div key={i} className="px-3 py-2">
@@ -527,14 +529,6 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
                             </div>
                           ))}
                         </div>
-                        <button
-                          className="btn-primary flex items-center gap-1.5 text-sm"
-                          disabled={redditImportMutation.isPending}
-                          onClick={() => redditImportMutation.mutate()}
-                        >
-                          {redditImportMutation.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
-                          Import {redditPreview.length} rules
-                        </button>
                       </div>
                     )}
                     {redditPreview && redditPreview.length === 0 && (
@@ -671,7 +665,9 @@ function CalibrateStep({
   onBack: () => void
   onFinish: () => void
 }) {
-  const [resolved, setResolved] = useState<Set<string>>(new Set())
+  // suggestionId -> chosen label ('compliant' | 'violating' | 'skipped')
+  const [resolutions, setResolutions] = useState<Record<string, string>>({})
+  const resolved = useMemo(() => new Set(Object.keys(resolutions)), [resolutions])
   const [expandedRuleId, setExpandedRuleId] = useState<string | null>(null)
 
   const { data: status, refetch } = useQuery({
@@ -699,14 +695,25 @@ function CalibrateStep({
     mutationFn: ({ suggestionId, label }: { suggestionId: string; label: string }) =>
       acceptSuggestionWithLabel(suggestionId, label),
     onSuccess: (_, vars) => {
-      setResolved(prev => new Set(prev).add(vars.suggestionId))
+      setResolutions(prev => ({ ...prev, [vars.suggestionId]: vars.label }))
     },
   })
 
   const skipMutation = useMutation({
     mutationFn: (suggestionId: string) => dismissSuggestion(suggestionId),
     onSuccess: (_, suggestionId) => {
-      setResolved(prev => new Set(prev).add(suggestionId))
+      setResolutions(prev => ({ ...prev, [suggestionId]: 'skipped' }))
+    },
+  })
+
+  const undoMutation = useMutation({
+    mutationFn: (suggestionId: string) => revertSuggestion(suggestionId),
+    onSuccess: (_, suggestionId) => {
+      setResolutions(prev => {
+        const next = { ...prev }
+        delete next[suggestionId]
+        return next
+      })
     },
   })
 
@@ -830,18 +837,34 @@ function CalibrateStep({
                   {isExpanded && (
                     <div className="border-t border-gray-200 divide-y divide-gray-100">
                       {items.map((item) => {
-                        const done = resolved.has(item.suggestion_id)
+                        const chosen = resolutions[item.suggestion_id]
+                        const done = !!chosen
                         const content = item.content as Record<string, unknown>
                         const title = (content?.title as string) || (content?.content as any)?.title || '(untitled)'
                         const body = (content?.body as string) || (content?.content as any)?.body || ''
-                        const busy = (resolveMutation.isPending || skipMutation.isPending) &&
+                        const busy = (resolveMutation.isPending || skipMutation.isPending || undoMutation.isPending) &&
                           (resolveMutation.variables?.suggestionId === item.suggestion_id ||
-                           skipMutation.variables === item.suggestion_id)
+                           skipMutation.variables === item.suggestion_id ||
+                           undoMutation.variables === item.suggestion_id)
+
+                        const handlePick = (label: 'compliant' | 'violating') => {
+                          if (chosen === label) {
+                            // Toggling the already-selected label off — revert.
+                            undoMutation.mutate(item.suggestion_id)
+                          } else if (chosen) {
+                            // Switching label — revert first, then re-pick.
+                            undoMutation.mutate(item.suggestion_id, {
+                              onSuccess: () => resolveMutation.mutate({ suggestionId: item.suggestion_id, label }),
+                            })
+                          } else {
+                            resolveMutation.mutate({ suggestionId: item.suggestion_id, label })
+                          }
+                        }
 
                         return (
                           <div
                             key={item.suggestion_id}
-                            className={`px-4 py-3 transition-colors ${done ? 'bg-gray-50 opacity-60' : 'bg-white'}`}
+                            className={`px-4 py-3 transition-colors ${done ? 'bg-gray-50' : 'bg-white'}`}
                           >
                             <div className="flex items-start justify-between gap-3 mb-1">
                               <span className="text-sm font-medium text-gray-900 flex-1 min-w-0">{title}</span>
@@ -854,24 +877,34 @@ function CalibrateStep({
                               <p className="text-xs text-gray-400 mt-1 italic">{item.relevance_note}</p>
                             )}
 
-                            {!done && (
-                              <div className="flex items-center gap-2 mt-3">
-                                <button
-                                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-green-300 text-green-700 hover:bg-green-50 transition-colors"
-                                  disabled={busy}
-                                  onClick={() => resolveMutation.mutate({ suggestionId: item.suggestion_id, label: 'compliant' })}
-                                >
-                                  {busy && resolveMutation.variables?.label === 'compliant' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />}
-                                  Compliant
-                                </button>
-                                <button
-                                  className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-red-300 text-red-700 hover:bg-red-50 transition-colors"
-                                  disabled={busy}
-                                  onClick={() => resolveMutation.mutate({ suggestionId: item.suggestion_id, label: 'violating' })}
-                                >
-                                  {busy && resolveMutation.variables?.label === 'violating' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsDown size={12} />}
-                                  Violating
-                                </button>
+                            <div className="flex items-center gap-2 mt-3">
+                              <button
+                                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border transition-colors ${
+                                  chosen === 'compliant'
+                                    ? 'bg-green-100 border-green-400 text-green-800 ring-1 ring-green-300'
+                                    : 'border-green-300 text-green-700 hover:bg-green-50'
+                                }`}
+                                disabled={busy}
+                                onClick={() => handlePick('compliant')}
+                                title={chosen === 'compliant' ? 'Click to undo' : 'Mark as compliant'}
+                              >
+                                {busy && resolveMutation.variables?.label === 'compliant' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsUp size={12} />}
+                                Compliant
+                              </button>
+                              <button
+                                className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border transition-colors ${
+                                  chosen === 'violating'
+                                    ? 'bg-red-100 border-red-400 text-red-800 ring-1 ring-red-300'
+                                    : 'border-red-300 text-red-700 hover:bg-red-50'
+                                }`}
+                                disabled={busy}
+                                onClick={() => handlePick('violating')}
+                                title={chosen === 'violating' ? 'Click to undo' : 'Mark as violating'}
+                              >
+                                {busy && resolveMutation.variables?.label === 'violating' ? <Loader2 size={12} className="animate-spin" /> : <ThumbsDown size={12} />}
+                                Violating
+                              </button>
+                              {!done && (
                                 <button
                                   className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors ml-auto"
                                   disabled={busy}
@@ -880,8 +913,11 @@ function CalibrateStep({
                                   <SkipForward size={12} />
                                   Skip
                                 </button>
-                              </div>
-                            )}
+                              )}
+                              {chosen === 'skipped' && (
+                                <span className="ml-auto text-xs text-gray-400">Skipped</span>
+                              )}
+                            </div>
                           </div>
                         )
                       })}

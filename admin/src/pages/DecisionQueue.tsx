@@ -194,14 +194,16 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             </button>
           )}
           <Filter size={14} className="text-gray-400" />
+          <span className="text-xs text-gray-500">Agent verdict:</span>
           <select
             className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none"
             value={verdictFilter}
             onChange={e => setVerdictFilter(e.target.value)}
           >
-            <option value="">All verdicts</option>
+            <option value="">All</option>
             <option value="approve">Approve</option>
             <option value="remove">Remove</option>
+            <option value="review">Review</option>
           </select>
         </div>
       </div>
@@ -597,6 +599,16 @@ function DecisionCard({
     setNotes('')
   }
 
+  const handleVerdictClick = (verdict: string) => {
+    if (resolving) return
+    // If user matches the agent's verdict, no override form needed — resolve immediately.
+    if (verdict === decision.agent_verdict) {
+      onResolve(verdict, undefined, undefined, undefined)
+      return
+    }
+    setSelectedVerdict(verdict)
+  }
+
   return (
     <div className={`card overflow-hidden ${selected ? 'ring-2 ring-indigo-400' : ''} ${decision.was_override ? 'border-amber-200' : ''}`}>
       <div className="p-4">
@@ -641,23 +653,26 @@ function DecisionCard({
             <>
               <button
                 className={`btn-success text-xs ${selectedVerdict === 'approve' ? 'ring-2 ring-green-500' : ''}`}
-                onClick={() => setSelectedVerdict('approve')}
+                onClick={() => handleVerdictClick('approve')}
+                disabled={resolving}
               >
-                <CheckCircle size={13} />
+                {resolving && decision.agent_verdict === 'approve' ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle size={13} />}
                 Approve
               </button>
               <button
-                className={`text-xs px-2.5 py-1.5 rounded-md font-medium inline-flex items-center gap-1.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 ${selectedVerdict === 'warn' ? 'ring-2 ring-amber-500' : ''}`}
-                onClick={() => setSelectedVerdict('warn')}
+                className={`text-xs px-2.5 py-1.5 rounded-md font-medium inline-flex items-center gap-1.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50 ${selectedVerdict === 'warn' ? 'ring-2 ring-amber-500' : ''}`}
+                onClick={() => handleVerdictClick('warn')}
+                disabled={resolving}
               >
-                <AlertTriangle size={13} />
+                {resolving && decision.agent_verdict === 'warn' ? <Loader2 size={13} className="animate-spin" /> : <AlertTriangle size={13} />}
                 Warn
               </button>
               <button
                 className={`btn-danger text-xs ${selectedVerdict === 'remove' ? 'ring-2 ring-red-500' : ''}`}
-                onClick={() => setSelectedVerdict('remove')}
+                onClick={() => handleVerdictClick('remove')}
+                disabled={resolving}
               >
-                <XCircle size={13} />
+                {resolving && decision.agent_verdict === 'remove' ? <Loader2 size={13} className="animate-spin" /> : <XCircle size={13} />}
                 Remove
               </button>
             </>
@@ -705,7 +720,7 @@ function DecisionCard({
             {isOverride && (
               <input
                 className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none"
-                placeholder="Quick note on why you're overriding (optional)"
+                placeholder="Quick note on why you're overriding the agent's decision (optional)"
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
               />
