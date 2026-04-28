@@ -428,6 +428,12 @@ export const acceptRecompile = (ruleId: string, suggestionId: string) =>
 export const previewRecompile = (ruleId: string, ruleText: string) =>
   api.post<PreviewRecompileResult>(`/rules/${ruleId}/preview-recompile`, { rule_text: ruleText }).then(r => r.data)
 
+export const commitRecompile = (
+  ruleId: string,
+  body: { rule_text: string; title?: string; operations: Record<string, unknown>[] },
+) =>
+  api.post<Rule>(`/rules/${ruleId}/commit-recompile`, body).then(r => r.data)
+
 export const evaluateExamplesWithDraft = (ruleId: string, ruleText: string) =>
   api.post<DraftEvaluationResult[]>(`/rules/${ruleId}/evaluate-examples-with-draft`, { rule_text: ruleText }).then(r => r.data)
 
@@ -646,6 +652,7 @@ export const previewDecisions = (
     rule_text?: string
     checklist_override_operations?: Record<string, unknown>[]
     limit?: number
+    decision_ids?: string[]
   },
 ) =>
   api.post<PreviewDecisionsResponse>(`/rules/${ruleId}/preview-decisions`, body).then(r => r.data)

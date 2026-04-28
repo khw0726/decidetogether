@@ -13,6 +13,10 @@ interface DecisionsPanelProps {
   checklistItemId: string | null
   previewResults: DecisionPreviewResult[] | null
   previewLoading: boolean
+  testSetIds?: string[]
+  useTestSet?: boolean
+  onToggleUseTestSet?: (next: boolean) => void
+  onToggleTestSetMember?: (decisionId: string) => void
 }
 
 const VERDICT_BADGE: Record<string, string> = {
@@ -29,30 +33,6 @@ function VerdictBadge({ label, verdict }: { label: string; verdict: string }) {
     <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5 ${cls}`}>
       <span className="opacity-60 font-normal normal-case tracking-normal">{label}</span>
       <span>{verdict}</span>
-    </span>
-  )
-}
-
-function DeltaChip({ kind }: { kind: 'fixed' | 'regressed' | 'unchanged' }) {
-  const styles: Record<typeof kind, string> = {
-    fixed: 'text-green-700 bg-green-50 border-green-200',
-    regressed: 'text-red-700 bg-red-50 border-red-200',
-    unchanged: 'text-gray-500 bg-gray-50 border-gray-200',
-  }
-  const icon: Record<typeof kind, string> = {
-    fixed: '✓',
-    regressed: '✗',
-    unchanged: '—',
-  }
-  const label: Record<typeof kind, string> = {
-    fixed: 'fixed',
-    regressed: 'regressed',
-    unchanged: 'no change',
-  }
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5 ${styles[kind]}`}>
-      <span>{icon[kind]}</span>
-      <span>{label[kind]}</span>
     </span>
   )
 }
@@ -76,7 +56,12 @@ export default function DecisionsPanel({
   checklistItemId,
   previewResults,
   previewLoading,
+  testSetIds = [],
+  useTestSet = false,
+  onToggleUseTestSet,
+  onToggleTestSetMember,
 }: DecisionsPanelProps) {
+  const testSetSet = new Set(testSetIds)
   const { data: decisions = [], isLoading } = useQuery({
     queryKey: ['decisions-for-rule', communityId, ruleId, checklistItemId],
     queryFn: () =>
@@ -136,17 +121,54 @@ export default function DecisionsPanel({
 
   return (
     <div className="flex-1 overflow-auto p-3 space-y-3">
+      {onToggleTestSetMember && (
+        <div className="flex items-center gap-3 text-[11px] bg-gray-50 border border-gray-200 rounded px-2 py-1.5 sticky top-0 z-10">
+          <span className="font-semibold text-gray-600 uppercase tracking-wide">Test set</span>
+          <span className="text-gray-500">{testSetIds.length} pinned</span>
+          <label className="ml-auto flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useTestSet}
+              onChange={e => onToggleUseTestSet?.(e.target.checked)}
+              disabled={testSetIds.length === 0}
+            />
+            <span>Use only pinned for live preview</span>
+          </label>
+        </div>
+      )}
       {decisions.map(d => (
-        <DecisionRow key={d.id} decision={d} />
+        <DecisionRow
+          key={d.id}
+          decision={d}
+          isPinned={testSetSet.has(d.id)}
+          onTogglePinned={onToggleTestSetMember}
+        />
       ))}
     </div>
   )
 }
 
-function DecisionRow({ decision }: { decision: Decision }) {
+function DecisionRow({
+  decision,
+  isPinned,
+  onTogglePinned,
+}: {
+  decision: Decision
+  isPinned?: boolean
+  onTogglePinned?: (decisionId: string) => void
+}) {
   return (
-    <div className="border border-gray-200 rounded-lg p-3 bg-white">
+    <div className={`border rounded-lg p-3 bg-white ${isPinned ? 'border-indigo-300 ring-1 ring-indigo-100' : 'border-gray-200'}`}>
       <div className="flex items-center gap-2 mb-2">
+        {onTogglePinned && (
+          <input
+            type="checkbox"
+            checked={!!isPinned}
+            onChange={() => onTogglePinned(decision.id)}
+            title="Pin to live test set"
+            className="cursor-pointer"
+          />
+        )}
         <VerdictBadge label="Agent" verdict={decision.agent_verdict} />
         <VerdictBadge label="Mod" verdict={decision.moderator_verdict} />
         <span className="text-[10px] text-gray-400 ml-auto">
@@ -186,7 +208,7 @@ function PreviewList({ items }: { items: DecisionPreviewResult[] }) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 text-xs bg-indigo-50 border border-indigo-200 rounded-lg p-2 sticky top-0">
+      <div className="flex items-center gap-3 text-xs bg-indigo-100 border border-indigo-200 rounded-lg p-2 sticky top-0 z-10 shadow-sm">
         <span className="font-semibold text-indigo-700 uppercase tracking-wide text-[10px]">Preview</span>
         {summary.fixed > 0 && <span className="text-green-700 font-semibold">{summary.fixed} fixed</span>}
         {summary.unchanged > 0 && <span className="text-gray-500">{summary.unchanged} unchanged</span>}
@@ -195,10 +217,11 @@ function PreviewList({ items }: { items: DecisionPreviewResult[] }) {
       {items.map(ev => (
         <div key={ev.decision_id} className="border border-gray-200 rounded p-2 bg-white text-xs">
           <div className="flex items-center gap-2 mb-1">
-            <DeltaChip kind={classifyPreview(ev)} />
+            <VerdictBadge label="Old" verdict={ev.old_verdict} />
+            <VerdictBadge label="New" verdict={ev.new_verdict} />
             <VerdictBadge label="Mod" verdict={ev.moderator_verdict} />
             <span className="ml-auto text-[10px] text-gray-400">
-              {ev.old_verdict} ({Math.round(ev.old_confidence * 100)}%) → {ev.new_verdict} ({Math.round(ev.new_confidence * 100)}%)
+              {Math.round(ev.old_confidence * 100)}% → {Math.round(ev.new_confidence * 100)}%
             </span>
           </div>
           <p className="text-gray-700 font-medium truncate">{ev.post_title}</p>

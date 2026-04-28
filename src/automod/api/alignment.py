@@ -505,6 +505,8 @@ class PreviewDecisionsRequest(BaseModel):
     # If provided, skip compiling from rule_text and evaluate against these ops directly.
     checklist_override_operations: list[dict[str, Any]] | None = None
     limit: int = 50
+    # If provided, evaluate against exactly this curated set instead of recent-N.
+    decision_ids: list[str] | None = None
 
 
 @router.post("/rules/{rule_id}/preview-decisions")
@@ -559,18 +561,26 @@ async def preview_decisions(
     if not hypothetical:
         return empty
 
-    # Fetch recent resolved decisions where this rule was evaluated
-    decisions_result = await db.execute(
-        select(Decision)
-        .where(
-            Decision.community_id == rule.community_id,
-            Decision.moderator_verdict != "pending",
+    # Fetch decisions: either a curated subset by id, or recent resolved decisions
+    if body.decision_ids:
+        decisions_result = await db.execute(
+            select(Decision)
+            .where(Decision.id.in_(body.decision_ids))
+            .where(Decision.community_id == rule.community_id)
         )
-        .order_by(Decision.resolved_at.desc())
-        .limit(body.limit * 4)
-    )
-    candidates = list(decisions_result.scalars().all())
-    decisions = [d for d in candidates if rule_id in (d.agent_reasoning or {})][: body.limit]
+        decisions = list(decisions_result.scalars().all())
+    else:
+        decisions_result = await db.execute(
+            select(Decision)
+            .where(
+                Decision.community_id == rule.community_id,
+                Decision.moderator_verdict != "pending",
+            )
+            .order_by(Decision.resolved_at.desc())
+            .limit(body.limit * 4)
+        )
+        candidates = list(decisions_result.scalars().all())
+        decisions = [d for d in candidates if rule_id in (d.agent_reasoning or {})][: body.limit]
     if not decisions:
         return empty
 

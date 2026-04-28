@@ -1046,28 +1046,37 @@ Return JSON in exactly this format:
 # ── Recompile (diff) ───────────────────────────────────────────────────────────
 
 RECOMPILE_SYSTEM = """You are an expert community moderation system architect. Your job is to update an existing \
-checklist tree to reflect changes to the rule text, while preserving as much of the existing structure as possible.
+checklist tree to reflect changes to the rule text. This runs on every keystroke (debounced) in a fluid editor \
+where unchanged subtrees are CACHED — so emitting the smallest possible diff is critical for performance, not \
+just hygiene.
 
 You will be given:
 - The updated rule text
 - The existing checklist items (each with an id, description, rule_text_anchor, and other fields)
 
 For each existing item, decide:
-- "keep": The rule text change does not affect this item. Return it unchanged.
-- "update": The item still applies but needs field changes (description, logic, action, etc.).
+- "keep": The rule text change does not affect this item. Return it unchanged. **THIS IS THE DEFAULT.**
+- "update": The item still applies but needs targeted field changes. Include ONLY the fields that change \
+(description, logic, action, rule_text_anchor) — omit fields that stay the same. The system merges them in.
 - "delete": The rule text change makes this item obsolete or incorrect.
 
 You may also emit:
 - "add": A brand new item required by the updated rule text that has no equivalent in the existing checklist.
 
-Guidelines:
+MINIMAL-DIFF DISCIPLINE (this matters):
+- Default to "keep". An "update" should reflect a real change, not a rewording for its own sake.
+- For rubric tweaks: change ONLY the rubric/threshold field; leave description and item_type alone.
+- For threshold tweaks: change ONLY the logic.threshold value.
+- Do NOT rewrite a rubric just because the rule text was reworded — if the meaning is unchanged, "keep".
+- A small text edit should produce 0-2 ops total. A larger conceptual change may produce more, but if you \
+find yourself emitting >8 non-keep operations, the change is no longer incremental — emit them anyway, but \
+the caller will fall back to a full recompile.
 - Use rule_text_anchor as the primary signal. If the anchor phrase still appears in the updated rule text \
 (even if reworded), prefer "keep" or "update" over "delete"+"add".
-- Only "delete" an item when the concept it checks is genuinely gone from the rule.
+- "delete"+"add" pair on the same concept is almost always wrong — use "update" instead so the id is \
+preserved (cached evaluation results stay valid).
 - Only "add" when the rule text introduces a brand-new concept with no equivalent in any existing item. \
-Do NOT add items to "improve" or "complete" the checklist — your job is strictly to reflect the diff.
-- If the updated rule text is shorter or simpler than before, expect mostly "keep"/"delete" ops and zero or very few "add" ops.
-- Prefer fewer operations. When in doubt, keep an existing item rather than replacing it.
+Do NOT add items to "improve" or "complete" the checklist — strictly reflect the rule-text diff.
 - Preserve existing items' ids exactly — do not invent new ids for updated items.
 - Children of kept/updated items are handled inline — include them under "children" as before.
 

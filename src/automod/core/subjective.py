@@ -8,6 +8,7 @@ import anthropic
 from ..config import Settings
 from ..db.models import ChecklistItem, Example
 from ..compiler.prompts import SUBJECTIVE_EVAL_SYSTEM, build_subjective_eval_prompt
+from . import eval_cache
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,22 @@ class SubjectiveEvaluator:
         if not items:
             return []
 
+        self._last_post = post
+
+        # Cache lookup: skip LLM for items whose (post, logic) hash already has a result.
+        cached_results: list[dict[str, Any]] = []
+        uncached_items: list[ChecklistItem] = []
+        for item in items:
+            hit = eval_cache.get(post, item.logic or {})
+            if hit is not None:
+                cached_results.append({**hit, "item_id": item.id})
+            else:
+                uncached_items.append(item)
+
+        if not uncached_items:
+            return cached_results
+
+        items = uncached_items  # only call the LLM on cache misses below
         items_dicts = [self._prepare_item_dict(item) for item in items]
         primary_dicts, borderline_dicts = self._prepare_example_dicts(examples)
 
@@ -133,7 +150,7 @@ class SubjectiveEvaluator:
             haiku_results = haiku_response.get("results", [])
         except Exception as e:
             logger.error(f"Haiku evaluation failed: {e}")
-            return [
+            failure = [
                 {
                     "item_id": item.id,
                     "triggered": False,
@@ -142,13 +159,15 @@ class SubjectiveEvaluator:
                 }
                 for item in items
             ]
+            return cached_results + failure
 
         # Identify low-confidence results that need escalation
         threshold = self.settings.escalation_confidence_threshold
         low_confidence = [r for r in haiku_results if r.get("confidence", 1.0) < threshold]
 
         if not low_confidence:
-            return haiku_results
+            self._cache_fresh(items, haiku_results)
+            return cached_results + haiku_results
 
         # Escalate low-confidence items to Sonnet
         logger.info(f"Escalating {len(low_confidence)} items to Sonnet")
@@ -188,6 +207,38 @@ class SubjectiveEvaluator:
                         "confidence": 0.5,
                         "reasoning": "No result returned",
                     }))
-            return final_results
+            self._cache_fresh(items, final_results)
+            return cached_results + final_results
 
-        return haiku_results
+        self._cache_fresh(items, haiku_results)
+        return cached_results + haiku_results
+
+    def _cache_fresh(
+        self,
+        items: list[ChecklistItem],
+        results: list[dict[str, Any]],
+    ) -> None:
+        """Populate the eval cache with fresh subjective results.
+
+        We need (post, logic) keys, so we look the post up via the call site —
+        but evaluate_batch closes over `post`. Pull it from `self._last_post`
+        (set by evaluate_batch before this is called).
+        """
+        post = self._last_post
+        items_by_id = {item.id: item for item in items}
+        for r in results:
+            item = items_by_id.get(r.get("item_id"))
+            if item is None:
+                continue
+            # Don't cache obvious failures.
+            reasoning = r.get("reasoning", "")
+            if isinstance(reasoning, str) and reasoning.startswith("Evaluation failed"):
+                continue
+            value = {
+                "triggered": r.get("triggered", False),
+                "confidence": r.get("confidence", 0.5),
+                "reasoning": reasoning,
+            }
+            if "escalated" in r:
+                value["escalated"] = r["escalated"]
+            eval_cache.set_(post, item.logic or {}, value)

@@ -503,24 +503,6 @@ function ItemHealthCard({
   )
 }
 
-// ── UncoveredViolations ─────────────────────────────────────────────────────────
-
-function UncoveredViolations({ violations }: { violations: ExampleSummary[] }) {
-  if (!violations.length) return null
-  return (
-    <div className="border border-gray-200 rounded-lg p-3">
-      <p className="text-xs font-semibold text-gray-500 mb-2">
-        Uncovered Violations ({violations.length}) — removed by moderators, no checklist item matches
-      </p>
-      <div className="border border-gray-100 rounded bg-white px-2 py-1">
-        {violations.slice(0, 8).map(ex => (
-          <ExampleRow key={ex.example_id} ex={ex} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── RuleHealthPanel ─────────────────────────────────────────────────────────────
 
 interface RuleHealthPanelProps {
@@ -582,7 +564,7 @@ export default function RuleHealthPanel({
     )
   }
 
-  const { overall, items, uncovered_violations } = health
+  const { overall, items } = health
   const unhealthyCount = items.filter(isUnhealthy).length
   const selectedItem = highlightItemId
     ? items.find(i => i.item_id === highlightItemId) || null
@@ -627,21 +609,22 @@ export default function RuleHealthPanel({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-[11px] text-gray-500">
-          <span><span className="font-semibold text-gray-700">{pct(overall.covered_by_examples)}</span> items with examples</span>
-          {unhealthyCount > 0 && (
-            <span className="text-amber-600 font-semibold flex items-center gap-1">
-              <AlertTriangle size={11} />
-              {unhealthyCount} item{unhealthyCount !== 1 ? 's' : ''} need attention
-            </span>
-          )}
-          {unhealthyCount === 0 && overall.total_decisions > 0 && (
-            <span className="text-green-600 font-semibold flex items-center gap-1">
-              <CheckCircle size={11} />
-              All items healthy
-            </span>
-          )}
-        </div>
+        {(unhealthyCount > 0 || overall.total_decisions > 0) && (
+          <div className="flex items-center gap-3 text-[11px] text-gray-500">
+            {unhealthyCount > 0 && (
+              <span className="text-amber-600 font-semibold flex items-center gap-1">
+                <AlertTriangle size={11} />
+                {unhealthyCount} item{unhealthyCount !== 1 ? 's' : ''} need attention
+              </span>
+            )}
+            {unhealthyCount === 0 && overall.total_decisions > 0 && (
+              <span className="text-green-600 font-semibold flex items-center gap-1">
+                <CheckCircle size={11} />
+                All items healthy
+              </span>
+            )}
+          </div>
+        )}
 
         {overall.total_decisions === 0 && (
           <p className="text-sm text-gray-400 text-center py-2">
@@ -657,9 +640,6 @@ export default function RuleHealthPanel({
             items={items}
           />
         )}
-
-        {/* Uncovered violations */}
-        <UncoveredViolations violations={uncovered_violations} />
       </div>
 
       {/* Item-specific health — only when a checklist item is selected */}

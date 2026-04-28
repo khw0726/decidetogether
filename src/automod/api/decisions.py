@@ -140,16 +140,20 @@ async def _resolve_single_decision(
     await db.flush()
 
     # Auto-create example from this decision based on the four cases:
-    #   agent=approve + mod=approve + no triggered rules → skip (no useful signal)
-    #   agent=approve + mod=remove/review               → violating/borderline, link to mod-specified rule_ids
-    #   agent=remove  + mod=approve                     → compliant, link to agent's triggered_rules
-    #   agent=remove  + mod=remove/review               → violating/borderline, link to agent's triggered_rules
+    #   agent=approve/review + mod=approve + no triggered rules → skip (no useful signal)
+    #   agent=approve/review + mod=remove/warn                  → violating/borderline, link to mod-specified rule_ids
+    #   agent=remove         + mod=approve                      → compliant, link to agent's triggered_rules
+    #   agent=remove         + mod=remove/warn                  → violating/borderline, link to agent's triggered_rules
+    # "review" (community-norms flag) is treated like "approve" for rule-linking purposes:
+    # the agent did not attribute the post to any specific rule, so if the mod removes/warns
+    # they may optionally attribute it themselves.
     agent_approved = decision.agent_verdict == "approve"
+    agent_missed_violation = decision.agent_verdict in ("approve", "review")
     mod_approved = body.verdict == "approve"
     agent_triggered = decision.triggered_rules or []
     agent_reasoning = decision.agent_reasoning or {}
 
-    skip_example = agent_approved and mod_approved and not agent_triggered
+    skip_example = agent_missed_violation and mod_approved and not agent_triggered
 
     if not skip_example:
         if body.verdict == "approve":
@@ -172,7 +176,7 @@ async def _resolve_single_decision(
         # Determine which rules to link:
         # - Agent missed the violation (approved but mod disagrees) → use moderator-specified rule_ids
         # - Agent was correct or conservative → use agent's triggered_rules
-        if agent_approved and not mod_approved:
+        if agent_missed_violation and not mod_approved:
             rule_ids_to_link = body.rule_ids or []
         else:
             rule_ids_to_link = agent_triggered
@@ -190,7 +194,7 @@ async def _resolve_single_decision(
 
                 # Increment override_count when moderator removes a post linked to this rule
                 # but agent approved it (agent missed the violation)
-                if not mod_approved and agent_approved:
+                if not mod_approved and agent_missed_violation:
                     rule.override_count = (rule.override_count or 0) + 1
 
             # Link to specific checklist items the agent triggered (empty for agent=approve cases)
@@ -221,7 +225,7 @@ async def _resolve_single_decision(
 
     # After a remove-override with no rule linked (unlinked remove), check if we've hit
     # the M=3 threshold and auto-trigger a new-rule suggestion.
-    if not skip_unlinked_check and not mod_approved and agent_approved and not (body.rule_ids or []):
+    if not skip_unlinked_check and not mod_approved and agent_missed_violation and not (body.rule_ids or []):
         await _maybe_auto_cluster_unlinked_removes(db, decision.community_id)
 
 

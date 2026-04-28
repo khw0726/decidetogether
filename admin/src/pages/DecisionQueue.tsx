@@ -564,9 +564,10 @@ function DecisionCard({
   const [notes, setNotes] = useState('')
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
 
-  // Rule picker is needed when agent approved (no triggered rules) but moderator disagrees
-  const agentApproved = decision.agent_verdict === 'approve'
-  const needsRulePicker = agentApproved && selectedVerdict && selectedVerdict !== 'approve'
+  // Rule picker is needed when the agent did not attribute the post to any rule
+  // (verdict approve, or review = community-norms flag) but the moderator removes/warns.
+  const agentMissedViolation = decision.agent_verdict === 'approve' || decision.agent_verdict === 'review'
+  const needsRulePicker = agentMissedViolation && selectedVerdict && selectedVerdict !== 'approve'
   const isOverride = selectedVerdict && selectedVerdict !== decision.agent_verdict
 
   const isPending = decision.moderator_verdict === 'pending'
@@ -699,7 +700,9 @@ function DecisionCard({
             {needsRulePicker && (
               <div>
                 <p className="text-xs text-amber-700 font-medium mb-1">
-                  Agent did not trigger any rules — which rule(s) does this post violate? (leave blank if no rule applies)
+                  {decision.agent_verdict === 'review'
+                    ? 'Agent flagged this as a community-norms issue with no specific rule — which rule(s) does this post violate? (leave blank if no rule applies)'
+                    : 'Agent did not trigger any rules — which rule(s) does this post violate? (leave blank if no rule applies)'}
                 </p>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {Object.entries(rulesMap).map(([id, rule]) => (

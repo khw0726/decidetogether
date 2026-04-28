@@ -845,6 +845,107 @@ async def list_rules(
     return [RuleRead.model_validate(r) for r in rules]
 
 
+class CommitRecompileRequest(BaseModel):
+    rule_text: str
+    title: Optional[str] = None
+    operations: list[dict] = []
+
+
+@router.post("/rules/{rule_id}/commit-recompile", response_model=RuleRead)
+async def commit_recompile(
+    rule_id: str,
+    body: CommitRecompileRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+) -> RuleRead:
+    """Apply a pre-computed recompile diff and persist the rule text in one shot.
+
+    Used by the fluid editor: the live preview already produced `operations`
+    via recompile_with_diff. Saving should apply THOSE ops, not re-run the
+    LLM — both for cost and so what the moderator saw is what gets persisted.
+    """
+    result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+    community = comm_result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    rule.text = body.rule_text
+    if body.title is not None:
+        rule.title = body.title
+
+    # Clear any stashed context preview — text changed.
+    rule.pending_checklist_json = None
+    rule.pending_context_adjustment_summary = None
+    rule.pending_relevant_context = None
+    rule.pending_custom_context_notes = None
+    rule.pending_generated_at = None
+
+    # Re-triage (fast, single LLM call) — rule_type may have shifted.
+    try:
+        compiler = get_compiler()
+        triage = await compiler.triage_rule(rule.text, community.name, community.platform)
+        rule.rule_type = triage["rule_type"]
+        rule.rule_type_reasoning = triage["reasoning"]
+        rule.applies_to = triage.get("applies_to", "both")
+    except Exception as e:
+        logger.error(f"Re-triage failed during commit-recompile: {e}")
+
+    # Apply the supplied operations synchronously, mirroring _compile_rule_persist's recompile path.
+    if rule.rule_type == "actionable" and body.operations:
+        existing_result = await db.execute(
+            select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+        )
+        existing_by_id = {item.id: item for item in existing_result.scalars()}
+        try:
+            await _apply_diff_operations(db, body.operations, existing_by_id, rule_id)
+            await db.flush()
+            await _re_resolve_checklist_links(db, rule_id)
+        except Exception as e:
+            logger.error(f"Apply ops failed during commit-recompile for {rule_id}: {e}")
+            await db.rollback()
+            raise HTTPException(status_code=500, detail="Failed to apply operations")
+
+    await db.commit()
+    await db.refresh(rule)
+
+    # Fill any missing examples + re-eval pending queue in the background.
+    if rule.rule_type == "actionable":
+        background_tasks.add_task(_fill_examples_and_reeval, rule_id, rule.community_id)
+
+    return RuleRead.model_validate(rule)
+
+
+async def _fill_examples_and_reeval(rule_id: str, community_id: str) -> None:
+    """Background follow-up after a synchronous commit-recompile.
+
+    Generates violating examples for any newly-added items that lack one, then
+    re-evaluates the moderation queue against the new logic.
+    """
+    from ..db.database import AsyncSessionLocal
+    try:
+        compiler = get_compiler()
+        async with AsyncSessionLocal() as db:
+            rule = (await db.execute(select(Rule).where(Rule.id == rule_id))).scalar_one_or_none()
+            community = (await db.execute(
+                select(Community).where(Community.id == community_id)
+            )).scalar_one_or_none()
+            if rule and community:
+                await _fill_missing_examples(db, rule_id, compiler, rule, community)
+                await db.commit()
+    except Exception as e:
+        logger.error(f"Background follow-up failed for rule {rule_id}: {e}")
+    try:
+        from .checklist import spawn_pending_queue_reeval
+        spawn_pending_queue_reeval(rule_id)
+    except Exception as e:
+        logger.error(f"Pending-queue re-eval spawn failed for rule {rule_id}: {e}")
+
+
 @router.put("/rules/{rule_id}", response_model=RuleRead)
 async def update_rule(
     rule_id: str,

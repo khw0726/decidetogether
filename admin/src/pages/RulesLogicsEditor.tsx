@@ -4,7 +4,6 @@ import {
   AlertCircle,
   BookOpen,
   Check,
-  Edit2,
   Loader2,
   Play,
   Plus,
@@ -23,6 +22,7 @@ import {
   RuleHealthSummary,
   Suggestion,
   commitContextAdjustment,
+  commitRecompile,
   createRule,
   discardContextPreview,
   getChecklist,
@@ -146,7 +146,6 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   const queryClient = useQueryClient()
 
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null)
-  const [editMode, setEditMode] = useState(false)
   const [editingText, setEditingText] = useState('')
   const [editingTitle, setEditingTitle] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -164,6 +163,33 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
 
   const [decisionPreview, setDecisionPreview] = useState<DecisionPreviewResult[] | null>(null)
   const [decisionPreviewLoading, setDecisionPreviewLoading] = useState(false)
+
+  // Curated test-set: localStorage-backed per-rule list of decision_ids.
+  const [testSetIds, setTestSetIds] = useState<string[]>([])
+  const [useTestSet, setUseTestSet] = useState(false)
+  useEffect(() => {
+    if (!selectedRuleId) { setTestSetIds([]); setUseTestSet(false); return }
+    try {
+      const raw = localStorage.getItem(`fluid-test-set:${selectedRuleId}`)
+      const parsed = raw ? JSON.parse(raw) : { ids: [], use: false }
+      setTestSetIds(Array.isArray(parsed.ids) ? parsed.ids : [])
+      setUseTestSet(!!parsed.use)
+    } catch {
+      setTestSetIds([]); setUseTestSet(false)
+    }
+  }, [selectedRuleId])
+  useEffect(() => {
+    if (!selectedRuleId) return
+    localStorage.setItem(
+      `fluid-test-set:${selectedRuleId}`,
+      JSON.stringify({ ids: testSetIds, use: useTestSet }),
+    )
+  }, [selectedRuleId, testSetIds, useTestSet])
+  const toggleTestSetMember = (decisionId: string) => {
+    setTestSetIds(prev =>
+      prev.includes(decisionId) ? prev.filter(id => id !== decisionId) : [...prev, decisionId],
+    )
+  }
 
   const [showTestModal, setShowTestModal] = useState(false)
   const [showNewRule, setShowNewRule] = useState(false)
@@ -241,16 +267,8 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     setHoveredAnchor(null)
     setSelectedChecklistItemId(null)
     setContextPreview(null)
-    setEditMode(false)
     setHealthSuggestions([])
     setDecisionPreview(null)
-  }
-
-  const exitEditMode = () => {
-    if (selectedRule) setEditingText(selectedRule.text)
-    setPreviewResult(null)
-    setDecisionPreview(null)
-    setEditMode(false)
   }
 
   const handlePreviewChanges = async () => {
@@ -281,10 +299,29 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   }
 
   const handleConfirmSave = async () => {
-    await handleSaveRule()
+    if (!selectedRuleId || !selectedRule) return
+    // Fluid-editor path: apply the diff that was already previewed.
+    if (previewResult && selectedRule.rule_type === 'actionable') {
+      setIsSaving(true)
+      try {
+        await commitRecompile(selectedRuleId, {
+          rule_text: editingText,
+          title: editingTitle,
+          operations: previewResult.operations as unknown as Record<string, unknown>[],
+        })
+        queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+        queryClient.invalidateQueries({ queryKey: ['checklist', selectedRuleId] })
+      } catch (e) {
+        showErrorToast(extractErrorMessage(e))
+      } finally {
+        setIsSaving(false)
+      }
+    } else {
+      await handleSaveRule()
+      queryClient.invalidateQueries({ queryKey: ['checklist', selectedRuleId] })
+    }
     setPreviewResult(null)
     setDecisionPreview(null)
-    setEditMode(false)
   }
 
   const handleDiscardEdit = () => {
@@ -299,7 +336,6 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     try {
       await commitContextAdjustment(selectedRule.id)
       setContextPreview(null)
-      setEditMode(false)
       queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
       queryClient.invalidateQueries({ queryKey: ['checklist', selectedRule.id] })
     } catch (e) {
@@ -342,6 +378,30 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     }
   }
 
+  // Fluid editor: debounce text edits and auto-recompile (preview) for actionable rules.
+  useEffect(() => {
+    if (!selectedRule || selectedRule.rule_type !== 'actionable') return
+    if (editingText === selectedRule.text) return
+    const controller = new AbortController()
+    const ruleId = selectedRule.id
+    const text = editingText
+    const handle = window.setTimeout(async () => {
+      setIsPreviewLoading(true)
+      try {
+        const result = await previewRecompile(ruleId, text)
+        if (!controller.signal.aborted) setPreviewResult(result)
+      } catch (e) {
+        if (!controller.signal.aborted) showErrorToast(extractErrorMessage(e))
+      } finally {
+        if (!controller.signal.aborted) setIsPreviewLoading(false)
+      }
+    }, 600)
+    return () => {
+      controller.abort()
+      window.clearTimeout(handle)
+    }
+  }, [editingText, selectedRule])
+
   // Trigger decisions preview when rule-text preview becomes active.
   useEffect(() => {
     if (!selectedRuleId || !previewResult) {
@@ -349,7 +409,12 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     }
     let cancelled = false
     setDecisionPreviewLoading(true)
-    previewDecisions(selectedRuleId, { rule_text: editingText, limit: 50 })
+    const decisionIds = useTestSet && testSetIds.length > 0 ? testSetIds : undefined
+    previewDecisions(selectedRuleId, {
+      rule_text: editingText,
+      limit: 50,
+      decision_ids: decisionIds,
+    })
       .then(data => {
         if (!cancelled) setDecisionPreview(data.results)
       })
@@ -362,7 +427,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     return () => {
       cancelled = true
     }
-  }, [previewResult, selectedRuleId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [previewResult, selectedRuleId, useTestSet, testSetIds]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Trigger decisions preview when analyze suggestions are present.
   useEffect(() => {
@@ -514,88 +579,78 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
             <div className="flex min-h-0 border-b border-gray-200" style={{ flex: '3 3 0%' }}>
               {/* Rule Text panel */}
               <div className="flex-1 min-w-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden">
-                <PanelHeader title="Rule Text">
-                  <button
-                    className="btn-secondary text-xs py-0.5"
-                    onClick={() => (editMode ? exitEditMode() : setEditMode(true))}
-                    title={editMode ? 'Lock rule' : 'Edit rule'}
-                  >
-                    {editMode ? <><Check size={11} /> Done</> : <><Edit2 size={11} /> Edit</>}
-                  </button>
-                </PanelHeader>
+                <PanelHeader title="Rule Text" />
 
                 <div className="flex-1 flex flex-col overflow-hidden p-4 gap-2 min-h-0">
-                  {editMode ? (
-                    <>
-                      {selectedRule.rule_type === 'actionable' && editingText !== selectedRule.text && (
-                        <div className="flex-shrink-0 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
-                          <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-500" />
-                          <span>
-                            Saving will recompile this rule's logic and automatically{' '}
-                            <strong>re-evaluate every pending item in the moderation queue</strong>{' '}
-                            against the new logic. Existing verdicts in the queue will update in place.
-                          </span>
-                        </div>
-                      )}
-                      <textarea
-                        className="flex-1 resize-none border border-indigo-300 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono min-h-0"
-                        value={editingText}
-                        onChange={e => { setEditingText(e.target.value); setPreviewResult(null); setDecisionPreview(null) }}
-                        placeholder="Rule text..."
-                      />
-                      {(() => {
-                        const textDirty = editingText !== selectedRule.text
-                        const anyDirty = textDirty || contextDirty
-                        const previewActive = !!previewResult || !!effectiveContextPreview
-                        const isActionable = selectedRule.rule_type === 'actionable'
-                        const previewBusy = isPreviewLoading || savingContextPreview
-                        const applyBusy = isSaving || committingContext
-                        return (
-                          <div className="flex gap-2 justify-end flex-shrink-0">
-                            <button
-                              className="btn-secondary text-xs"
-                              onClick={handleUnifiedDiscard}
-                              disabled={!anyDirty && !previewActive}
-                            >
-                              <X size={12} /> Discard edits
-                            </button>
-                            {previewActive ? (
-                              <button
-                                className="btn-primary text-xs"
-                                onClick={handleUnifiedApply}
-                                disabled={applyBusy}
-                              >
-                                {applyBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                                {applyBusy ? 'Applying…' : 'Confirm & Save'}
-                              </button>
-                            ) : isActionable ? (
-                              <button
-                                className="btn-primary text-xs"
-                                onClick={handleUnifiedPreview}
-                                disabled={previewBusy || !anyDirty}
-                              >
-                                {previewBusy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                                {previewBusy ? 'Previewing…' : 'Preview'}
-                              </button>
-                            ) : (
-                              <button
-                                className="btn-primary text-xs"
-                                onClick={handleConfirmSave}
-                                disabled={isSaving || !textDirty}
-                              >
-                                {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                                {isSaving ? 'Saving…' : 'Save'}
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </>
-                  ) : (
-                    <div className="flex-1 border border-gray-200 rounded-lg p-3 text-sm font-mono overflow-auto bg-gray-50 whitespace-pre-wrap text-gray-700 leading-relaxed min-h-0">
-                      {renderTextWithHighlight(editingText, hoveredAnchor)}
+                  {selectedRule.rule_type === 'actionable' && editingText !== selectedRule.text && (
+                    <div className="flex-shrink-0 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
+                      <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-500" />
+                      <span>
+                        Saving will recompile this rule's logic and automatically{' '}
+                        <strong>re-evaluate every pending item in the moderation queue</strong>{' '}
+                        against the new logic. Existing verdicts in the queue will update in place.
+                      </span>
                     </div>
                   )}
+                  <HighlightedTextarea
+                    value={editingText}
+                    onChange={setEditingText}
+                    anchor={hoveredAnchor}
+                    placeholder="Rule text..."
+                  />
+                  {selectedRule.rule_type === 'actionable' && isPreviewLoading && (
+                    <div className="flex-shrink-0 text-[11px] text-indigo-600 flex items-center gap-1.5">
+                      <Loader2 size={11} className="animate-spin" />
+                      Recompiling…
+                    </div>
+                  )}
+                  {(() => {
+                    const textDirty = editingText !== selectedRule.text
+                    const anyDirty = textDirty || contextDirty
+                    const previewActive = !!previewResult || !!effectiveContextPreview
+                    if (!anyDirty && !previewActive) return null
+                    const isActionable = selectedRule.rule_type === 'actionable'
+                    const previewBusy = isPreviewLoading || savingContextPreview
+                    const applyBusy = isSaving || committingContext
+                    return (
+                      <div className="flex gap-2 justify-end flex-shrink-0">
+                        <button
+                          className="btn-secondary text-xs"
+                          onClick={handleUnifiedDiscard}
+                        >
+                          <X size={12} /> Discard edits
+                        </button>
+                        {previewActive ? (
+                          <button
+                            className="btn-primary text-xs"
+                            onClick={handleUnifiedApply}
+                            disabled={applyBusy}
+                          >
+                            {applyBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            {applyBusy ? 'Applying…' : 'Confirm & Save'}
+                          </button>
+                        ) : isActionable ? (
+                          <button
+                            className="btn-primary text-xs"
+                            onClick={handleUnifiedPreview}
+                            disabled={previewBusy}
+                          >
+                            {previewBusy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                            {previewBusy ? 'Previewing…' : 'Preview'}
+                          </button>
+                        ) : (
+                          <button
+                            className="btn-primary text-xs"
+                            onClick={handleConfirmSave}
+                            disabled={isSaving || !textDirty}
+                          >
+                            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                            {isSaving ? 'Saving…' : 'Save'}
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   {/* Rule metadata: context + type + scope */}
                   <div className="border-t border-gray-100 pt-2 flex flex-col gap-2 flex-shrink-0">
@@ -606,7 +661,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                           ref={contextPickerRef}
                           rule={selectedRule}
                           community_context={community?.community_context ?? null}
-                          readOnly={!editMode}
+                          readOnly={false}
                           onDirtyChange={setContextDirty}
                           onSavePreview={async ({ relevant_context, custom_context_notes }) => {
                             setSavingContextPreview(true)
@@ -635,13 +690,8 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                         return (
                           <button
                             key={type}
-                            disabled={!editMode}
                             className={`text-xs px-2 py-0.5 rounded border ${
-                              !editMode
-                                ? active
-                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-600 cursor-default'
-                                  : 'bg-white border-gray-200 text-gray-400 cursor-default'
-                                : active
+                              active
                                 ? 'bg-indigo-600 text-white border-indigo-600 transition-colors'
                                 : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors'
                             }`}
@@ -663,13 +713,8 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                         return (
                           <button
                             key={target}
-                            disabled={!editMode}
                             className={`text-xs px-2 py-0.5 rounded border ${
-                              !editMode
-                                ? active
-                                  ? 'bg-emerald-50 border-emerald-200 text-emerald-600 cursor-default'
-                                  : 'bg-white border-gray-200 text-gray-400 cursor-default'
-                                : active
+                              active
                                 ? 'bg-emerald-600 text-white border-emerald-600 transition-colors'
                                 : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 transition-colors'
                             }`}
@@ -798,6 +843,10 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 checklistItemId={selectedChecklistItemId}
                 previewResults={decisionPreview}
                 previewLoading={decisionPreviewLoading}
+                testSetIds={testSetIds}
+                useTestSet={useTestSet}
+                onToggleUseTestSet={setUseTestSet}
+                onToggleTestSetMember={toggleTestSetMember}
               />
             </div>
           </>
@@ -826,6 +875,53 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
           loading={createRuleMutation.isPending}
         />
       )}
+    </div>
+  )
+}
+
+function HighlightedTextarea({
+  value,
+  onChange,
+  anchor,
+  placeholder,
+}: {
+  value: string
+  onChange: (v: string) => void
+  anchor: string | null
+  placeholder?: string
+}) {
+  const taRef = useRef<HTMLTextAreaElement | null>(null)
+  const overlayRef = useRef<HTMLDivElement | null>(null)
+  const syncScroll = () => {
+    if (taRef.current && overlayRef.current) {
+      overlayRef.current.scrollTop = taRef.current.scrollTop
+      overlayRef.current.scrollLeft = taRef.current.scrollLeft
+    }
+  }
+  // The overlay and textarea share font/padding/border so positions line up.
+  const shared =
+    'absolute inset-0 p-3 text-sm font-mono leading-relaxed whitespace-pre-wrap break-words overflow-auto rounded-lg border'
+  return (
+    <div className="flex-1 relative min-h-0">
+      <div
+        ref={overlayRef}
+        aria-hidden
+        className={`${shared} border-transparent text-gray-700 pointer-events-none`}
+      >
+        {renderTextWithHighlight(value, anchor)}
+        {/* trailing space ensures the last line keeps height */}
+        {'​'}
+      </div>
+      <textarea
+        ref={taRef}
+        className={`${shared} border-indigo-300 bg-transparent text-transparent caret-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+        style={{ WebkitTextFillColor: 'transparent' }}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onScroll={syncScroll}
+        placeholder={placeholder}
+        spellCheck={false}
+      />
     </div>
   )
 }
