@@ -3,6 +3,73 @@ import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus, Sparkle
 import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem, setContextOverride, Rule, ItemHealthMetrics } from '../api/client'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
+// ── Health Chip ──────────────────────────────────────────────────────────────
+
+function HealthChip({ metrics }: { metrics: ItemHealthMetrics }) {
+  const [open, setOpen] = useState(false)
+  if (metrics.decision_count === 0) return null
+  const fpRate = metrics.false_positive_rate
+  const fnRate = metrics.false_negative_rate
+  const errorRate = Math.max(fpRate, fnRate)
+  const errorCount = metrics.false_positive_count + metrics.false_negative_count
+  const unhealthy = errorRate > 0.15
+  const errorPct = Math.round(errorRate * 100)
+  const tone = unhealthy
+    ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
+    : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+
+  return (
+    <span className="relative inline-block">
+      <button
+        type="button"
+        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${tone}`}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onClick={(e) => { e.stopPropagation(); setOpen(v => !v) }}
+        title=""
+      >
+        {unhealthy ? '⚠' : '✓'} {unhealthy ? `${errorPct}% error` : `${metrics.decision_count} ok`}
+      </button>
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-1 z-30 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-2 text-[11px] text-gray-700 cursor-default"
+          onMouseEnter={() => setOpen(true)}
+          onMouseLeave={() => setOpen(false)}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="grid grid-cols-3 gap-1.5 mb-1.5">
+            <div className="bg-red-50 border border-red-100 rounded px-1.5 py-1 text-center">
+              <p className="text-[9px] text-red-500 font-semibold uppercase tracking-wide">Wrongly flagged</p>
+              <p className="text-sm font-bold text-red-700 leading-tight">{Math.round(fpRate * 100)}%</p>
+              <p className="text-[9px] text-red-400">{metrics.false_positive_count}/{metrics.decision_count}</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-100 rounded px-1.5 py-1 text-center">
+              <p className="text-[9px] text-amber-600 font-semibold uppercase tracking-wide">Missed</p>
+              <p className="text-sm font-bold text-amber-700 leading-tight">{Math.round(fnRate * 100)}%</p>
+              <p className="text-[9px] text-amber-500">{metrics.false_negative_count}/{metrics.decision_count}</p>
+            </div>
+            <div className="bg-gray-50 border border-gray-200 rounded px-1.5 py-1 text-center">
+              <p className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide">Decisions</p>
+              <p className="text-sm font-bold text-gray-700 leading-tight">{metrics.decision_count}</p>
+              {metrics.avg_confidence_correct != null && (
+                <p className="text-[9px] text-gray-400">conf {metrics.avg_confidence_correct.toFixed(2)}</p>
+              )}
+            </div>
+          </div>
+          {errorCount > 0 ? (
+            <p className="text-[10px] text-gray-500">
+              {metrics.false_positive_count} wrongly flagged, {metrics.false_negative_count} missed
+              {metrics.avg_confidence_errors != null && ` · errors avg conf ${metrics.avg_confidence_errors.toFixed(2)}`}
+            </p>
+          ) : (
+            <p className="text-[10px] text-emerald-600">No errors recorded.</p>
+          )}
+        </div>
+      )}
+    </span>
+  )
+}
+
 // ── Change Type Icons ────────────────────────────────────────────────────────
 
 const CHANGE_TYPE_META: Record<string, { icon: typeof Gauge; label: string; color: string }> = {
@@ -704,18 +771,15 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {typeBadge}
-              {isUnhealthy && healthMetrics && (
-                <span
-                  className="badge bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1"
-                  title={`${healthMetrics.false_positive_count} wrongly flagged, ${healthMetrics.false_negative_count} missed (of ${healthMetrics.decision_count})`}
-                >
-                  ⚠ {Math.round(errorRate * 100)}% error
-                </span>
-              )}
               {!editing && (
                 <span className="text-sm font-medium text-gray-800">{item.description}</span>
               )}
             </div>
+            {!editing && healthMetrics && healthMetrics.decision_count > 0 && (
+              <div className="mt-1">
+                <HealthChip metrics={healthMetrics} />
+              </div>
+            )}
 
             {editing ? (
               <div className="mt-2 space-y-2">

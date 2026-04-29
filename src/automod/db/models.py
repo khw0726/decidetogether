@@ -8,6 +8,7 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     func,
@@ -34,6 +35,11 @@ class Community(Base):
     community_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     context_samples: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
+    # Reference communities are read-only peer corpus used as grounding for rule-text
+    # suggestions. They are excluded from user-facing community lists and decision flows.
+    is_reference: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    public_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     rules: Mapped[list["Rule"]] = relationship("Rule", back_populates="community", cascade="all, delete-orphan")
     decisions: Mapped[list["Decision"]] = relationship("Decision", back_populates="community", cascade="all, delete-orphan")
     sample_posts: Mapped[list["CommunitySamplePost"]] = relationship("CommunitySamplePost", back_populates="community", cascade="all, delete-orphan")
@@ -55,7 +61,7 @@ class Rule(Base):
     # posts | comments | both
     override_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     base_checklist_json: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    context_adjustment_summary: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    context_adjustment_summary: Mapped[Optional[str]] = mapped_column(JSON, nullable=True)
     # Per-rule context bundle selection. None = all bundles apply (default).
     # Non-None = filtered list of {dimension, tag} entries to include in context calibration.
     relevant_context: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
@@ -64,12 +70,15 @@ class Rule(Base):
     # Pending Pass 2 preview — stashed when moderator previews a context adjustment
     # but hasn't committed yet. Cleared on commit, discard, or when the inputs change.
     pending_checklist_json: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    pending_context_adjustment_summary: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    pending_context_adjustment_summary: Mapped[Optional[str]] = mapped_column(JSON, nullable=True)
     # Snapshot of the inputs used to generate the preview, for staleness detection.
     # Wrapped as {"value": <list|null>} so "None=use-all" is distinguishable from "column missing".
     pending_relevant_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     pending_custom_context_notes: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     pending_generated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # Embedding of the rule title (packed float32 bytes) — populated only for reference
+    # rules in the peer-grounding corpus. Used for cosine retrieval at suggestion time.
+    title_embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

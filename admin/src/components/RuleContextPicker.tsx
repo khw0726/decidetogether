@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, Check } from 'lucide-react'
 import type {
   CommunityContext,
@@ -7,18 +7,13 @@ import type {
   RuleContextTag,
 } from '../api/client'
 
-export interface RuleContextPickerHandle {
-  savePreview: () => Promise<void>
-}
-
 interface Props {
   rule: Rule
   community_context: CommunityContext | null
-  onSavePreview: (data: {
+  onChange: (data: {
     relevant_context: RuleContextTag[] | null
     custom_context_notes: CommunityContextNote[]
-  }) => Promise<void>
-  onDirtyChange?: (dirty: boolean) => void
+  }) => void
   readOnly?: boolean
 }
 
@@ -33,13 +28,12 @@ function keyOf(dim: string, tag: string): string {
   return `${dim}::${tag}`
 }
 
-const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function RuleContextPicker({
+function RuleContextPicker({
   rule,
   community_context,
-  onSavePreview,
-  onDirtyChange,
+  onChange,
   readOnly,
-}, ref) {
+}: Props) {
   const allBundles = useMemo(() => {
     const out: { dim: keyof CommunityContext; tag: string; text: string }[] = []
     if (!community_context) return out
@@ -70,18 +64,28 @@ const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function Ru
   const [customNotes, setCustomNotes] = useState<CommunityContextNote[]>(
     rule.custom_context_notes || [],
   )
-  const [dirty, setDirty] = useState(false)
 
   useEffect(() => {
     setSelected(defaultSelected)
     setUseAll(rule.relevant_context === null || rule.relevant_context === undefined)
     setCustomNotes(rule.custom_context_notes || [])
-    setDirty(false)
   }, [rule.id, defaultSelected, rule.relevant_context, rule.custom_context_notes])
 
-  useEffect(() => {
-    onDirtyChange?.(dirty)
-  }, [dirty, onDirtyChange])
+  const emitChange = (
+    nextSelected: Set<string>,
+    nextUseAll: boolean,
+    nextNotes: CommunityContextNote[],
+  ) => {
+    const relevantContext: RuleContextTag[] | null = nextUseAll
+      ? null
+      : allBundles
+          .filter(b => nextSelected.has(keyOf(b.dim, b.tag)))
+          .map(b => ({ dimension: b.dim as string, tag: b.tag }))
+    const cleanNotes = nextNotes
+      .map(n => ({ text: (n.text || '').trim(), tag: (n.tag || '').trim() }))
+      .filter(n => n.text)
+    onChange({ relevant_context: relevantContext, custom_context_notes: cleanNotes })
+  }
 
   const toggleBundle = (dim: keyof CommunityContext, tag: string) => {
     const k = keyOf(dim, tag)
@@ -90,38 +94,27 @@ const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function Ru
     else next.add(k)
     setSelected(next)
     setUseAll(false)
-    setDirty(true)
+    emitChange(next, false, customNotes)
   }
 
   const handleUseAll = () => {
+    const next = new Set(allBundles.map(b => keyOf(b.dim, b.tag)))
     setUseAll(true)
-    setSelected(new Set(allBundles.map(b => keyOf(b.dim, b.tag))))
-    setDirty(true)
+    setSelected(next)
+    emitChange(next, true, customNotes)
   }
 
   const handleUseNone = () => {
+    const next = new Set<string>()
     setUseAll(false)
-    setSelected(new Set())
-    setDirty(true)
+    setSelected(next)
+    emitChange(next, false, customNotes)
   }
 
-  const handleSavePreview = async () => {
-    const relevantContext: RuleContextTag[] | null = useAll
-      ? null
-      : allBundles
-          .filter(b => selected.has(keyOf(b.dim, b.tag)))
-          .map(b => ({ dimension: b.dim as string, tag: b.tag }))
-    const cleanNotes = customNotes
-      .map(n => ({ text: (n.text || '').trim(), tag: (n.tag || '').trim() }))
-      .filter(n => n.text)
-    await onSavePreview({
-      relevant_context: relevantContext,
-      custom_context_notes: cleanNotes,
-    })
-    setDirty(false)
+  const updateNotes = (next: CommunityContextNote[]) => {
+    setCustomNotes(next)
+    emitChange(selected, useAll, next)
   }
-
-  useImperativeHandle(ref, () => ({ savePreview: handleSavePreview }))
 
   if (!community_context || allBundles.length === 0) {
     return (
@@ -212,10 +205,7 @@ const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function Ru
               <button
                 className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5"
                 type="button"
-                onClick={() => {
-                  setCustomNotes([...customNotes, { text: '', tag: '' }])
-                  setDirty(true)
-                }}
+                onClick={() => updateNotes([...customNotes, { text: '', tag: '' }])}
               >
                 <Plus size={11} /> Add note
               </button>
@@ -230,8 +220,7 @@ const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function Ru
                   onChange={e => {
                     const next = [...customNotes]
                     next[i] = { ...note, tag: e.target.value }
-                    setCustomNotes(next)
-                    setDirty(true)
+                    updateNotes(next)
                   }}
                   placeholder="tag (optional)"
                   disabled={readOnly}
@@ -242,8 +231,7 @@ const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function Ru
                   onChange={e => {
                     const next = [...customNotes]
                     next[i] = { ...note, text: e.target.value }
-                    setCustomNotes(next)
-                    setDirty(true)
+                    updateNotes(next)
                   }}
                   placeholder="e.g., Seeking advice here still means specific legal advice is dangerous"
                   disabled={readOnly}
@@ -252,10 +240,7 @@ const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function Ru
                   <button
                     type="button"
                     className="text-gray-400 hover:text-red-500 p-1 flex-shrink-0"
-                    onClick={() => {
-                      setCustomNotes(customNotes.filter((_, j) => j !== i))
-                      setDirty(true)
-                    }}
+                    onClick={() => updateNotes(customNotes.filter((_, j) => j !== i))}
                   >
                     <Trash2 size={12} />
                   </button>
@@ -271,6 +256,6 @@ const RuleContextPicker = forwardRef<RuleContextPickerHandle, Props>(function Ru
 
     </div>
   )
-})
+}
 
 export default RuleContextPicker

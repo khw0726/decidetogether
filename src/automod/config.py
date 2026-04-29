@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     sonnet_model: str = "global.anthropic.claude-sonnet-4-6"
     haiku_model: str = "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     escalation_confidence_threshold: float = 0.75
+    embedding_model: str = "amazon.titan-embed-text-v2:0"
+    embedding_dim: int = 1024
     database_url: str = "sqlite+aiosqlite:///./automod.db"
 
     reddit_client_id: str = ""

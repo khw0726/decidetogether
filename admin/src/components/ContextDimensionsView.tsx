@@ -277,19 +277,7 @@ export default function ContextDimensionsView({
                       {preview.impacts.map((imp) => (
                         <div key={imp.rule_id} className="mb-1.5 last:mb-0">
                           <p className="font-medium text-gray-800">{imp.rule_title}</p>
-                          {Array.isArray(imp.adjustment_summary)
-                            ? (
-                              <ul className="mt-0.5 space-y-0.5 text-gray-600">
-                                {(imp.adjustment_summary as string[]).map((b, i) => (
-                                  <li key={i} className="flex gap-1.5">
-                                    <span className="text-gray-400 flex-shrink-0">-</span>
-                                    <span>{b}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            )
-                            : <p className="text-gray-600 mt-0.5">{imp.adjustment_summary}</p>
-                          }
+                          <p className="text-gray-600 mt-0.5">{imp.adjustment_summary}</p>
                         </div>
                       ))}
                     </div>

@@ -1,6 +1,7 @@
 """Rule health metrics computation + LLM-based diagnosis."""
 
 import logging
+import re
 from collections import defaultdict
 from typing import Any
 
@@ -394,6 +395,72 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
     }
 
 
+_STOPWORDS = {
+    "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "is", "are",
+    "be", "by", "with", "this", "that", "these", "those", "it", "its", "as",
+    "at", "from", "but", "not", "no", "any", "all", "can", "may", "must",
+    "should", "would", "will", "do", "does", "did", "have", "has", "had",
+    "you", "your", "we", "our", "they", "them", "their", "if", "when", "than",
+}
+
+
+def _tokenize(text: str) -> set[str]:
+    if not text:
+        return set()
+    tokens = re.findall(r"[a-zA-Z]{3,}", text.lower())
+    return {t for t in tokens if t not in _STOPWORDS}
+
+
+def find_related_rules_for_context_note(
+    proposed_note_text: str,
+    proposed_note_tag: str | None,
+    source_rule_id: str,
+    sibling_rules: list[Rule],
+) -> list[dict]:
+    """Score sibling rules for likely co-applicability of a proposed context note.
+
+    Phase 1: lexical overlap on Rule.text + custom_context_notes, plus a tag-overlap
+    bonus when the sibling already opted into the same context tag.
+    """
+    note_tokens = _tokenize(proposed_note_text)
+    if not note_tokens:
+        return []
+
+    out: list[dict] = []
+    for rule in sibling_rules:
+        if rule.id == source_rule_id:
+            continue
+        rule_tokens = _tokenize(rule.text or "")
+        custom_text = " ".join(
+            (n.get("text", "") if isinstance(n, dict) else "")
+            for n in (rule.custom_context_notes or [])
+        )
+        rule_tokens |= _tokenize(custom_text)
+
+        overlap = note_tokens & rule_tokens
+        if not overlap:
+            continue
+        score = len(overlap) / len(note_tokens)
+        signals = [f"text-overlap: {sorted(overlap)[:5]}"]
+
+        if proposed_note_tag and rule.relevant_context:
+            for tag_obj in rule.relevant_context:
+                tag_str = (
+                    f"{tag_obj.get('dimension')}:{tag_obj.get('tag')}"
+                    if isinstance(tag_obj, dict)
+                    else None
+                )
+                if tag_str and tag_str == proposed_note_tag:
+                    score += 0.3
+                    signals.append(f"shared-tag: {tag_str}")
+                    break
+
+        out.append({"rule_id": rule.id, "score": round(score, 3), "signals": signals})
+
+    out.sort(key=lambda r: r["score"], reverse=True)
+    return out
+
+
 @router.post("/rules/{rule_id}/analyze-health")
 async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> list[dict]:
     """LLM call: diagnose per-item issues and create Suggestion records."""
@@ -412,8 +479,26 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
 
     health_data = await get_rule_health(rule_id, db)
 
+    # Load community context + sibling rules so the diagnoser can fire L2 triggers.
+    community_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+    community = community_result.scalar_one_or_none()
+    siblings_result = await db.execute(
+        select(Rule).where(Rule.community_id == rule.community_id, Rule.id != rule.id)
+    )
+    sibling_rules = list(siblings_result.scalars().all())
+    sibling_rule_dicts = [
+        {"id": r.id, "title": r.title, "text": (r.text or "")[:300]}
+        for r in sibling_rules
+    ]
+
     compiler = get_compiler()
-    diagnoses = await compiler.diagnose_rule_health(rule, checklist, health_data)
+    diagnoses = await compiler.diagnose_rule_health(
+        rule,
+        checklist,
+        health_data,
+        community_context=(community.community_context if community else None),
+        sibling_rules=sibling_rule_dicts,
+    )
 
     created: list[Suggestion] = []
 
@@ -427,6 +512,113 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
         else:
             standalone_new_items.append(new_item_diag)
 
+    async def _precompute_recompile_ops(proposed_text: str) -> list[dict] | None:
+        """Run recompile_with_diff against a draft rule with the proposed text so the
+        carousel can show the resulting checklist diff without a per-click LLM call.
+        Returns None on failure — the frontend will fall back to the live preview path."""
+        if not community or not checklist:
+            return None
+        try:
+            # Build a draft rule with the proposed text. SQLAlchemy ORM objects are
+            # mutable; using a detached duplicate avoids touching the persisted rule.
+            from copy import copy as _copy
+            draft_rule = _copy(rule)
+            draft_rule.text = proposed_text
+            other_rules_for_recompile = [
+                r for r in sibling_rules if r.id != rule_id
+            ]
+            ops = await compiler.recompile_with_diff(
+                rule=draft_rule,
+                community=community,
+                other_rules=other_rules_for_recompile,
+                existing_items=checklist,
+            )
+            return ops or None
+        except Exception:
+            logger.exception(f"Failed to precompute recompile for rule {rule_id}")
+            return None
+
+    async def _emit_paired(
+        l1: Suggestion | None,
+        diag: dict,
+        rule_id_local: str,
+        motivating_clusters: list[str] | None = None,
+    ) -> None:
+        """If diag asks for rule_text and/or context, emit those as linked suggestions."""
+        levels = diag.get("proposed_levels") or []
+        level_reasoning = diag.get("level_reasoning", "")
+
+        # Need l1.id for linking; flush so it's assigned.
+        if l1 is not None:
+            await db.flush()
+
+        if "rule_text" in levels:
+            text_change = diag.get("text_change") or {}
+            proposed_text = text_change.get("proposed_text")
+            if proposed_text:
+                # Pre-compute the resulting checklist diff so the carousel preview is
+                # instant when the moderator navigates to this slide.
+                precomputed_ops = await _precompute_recompile_ops(proposed_text)
+
+                content: dict = {
+                    "proposed_text": proposed_text,
+                    "reasoning": text_change.get("rationale") or diag.get("reasoning", ""),
+                    "description": f"[paired] {level_reasoning or 'rule text clarification'}",
+                    "level_reasoning": level_reasoning,
+                    "source": "health_analysis",
+                    "action": diag.get("action", ""),
+                }
+                if precomputed_ops is not None:
+                    content["precomputed_recompile_ops"] = precomputed_ops
+                if l1 is not None:
+                    content["linked_suggestion_id"] = l1.id
+                    content["supersedes_logic_suggestion_id"] = l1.id
+                if motivating_clusters:
+                    content["motivating_clusters"] = motivating_clusters
+                rt = Suggestion(
+                    rule_id=rule_id_local,
+                    suggestion_type="rule_text",
+                    content=content,
+                )
+                db.add(rt)
+                created.append(rt)
+                if l1 is not None:
+                    await db.flush()
+                    l1_content = dict(l1.content or {})
+                    l1_content["linked_suggestion_id"] = rt.id
+                    l1.content = l1_content
+                    flag_modified(l1, "content")
+
+        if "context" in levels:
+            ctx_change = diag.get("context_change") or {}
+            proposed_note = ctx_change.get("proposed_note") or {}
+            if proposed_note.get("text"):
+                affects = find_related_rules_for_context_note(
+                    proposed_note_text=proposed_note.get("text", ""),
+                    proposed_note_tag=proposed_note.get("tag"),
+                    source_rule_id=rule_id_local,
+                    sibling_rules=sibling_rules,
+                )
+                ctx_content: dict = {
+                    "proposed_note": proposed_note,
+                    "l2_trigger": ctx_change.get("l2_trigger"),
+                    "reasoning": ctx_change.get("rationale") or diag.get("reasoning", ""),
+                    "description": f"[context] {level_reasoning or 'community calibration'}",
+                    "affects_rules": affects,
+                    "level_reasoning": level_reasoning,
+                    "source": "health_analysis",
+                    "action": diag.get("action", ""),
+                }
+                if l1 is not None:
+                    ctx_content["linked_suggestion_id"] = l1.id
+                ctx = Suggestion(
+                    rule_id=rule_id_local,
+                    suggestion_type="context",
+                    content=ctx_content,
+                )
+                db.add(ctx)
+                created.append(ctx)
+
     for diag in diagnoses.get("diagnoses", []):
         item_id = diag.get("item_id")
         if not item_id or item_id not in items_by_id:
@@ -436,41 +628,47 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
         reasoning = diag.get("reasoning", "")
         proposed_change = diag.get("proposed_change") or {}
         confidence = diag.get("confidence", "medium")
+        levels = diag.get("proposed_levels") or ["logic"]  # backward-compat default
 
-        # Build as a recompile diff operation so accept_recompile can apply it
-        update_op: dict = {"op": "update", "existing_id": item_id}
-        update_op.update({k: v for k, v in proposed_change.items() if k != "id"})
+        # Build the L1 logic suggestion when "logic" is in proposed_levels.
+        l1_suggestion: Suggestion | None = None
+        if "logic" in levels:
+            update_op: dict = {"op": "update", "existing_id": item_id}
+            update_op.update({k: v for k, v in proposed_change.items() if k != "id"})
 
-        # Only include "children" for actions that restructure child items (split_item).
-        # For other actions (promote, tighten, threshold), preserve existing children.
-        if action != "split_item":
-            update_op.pop("children", None)
+            # Only include "children" for actions that restructure child items (split_item).
+            if action != "split_item":
+                update_op.pop("children", None)
 
-        operations = [update_op]
+            operations = [update_op]
 
-        # For split_item, merge the second half (from new_items) into the same suggestion
-        if action == "split_item" and item_id in new_items_by_split:
-            split_new = new_items_by_split.pop(item_id)
-            add_op = {"op": "add", **(split_new.get("proposed_item") or {})}
-            if "children" not in add_op:
-                add_op["children"] = []
-            operations.append(add_op)
-            reasoning = f"{reasoning} — also adds: {split_new.get('reasoning', '')}"
+            # For split_item, merge the second half (from new_items) into the same suggestion
+            if action == "split_item" and item_id in new_items_by_split:
+                split_new = new_items_by_split.pop(item_id)
+                add_op = {"op": "add", **(split_new.get("proposed_item") or {})}
+                if "children" not in add_op:
+                    add_op["children"] = []
+                operations.append(add_op)
+                reasoning = f"{reasoning} — also adds: {split_new.get('reasoning', '')}"
 
-        suggestion = Suggestion(
-            rule_id=rule_id,
-            checklist_item_id=item_id,
-            suggestion_type="checklist",
-            content={
-                "operations": operations,
-                "action": action,
-                "reasoning": reasoning,
-                "confidence": confidence,
-                "description": f"[{action}] {reasoning[:100]}",
-            },
-        )
-        db.add(suggestion)
-        created.append(suggestion)
+            l1_suggestion = Suggestion(
+                rule_id=rule_id,
+                checklist_item_id=item_id,
+                suggestion_type="checklist",
+                content={
+                    "operations": operations,
+                    "action": action,
+                    "reasoning": reasoning,
+                    "confidence": confidence,
+                    "description": f"[{action}] {reasoning[:100]}",
+                    "level_reasoning": diag.get("level_reasoning", ""),
+                    "source": "health_analysis",
+                },
+            )
+            db.add(l1_suggestion)
+            created.append(l1_suggestion)
+
+        await _emit_paired(l1_suggestion, diag, rule_id)
 
     # Any new_items not consumed by a split_item diagnosis (+ unlinked ones)
     for new_item_diag in standalone_new_items + list(new_items_by_split.values()):
@@ -478,25 +676,33 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
         reasoning = new_item_diag.get("reasoning", "")
         proposed_item = new_item_diag.get("proposed_item") or {}
         motivated_by = new_item_diag.get("motivated_by", [])
+        # Default: rule_text-only for add_item (text gap). Backward-compat: ["logic"] if absent.
+        levels = new_item_diag.get("proposed_levels") or ["rule_text"]
 
-        op = {"op": "add", **proposed_item}
-        if "children" not in op:
-            op["children"] = []
+        l1_suggestion: Suggestion | None = None
+        if "logic" in levels:
+            op = {"op": "add", **proposed_item}
+            if "children" not in op:
+                op["children"] = []
 
-        suggestion = Suggestion(
-            rule_id=rule_id,
-            checklist_item_id=None,
-            suggestion_type="checklist",
-            content={
-                "operations": [op],
-                "action": action,
-                "reasoning": reasoning,
-                "description": f"[add_item] {reasoning[:100]}",
-                "motivated_by": motivated_by,
-            },
-        )
-        db.add(suggestion)
-        created.append(suggestion)
+            l1_suggestion = Suggestion(
+                rule_id=rule_id,
+                checklist_item_id=None,
+                suggestion_type="checklist",
+                content={
+                    "operations": [op],
+                    "action": action,
+                    "reasoning": reasoning,
+                    "description": f"[add_item] {reasoning[:100]}",
+                    "motivated_by": motivated_by,
+                    "level_reasoning": new_item_diag.get("level_reasoning", ""),
+                    "source": "health_analysis",
+                },
+            )
+            db.add(l1_suggestion)
+            created.append(l1_suggestion)
+
+        await _emit_paired(l1_suggestion, new_item_diag, rule_id, motivating_clusters=motivated_by)
 
     await db.commit()
     for s in created:

@@ -121,11 +121,11 @@ class RuleRead(BaseModel):
     applies_to: str = "both"
     override_count: int = 0
     base_checklist_json: Optional[list[dict[str, Any]]] = None
-    context_adjustment_summary: Optional[list[str]] = None
+    context_adjustment_summary: Optional[str] = None
     relevant_context: Optional[list[RuleContextTag]] = None
     custom_context_notes: list[CommunityContextNote] = []
     pending_checklist_json: Optional[list[dict[str, Any]]] = None
-    pending_context_adjustment_summary: Optional[list[str]] = None
+    pending_context_adjustment_summary: Optional[str] = None
     pending_relevant_context: Optional[dict[str, Any]] = None
     pending_custom_context_notes: Optional[list[CommunityContextNote]] = None
     pending_generated_at: Optional[datetime] = None
@@ -137,15 +137,15 @@ class RuleRead(BaseModel):
     def _default_custom_notes(cls, v):
         return v or []
 
+    @field_validator('context_adjustment_summary', 'pending_context_adjustment_summary', mode='before')
+    @classmethod
+    def _coerce_summary(cls, v):
+        # Legacy rows stored bullet lists; join into a single string for the new schema.
+        if isinstance(v, list):
+            return " ".join(s.strip() for s in v if isinstance(s, str) and s.strip()) or None
+        return v
+
     model_config = {"from_attributes": True}
-
-
-class ContextPreviewResponse(BaseModel):
-    """Result of POST /rules/{rule_id}/context-preview — the proposed Pass 2 output."""
-    preview_items: list[dict[str, Any]]
-    summary: Optional[list[str]] = None
-    generated_at: datetime
-    current_items: list["ChecklistItemRead"]
 
 
 class RulePriorityUpdate(BaseModel):
@@ -411,7 +411,6 @@ class DecisionStats(BaseModel):
 
 # Allow forward references in ChecklistItemRead
 ChecklistItemRead.model_rebuild()
-ContextPreviewResponse.model_rebuild()
 
 
 # ── Reddit Import ───────────────────────────────────────────────────────────────
@@ -453,3 +452,46 @@ class RedditImportResponse(BaseModel):
     crawled_count: int
     evaluated_count: int
     skipped_count: int
+
+
+# ── Rule-text suggestion (grounded in context + peers) ─────────────────────────
+
+class SuggestRuleTextRequest(BaseModel):
+    title: str
+    scope: Optional[str] = "both"  # post | comment | both
+
+
+class RuleTextCitation(BaseModel):
+    """Grounding citation for a single clause.
+
+    kind=context: cites a {dimension, tag} note from the target community.
+    kind=peer_rule: cites a peer-community rule with a shared context tag.
+    """
+    kind: str  # "context" | "peer_rule"
+    # context-kind fields
+    dimension: Optional[str] = None
+    tag: Optional[str] = None
+    note_text: Optional[str] = None
+    # peer_rule-kind fields
+    community_name: Optional[str] = None
+    rule_title: Optional[str] = None
+    rule_text: Optional[str] = None
+    shared_tag: Optional[str] = None
+
+
+class RuleTextClause(BaseModel):
+    text: str
+    citations: list[RuleTextCitation]
+
+
+class SuggestedContextBundle(BaseModel):
+    dimension: str
+    tag: str
+
+
+class SuggestRuleTextResponse(BaseModel):
+    draft_text: str
+    clauses: list[RuleTextClause]
+    suggested_relevant_context: list[SuggestedContextBundle]
+    peer_rules_considered: int
+    target_has_context: bool

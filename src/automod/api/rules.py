@@ -17,16 +17,23 @@ from ..config import get_anthropic_client, settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
 from ..db.models import ChecklistItem, CommunitySamplePost, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..embeddings import embed_text, unpack_vector, cosine
 from ..models.schemas import (
-    ContextPreviewResponse,
+    CommunityContextNote,
     RuleBatchImportRequest,
     RuleBatchImportResponse,
     RuleBatchImportResult,
+    RuleContextTag,
     RuleCreate,
     RuleRead,
     RulePriorityUpdate,
     RuleTypeOverride,
     RuleUpdate,
+    RuleTextCitation,
+    RuleTextClause,
+    SuggestedContextBundle,
+    SuggestRuleTextRequest,
+    SuggestRuleTextResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -265,130 +272,6 @@ async def _compile_rule_background(
         logger.error(f"Compilation failed for rule {rule_id}: {e}")
 
 
-def _serialize_adjusted_items(items: list[ChecklistItem]) -> list[dict]:
-    """Serialize Pass 2 output (unsaved ORM instances) to JSON-safe flat dicts.
-
-    parent_id references are preserved by ID so the tree can be reconstructed on commit.
-    """
-    return [
-        {
-            "id": item.id,
-            "order": item.order,
-            "parent_id": item.parent_id,
-            "description": item.description,
-            "rule_text_anchor": item.rule_text_anchor,
-            "item_type": item.item_type,
-            "logic": item.logic,
-            "action": item.action,
-            "context_influenced": item.context_influenced,
-            "context_note": item.context_note,
-            "context_change_types": item.context_change_types,
-            "base_description": item.base_description,
-            "context_pinned": item.context_pinned,
-            "context_override_note": item.context_override_note,
-            "pinned_tags": item.pinned_tags,
-        }
-        for item in items
-    ]
-
-
-def _rehydrate_checklist_items(dicts: list[dict], rule_id: str) -> list[ChecklistItem]:
-    """Create fresh ChecklistItem ORM instances from stashed dicts.
-
-    Generates new IDs and remaps parent_id references so the structure is preserved.
-    """
-    old_to_new: dict[str, str] = {d["id"]: str(uuid.uuid4()) for d in dicts if d.get("id")}
-    items: list[ChecklistItem] = []
-    for d in dicts:
-        parent_old = d.get("parent_id")
-        parent_new = old_to_new.get(parent_old) if parent_old else None
-        items.append(ChecklistItem(
-            id=old_to_new.get(d.get("id")) or str(uuid.uuid4()),
-            rule_id=rule_id,
-            order=d.get("order", 0),
-            parent_id=parent_new,
-            description=d.get("description", ""),
-            rule_text_anchor=d.get("rule_text_anchor"),
-            item_type=d.get("item_type", "subjective"),
-            logic=d.get("logic") or {},
-            action=d.get("action", "warn"),
-            context_influenced=d.get("context_influenced", False),
-            context_note=d.get("context_note"),
-            context_change_types=d.get("context_change_types"),
-            base_description=d.get("base_description"),
-            context_pinned=d.get("context_pinned", False),
-            context_override_note=d.get("context_override_note"),
-            pinned_tags=d.get("pinned_tags"),
-        ))
-    return items
-
-
-def _nest_preview_items(flat: list[dict]) -> list[dict]:
-    """Convert a flat list of stashed item dicts into a nested tree for frontend rendering.
-
-    Each node gets a `children` key holding nested child dicts.
-    """
-    nodes: dict[str, dict] = {}
-    for d in flat:
-        nodes[d["id"]] = {**d, "children": []}
-    roots: list[dict] = []
-    for d in sorted(flat, key=lambda x: x.get("order", 0)):
-        node = nodes[d["id"]]
-        parent_id = d.get("parent_id")
-        if parent_id and parent_id in nodes:
-            nodes[parent_id]["children"].append(node)
-        else:
-            roots.append(node)
-    return roots
-
-
-async def _run_pass2(rule_id: str) -> Optional[tuple[list[dict], list[str]]]:
-    """Run Pass 2 (context adjustment) against the rule's current base checklist and context.
-
-    Returns (serialized items, summary) or None if the rule is not eligible.
-    Does not touch the DB — callers decide whether to stash or persist.
-    """
-    from ..db.database import AsyncSessionLocal
-
-    async with AsyncSessionLocal() as db:
-        rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-        rule = rule_result.scalar_one_or_none()
-        if not rule or not rule.base_checklist_json:
-            return None
-        community_result = await db.execute(
-            select(Community).where(Community.id == rule.community_id)
-        )
-        community = community_result.scalar_one_or_none()
-        if not community or not community.community_context:
-            return None
-
-        pinned_result = await db.execute(
-            select(ChecklistItem).where(
-                ChecklistItem.rule_id == rule.id,
-                ChecklistItem.context_pinned == True,  # noqa: E712
-            )
-        )
-        pinned_items = [
-            {"description": p.description, "context_override_note": p.context_override_note}
-            for p in pinned_result.scalars().all()
-        ] or None
-
-    compiler = get_compiler()
-    adjusted_items, summary = await compiler.adjust_for_context(
-        rule=rule,
-        community=community,
-        base_checklist_dicts=rule.base_checklist_json,
-        community_context=community.community_context,
-        pinned_items=pinned_items,
-        relevant_context=rule.relevant_context,
-        custom_context_notes=rule.custom_context_notes,
-    )
-    # Compiler returns "" for summary when there's no context to apply; normalize to list.
-    if isinstance(summary, str):
-        summary = [s.strip() for s in summary.split(". ") if s.strip()]
-    return _serialize_adjusted_items(adjusted_items), summary
-
-
 async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
     """Insert a fresh set of checklist items.
 
@@ -546,6 +429,12 @@ async def _apply_diff_operations(
                 item.logic = op["logic"]
             if "action" in op:
                 item.action = op["action"]
+            if "context_influenced" in op:
+                item.context_influenced = op["context_influenced"]
+            if "context_note" in op:
+                item.context_note = op["context_note"]
+            if "context_change_types" in op:
+                item.context_change_types = op["context_change_types"]
             # Replace children: null out links, delete old child rows, insert new ones
             if "children" in op:
                 old_child_ids_result = await db.execute(
@@ -650,6 +539,202 @@ async def _apply_diff_operations(
 
         else:
             logger.warning(f"recompile: unknown op {kind!r}, skipping")
+
+
+def _community_tag_set(community_context: Optional[dict]) -> set[tuple[str, str]]:
+    """Flatten a community_context dict into a set of (dimension, tag) pairs."""
+    out: set[tuple[str, str]] = set()
+    if not community_context:
+        return out
+    for dim in ("purpose", "participants", "stakes", "tone"):
+        d = (community_context or {}).get(dim) or {}
+        for note in d.get("notes") or []:
+            tag = note.get("tag", "") if isinstance(note, dict) else ""
+            if tag:
+                out.add((dim, tag))
+    return out
+
+
+def _community_tag_text_map(community_context: Optional[dict]) -> dict[tuple[str, str], str]:
+    """Map (dimension, tag) → note text for citation hydration."""
+    out: dict[tuple[str, str], str] = {}
+    if not community_context:
+        return out
+    for dim in ("purpose", "participants", "stakes", "tone"):
+        d = (community_context or {}).get(dim) or {}
+        for note in d.get("notes") or []:
+            if not isinstance(note, dict):
+                continue
+            tag = note.get("tag", "")
+            if tag and (dim, tag) not in out:
+                out[(dim, tag)] = note.get("text", "")
+    return out
+
+
+@router.post(
+    "/communities/{community_id}/rules/suggest-text",
+    response_model=SuggestRuleTextResponse,
+)
+async def suggest_rule_text(
+    community_id: str,
+    body: SuggestRuleTextRequest,
+    db: AsyncSession = Depends(get_db),
+) -> SuggestRuleTextResponse:
+    """Draft a rule text grounded in this community's context + peer-community rules.
+
+    A9 + A8 grounding: every clause cites either a {dimension, tag} note from this
+    community's context or a peer rule from a community with overlapping context tags.
+    """
+    title = (body.title or "").strip()
+    if len(title) < 3:
+        raise HTTPException(status_code=400, detail="title must be at least 3 characters")
+
+    comm_result = await db.execute(
+        select(Community).where(Community.id == community_id)
+    )
+    community = comm_result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    target_context = community.community_context or {}
+    target_tags = _community_tag_set(target_context)
+
+    # Embed the user's title
+    try:
+        query_vec = await embed_text(title)
+    except Exception as e:
+        logger.error(f"embed_text failed: {e}")
+        raise HTTPException(status_code=502, detail="embedding service unavailable")
+
+    # Pull all reference rules + their parent communities. Brute-force scan is fine
+    # at corpus sizes up to ~10k. Keep this on the DB side as a single join.
+    ref_rules_result = await db.execute(
+        select(Rule, Community)
+        .join(Community, Rule.community_id == Community.id)
+        .where(Community.is_reference.is_(True))
+        .where(Rule.title_embedding.is_not(None))
+    )
+    candidates: list[tuple[Rule, Community, float]] = []
+    for rule, ref_comm in ref_rules_result.all():
+        vec = unpack_vector(rule.title_embedding)
+        if vec is None or vec.size == 0:
+            continue
+        score = cosine(query_vec, vec)
+        candidates.append((rule, ref_comm, score))
+
+    # Top-20 by cosine, then re-rank by Jaccard tag overlap with target community
+    candidates.sort(key=lambda t: t[2], reverse=True)
+    top_n = candidates[:20]
+
+    rescored: list[tuple[Rule, Community, float, list[str]]] = []
+    for rule, ref_comm, cos_score in top_n:
+        peer_tags = _community_tag_set(ref_comm.community_context)
+        overlap = target_tags & peer_tags
+        union = target_tags | peer_tags
+        jaccard = (len(overlap) / len(union)) if union else 0.0
+        # Combined score: 0.6·cosine + 0.4·jaccard
+        combined = 0.6 * cos_score + 0.4 * jaccard
+        shared = sorted({t for (_, t) in overlap})
+        rescored.append((rule, ref_comm, combined, shared))
+
+    rescored.sort(key=lambda t: t[2], reverse=True)
+    top_peers = rescored[:5]
+
+    # Build peer-rules payload for the compiler
+    peer_rules_payload: list[dict] = []
+    for rule, ref_comm, _score, shared in top_peers:
+        peer_rules_payload.append({
+            "community_name": ref_comm.name,
+            "rule_title": rule.title,
+            "rule_text": rule.text,
+            "shared_tags": shared,
+        })
+
+    compiler = get_compiler()
+    try:
+        result = await compiler.draft_rule_from_context(
+            title=title,
+            target_community_name=community.name,
+            target_context=target_context,
+            peer_rules=peer_rules_payload,
+        )
+    except Exception as e:
+        logger.error(f"draft_rule_from_context failed: {e}")
+        raise HTTPException(status_code=502, detail="LLM drafting failed")
+
+    # Validate + hydrate citations. Reject ungrounded clauses; drop fabricated citations.
+    target_note_texts = _community_tag_text_map(target_context)
+    peer_lookup: dict[tuple[str, str], dict] = {
+        (p["community_name"], p["rule_title"]): p for p in peer_rules_payload
+    }
+
+    raw_clauses = result.get("clauses") or []
+    validated_clauses: list[RuleTextClause] = []
+    for raw in raw_clauses:
+        if not isinstance(raw, dict):
+            continue
+        c_text = (raw.get("text") or "").strip()
+        if not c_text:
+            continue
+        valid_citations: list[RuleTextCitation] = []
+        for c in raw.get("citations") or []:
+            if not isinstance(c, dict):
+                continue
+            kind = c.get("kind")
+            if kind == "context":
+                dim, tag = c.get("dimension"), c.get("tag")
+                if not dim or not tag:
+                    continue
+                note_text = target_note_texts.get((dim, tag))
+                if note_text is None:
+                    # Citation references a tag not present in target context — drop it.
+                    continue
+                valid_citations.append(RuleTextCitation(
+                    kind="context", dimension=dim, tag=tag, note_text=note_text,
+                ))
+            elif kind == "peer_rule":
+                cname, rtitle = c.get("community_name"), c.get("rule_title")
+                peer = peer_lookup.get((cname, rtitle))
+                if peer is None:
+                    continue
+                shared_tag = c.get("shared_tag")
+                # Only allow shared_tags actually shared with the target.
+                if shared_tag and shared_tag not in (peer.get("shared_tags") or []):
+                    shared_tag = None
+                valid_citations.append(RuleTextCitation(
+                    kind="peer_rule",
+                    community_name=cname,
+                    rule_title=rtitle,
+                    rule_text=peer.get("rule_text"),
+                    shared_tag=shared_tag,
+                ))
+        if not valid_citations:
+            # Reject ungrounded clauses outright.
+            continue
+        validated_clauses.append(RuleTextClause(text=c_text, citations=valid_citations))
+
+    if not validated_clauses:
+        raise HTTPException(
+            status_code=502,
+            detail="Drafting produced no grounded clauses. Try again or refine the title.",
+        )
+
+    # Validate suggested_relevant_context against target tags.
+    suggested_bundles: list[SuggestedContextBundle] = []
+    for entry in result.get("suggested_relevant_context") or []:
+        if not isinstance(entry, dict):
+            continue
+        dim, tag = entry.get("dimension"), entry.get("tag")
+        if dim and tag and (dim, tag) in target_tags:
+            suggested_bundles.append(SuggestedContextBundle(dimension=dim, tag=tag))
+
+    return SuggestRuleTextResponse(
+        draft_text=result.get("draft_text", ""),
+        clauses=validated_clauses,
+        suggested_relevant_context=suggested_bundles,
+        peer_rules_considered=len(peer_rules_payload),
+        target_has_context=bool(target_tags),
+    )
 
 
 @router.post("/communities/{community_id}/rules", response_model=RuleRead, status_code=201)
@@ -845,10 +930,16 @@ async def list_rules(
     return [RuleRead.model_validate(r) for r in rules]
 
 
+class CommitContextDraft(BaseModel):
+    relevant_context: Optional[list[RuleContextTag]] = None
+    custom_context_notes: list[CommunityContextNote] = []
+
+
 class CommitRecompileRequest(BaseModel):
     rule_text: str
     title: Optional[str] = None
     operations: list[dict] = []
+    context: Optional[CommitContextDraft] = None
 
 
 @router.post("/rules/{rule_id}/commit-recompile", response_model=RuleRead)
@@ -874,26 +965,36 @@ async def commit_recompile(
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
 
+    text_changed = body.rule_text != rule.text
     rule.text = body.rule_text
     if body.title is not None:
         rule.title = body.title
 
-    # Clear any stashed context preview — text changed.
+    # Apply draft context fields, if supplied.
+    if body.context is not None:
+        rule.relevant_context = (
+            [t.model_dump() for t in body.context.relevant_context]
+            if body.context.relevant_context is not None else None
+        )
+        rule.custom_context_notes = [n.model_dump() for n in body.context.custom_context_notes]
+
+    # Clear any stashed context preview — text or context changed.
     rule.pending_checklist_json = None
     rule.pending_context_adjustment_summary = None
     rule.pending_relevant_context = None
     rule.pending_custom_context_notes = None
     rule.pending_generated_at = None
 
-    # Re-triage (fast, single LLM call) — rule_type may have shifted.
-    try:
-        compiler = get_compiler()
-        triage = await compiler.triage_rule(rule.text, community.name, community.platform)
-        rule.rule_type = triage["rule_type"]
-        rule.rule_type_reasoning = triage["reasoning"]
-        rule.applies_to = triage.get("applies_to", "both")
-    except Exception as e:
-        logger.error(f"Re-triage failed during commit-recompile: {e}")
+    # Re-triage only if text actually changed.
+    if text_changed:
+        try:
+            compiler = get_compiler()
+            triage = await compiler.triage_rule(rule.text, community.name, community.platform)
+            rule.rule_type = triage["rule_type"]
+            rule.rule_type_reasoning = triage["reasoning"]
+            rule.applies_to = triage.get("applies_to", "both")
+        except Exception as e:
+            logger.error(f"Re-triage failed during commit-recompile: {e}")
 
     # Apply the supplied operations synchronously, mirroring _compile_rule_persist's recompile path.
     if rule.rule_type == "actionable" and body.operations:
@@ -1012,131 +1113,6 @@ async def update_rule(
         if rule.rule_type == "actionable":
             background_tasks.add_task(_compile_rule_background, rule.id, rule.community_id)
 
-    await db.commit()
-    await db.refresh(rule)
-    return RuleRead.model_validate(rule)
-
-
-def _current_context_inputs(rule: Rule) -> tuple[dict, list]:
-    """Snapshot the rule's current context selection for staleness detection."""
-    return (
-        {"value": rule.relevant_context},  # None-vs-empty-list distinguishable
-        list(rule.custom_context_notes or []),
-    )
-
-
-@router.post("/rules/{rule_id}/context-preview", response_model=ContextPreviewResponse)
-async def preview_context_adjustment(
-    rule_id: str,
-    db: AsyncSession = Depends(get_db),
-) -> ContextPreviewResponse:
-    """Run Pass 2 synchronously and stash the result on the rule without persisting
-    checklist changes. Moderator reviews the stash, then commits or discards it.
-    """
-    result = await db.execute(select(Rule).where(Rule.id == rule_id))
-    rule = result.scalar_one_or_none()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Rule not found")
-    if rule.rule_type != "actionable":
-        raise HTTPException(status_code=400, detail="Only actionable rules support context adjustment")
-    if not rule.base_checklist_json:
-        raise HTTPException(status_code=400, detail="Rule has no base checklist to adjust")
-
-    pass2 = await _run_pass2(rule_id)
-    if pass2 is None:
-        raise HTTPException(status_code=400, detail="Rule is not eligible for context adjustment")
-    preview_flat, summary = pass2
-
-    rel_snap, notes_snap = _current_context_inputs(rule)
-    rule.pending_checklist_json = preview_flat
-    rule.pending_context_adjustment_summary = summary
-    rule.pending_relevant_context = rel_snap
-    rule.pending_custom_context_notes = notes_snap
-    rule.pending_generated_at = datetime.utcnow()
-    await db.commit()
-    await db.refresh(rule)
-
-    # Fetch current (live) checklist for side-by-side display.
-    current_result = await db.execute(
-        select(ChecklistItem)
-        .where(ChecklistItem.rule_id == rule_id)
-        .order_by(ChecklistItem.order.asc())
-    )
-    current_items = list(current_result.scalars().all())
-
-    # Import locally to avoid a circular import with checklist.py → rules helpers.
-    from .checklist import _build_tree
-
-    return ContextPreviewResponse(
-        preview_items=_nest_preview_items(preview_flat),
-        summary=summary,
-        generated_at=rule.pending_generated_at,
-        current_items=_build_tree(current_items),
-    )
-
-
-@router.post("/rules/{rule_id}/context-commit", response_model=RuleRead)
-async def commit_context_adjustment(
-    rule_id: str,
-    db: AsyncSession = Depends(get_db),
-) -> RuleRead:
-    """Apply the stashed Pass 2 preview: replace checklist items, move summary, clear stash."""
-    result = await db.execute(select(Rule).where(Rule.id == rule_id))
-    rule = result.scalar_one_or_none()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Rule not found")
-    if not rule.pending_checklist_json:
-        raise HTTPException(status_code=400, detail="No pending preview to commit")
-
-    # Staleness check: current context must match what was used to generate the preview.
-    current_rel, current_notes = _current_context_inputs(rule)
-    if rule.pending_relevant_context != current_rel or rule.pending_custom_context_notes != current_notes:
-        raise HTTPException(
-            status_code=409,
-            detail="Preview is stale — context selection has changed since it was generated. Regenerate the preview.",
-        )
-
-    stashed_items = rule.pending_checklist_json
-    stashed_summary = rule.pending_context_adjustment_summary
-
-    try:
-        await db.execute(sa_delete(ChecklistItem).where(ChecklistItem.rule_id == rule_id))
-        for item in _rehydrate_checklist_items(stashed_items, rule_id):
-            db.add(item)
-        rule.context_adjustment_summary = stashed_summary
-        rule.pending_checklist_json = None
-        rule.pending_context_adjustment_summary = None
-        rule.pending_relevant_context = None
-        rule.pending_custom_context_notes = None
-        rule.pending_generated_at = None
-        await db.commit()
-        await _re_resolve_checklist_links(db, rule_id)
-        await db.commit()
-    except Exception as e:
-        logger.error(f"Commit preview failed for rule {rule_id}: {e}")
-        await db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to commit preview")
-
-    await db.refresh(rule)
-    return RuleRead.model_validate(rule)
-
-
-@router.delete("/rules/{rule_id}/context-preview", response_model=RuleRead)
-async def discard_context_preview(
-    rule_id: str,
-    db: AsyncSession = Depends(get_db),
-) -> RuleRead:
-    """Clear any stashed preview without applying it."""
-    result = await db.execute(select(Rule).where(Rule.id == rule_id))
-    rule = result.scalar_one_or_none()
-    if not rule:
-        raise HTTPException(status_code=404, detail="Rule not found")
-
-    rule.pending_checklist_json = None
-    rule.pending_context_adjustment_summary = None
-    rule.pending_relevant_context = None
-    rule.pending_custom_context_notes = None
-    rule.pending_generated_at = None
     await db.commit()
     await db.refresh(rule)
     return RuleRead.model_validate(rule)

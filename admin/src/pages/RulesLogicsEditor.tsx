@@ -4,44 +4,40 @@ import {
   AlertCircle,
   BookOpen,
   Check,
+  ChevronDown,
+  ChevronUp,
   Loader2,
   Play,
   Plus,
-  RefreshCw,
   X,
 } from 'lucide-react'
 import {
   CommunityContextNote,
-  ContextPreviewResponse,
   DecisionPreviewResult,
   ItemHealthMetrics,
-  PreviewChecklistItem,
   PreviewRecompileResult,
   Rule,
   RuleContextTag,
   RuleHealthSummary,
   Suggestion,
-  commitContextAdjustment,
   commitRecompile,
   createRule,
-  discardContextPreview,
   getChecklist,
   getCommunity,
   getRuleHealth,
   getRulesHealthSummary,
   listRules,
   overrideRuleType,
-  previewContextAdjustment,
   previewDecisions,
   previewRecompile,
   updateRule,
 } from '../api/client'
 import ChecklistTree from '../components/ChecklistTree'
 import ChecklistPreview from '../components/ChecklistPreview'
-import ChecklistDiff from '../components/ChecklistDiff'
 import DecisionsPanel from '../components/DecisionsPanel'
-import RuleContextPicker, { RuleContextPickerHandle } from '../components/RuleContextPicker'
+import RuleContextPicker from '../components/RuleContextPicker'
 import RuleHealthPanel from '../components/RuleHealthPanel'
+import { RuleTextSuggestion } from '../components/RuleTextSuggestion'
 import TestModal from '../components/TestModal'
 import { showErrorToast } from '../components/Toast'
 
@@ -106,38 +102,6 @@ function sameNotes(
   return true
 }
 
-function nestPreviewItems(flat: Record<string, unknown>[]): PreviewChecklistItem[] {
-  const nodes = new Map<string, PreviewChecklistItem>()
-  for (const d of flat) {
-    const id = String(d.id)
-    nodes.set(id, { ...(d as unknown as PreviewChecklistItem), children: [] })
-  }
-  const roots: PreviewChecklistItem[] = []
-  const sorted = [...flat].sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0))
-  for (const d of sorted) {
-    const id = String(d.id)
-    const node = nodes.get(id)!
-    const parentId = d.parent_id ? String(d.parent_id) : null
-    if (parentId && nodes.has(parentId)) {
-      nodes.get(parentId)!.children.push(node)
-    } else {
-      roots.push(node)
-    }
-  }
-  return roots
-}
-
-function mergeSuggestionOperations(suggestions: Suggestion[]): Record<string, unknown>[] {
-  const merged: Record<string, unknown>[] = []
-  for (const s of suggestions) {
-    const ops = (s.content as Record<string, unknown>).operations
-    if (Array.isArray(ops)) {
-      merged.push(...(ops as Record<string, unknown>[]))
-    }
-  }
-  return merged
-}
-
 interface RulesLogicsEditorProps {
   communityId: string
 }
@@ -155,11 +119,48 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
 
   const [previewResult, setPreviewResult] = useState<PreviewRecompileResult | null>(null)
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
-  const [contextPreview, setContextPreview] = useState<ContextPreviewResponse | null>(null)
-  const [savingContextPreview, setSavingContextPreview] = useState(false)
-  const [committingContext, setCommittingContext] = useState(false)
 
-  const [healthSuggestions, setHealthSuggestions] = useState<Suggestion[]>([])
+  // Draft per-rule context state — edits buffer here until commit, mirroring rule-text edits.
+  const [draftRelevantContext, setDraftRelevantContext] = useState<RuleContextTag[] | null>(null)
+  const [draftCustomNotes, setDraftCustomNotes] = useState<CommunityContextNote[]>([])
+
+  // Driven by RuleHealthPanel's carousel: the primary suggestion of the currently-shown
+  // slide, or null. All suggestion-driven previews flow through this single source.
+  const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null)
+
+  // Convenience derivations for the active suggestion preview.
+  const activePreviewText = useMemo<string | null>(() => {
+    if (activeSuggestion?.suggestion_type !== 'rule_text') return null
+    const c = activeSuggestion.content as Record<string, unknown>
+    return (
+      (c.proposed_text as string | undefined)
+      ?? ((c.proposed_change as Record<string, unknown> | undefined)?.text as string | undefined)
+      ?? null
+    )
+  }, [activeSuggestion])
+
+  // Pre-computed recompile ops baked into the suggestion at analyze-health time.
+  // When present, the frontend skips the live previewRecompile call entirely.
+  const activePrecomputedOps = useMemo<Record<string, unknown>[] | null>(() => {
+    if (activeSuggestion?.suggestion_type !== 'rule_text') return null
+    const c = activeSuggestion.content as Record<string, unknown>
+    const ops = c.precomputed_recompile_ops
+    return Array.isArray(ops) ? (ops as Record<string, unknown>[]) : null
+  }, [activeSuggestion])
+
+  const activeContextDraft = useMemo<{ note: { text: string; tag: string } } | null>(() => {
+    if (activeSuggestion?.suggestion_type !== 'context') return null
+    const note = (activeSuggestion.content as Record<string, unknown>).proposed_note as
+      | { text?: string; tag?: string } | undefined
+    if (!note?.text) return null
+    return { note: { text: note.text, tag: note.tag ?? '' } }
+  }, [activeSuggestion])
+
+  const activeLogicOps = useMemo<Record<string, unknown>[] | null>(() => {
+    if (activeSuggestion?.suggestion_type !== 'checklist') return null
+    const ops = (activeSuggestion.content as Record<string, unknown>).operations
+    return Array.isArray(ops) ? (ops as Record<string, unknown>[]) : null
+  }, [activeSuggestion])
 
   const [decisionPreview, setDecisionPreview] = useState<DecisionPreviewResult[] | null>(null)
   const [decisionPreviewLoading, setDecisionPreviewLoading] = useState(false)
@@ -193,10 +194,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
 
   const [showTestModal, setShowTestModal] = useState(false)
   const [showNewRule, setShowNewRule] = useState(false)
-
-  const contextPickerRef = useRef<RuleContextPickerHandle>(null)
-  const [contextDirty, setContextDirty] = useState(false)
-  const [pickerResetKey, setPickerResetKey] = useState(0)
+  const [decisionsExpanded, setDecisionsExpanded] = useState(false)
 
   const { data: rules = [], isLoading: rulesLoading } = useQuery({
     queryKey: ['rules', communityId],
@@ -266,24 +264,26 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     setPreviewResult(null)
     setHoveredAnchor(null)
     setSelectedChecklistItemId(null)
-    setContextPreview(null)
-    setHealthSuggestions([])
+    setDraftRelevantContext(rule.relevant_context ?? null)
+    setDraftCustomNotes(rule.custom_context_notes ?? [])
+    setActiveSuggestion(null)
     setDecisionPreview(null)
   }
 
-  const handlePreviewChanges = async () => {
-    if (!selectedRuleId) return
-    setIsPreviewLoading(true)
-    setPreviewResult(null)
-    try {
-      const result = await previewRecompile(selectedRuleId, editingText)
-      setPreviewResult(result)
-    } catch (e) {
-      showErrorToast(extractErrorMessage(e))
-    } finally {
-      setIsPreviewLoading(false)
-    }
-  }
+  // Whenever the selected rule's persisted context changes (e.g., after a commit
+  // or external update), resync the draft baseline.
+  useEffect(() => {
+    if (!selectedRule) return
+    setDraftRelevantContext(selectedRule.relevant_context ?? null)
+    setDraftCustomNotes(selectedRule.custom_context_notes ?? [])
+  }, [selectedRule?.id, selectedRule?.relevant_context, selectedRule?.custom_context_notes])
+
+  const textDirty = !!selectedRule && editingText !== selectedRule.text
+  const contextDirty =
+    !!selectedRule &&
+    (!sameTagSet(draftRelevantContext, selectedRule.relevant_context) ||
+      !sameNotes(draftCustomNotes, selectedRule.custom_context_notes))
+  const anyDirty = textDirty || contextDirty
 
   const handleSaveRule = async () => {
     if (!selectedRuleId) return
@@ -300,14 +300,20 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
 
   const handleConfirmSave = async () => {
     if (!selectedRuleId || !selectedRule) return
-    // Fluid-editor path: apply the diff that was already previewed.
-    if (previewResult && selectedRule.rule_type === 'actionable') {
+    // Fluid-editor path: commit text + context + ops in one shot.
+    if (selectedRule.rule_type === 'actionable' && (textDirty || contextDirty)) {
       setIsSaving(true)
       try {
         await commitRecompile(selectedRuleId, {
           rule_text: editingText,
           title: editingTitle,
-          operations: previewResult.operations as unknown as Record<string, unknown>[],
+          operations: (previewResult?.operations ?? []) as unknown as Record<string, unknown>[],
+          context: contextDirty
+            ? {
+                relevant_context: draftRelevantContext,
+                custom_context_notes: draftCustomNotes,
+              }
+            : undefined,
         })
         queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
         queryClient.invalidateQueries({ queryKey: ['checklist', selectedRuleId] })
@@ -325,70 +331,75 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   }
 
   const handleDiscardEdit = () => {
-    if (selectedRule) setEditingText(selectedRule.text)
+    if (selectedRule) {
+      setEditingText(selectedRule.text)
+      setDraftRelevantContext(selectedRule.relevant_context ?? null)
+      setDraftCustomNotes(selectedRule.custom_context_notes ?? [])
+    }
     setPreviewResult(null)
     setDecisionPreview(null)
   }
 
-  const handleApplyContextPreview = async () => {
-    if (!selectedRule) return
-    setCommittingContext(true)
-    try {
-      await commitContextAdjustment(selectedRule.id)
-      setContextPreview(null)
-      queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
-      queryClient.invalidateQueries({ queryKey: ['checklist', selectedRule.id] })
-    } catch (e) {
-      showErrorToast(extractErrorMessage(e))
-    } finally {
-      setCommittingContext(false)
-    }
-  }
-
-  const handleUnifiedDiscard = async () => {
-    if (selectedRule) setEditingText(selectedRule.text)
-    setPreviewResult(null)
-    setDecisionPreview(null)
-    if (contextPreview || selectedRule?.pending_checklist_json) {
-      try {
-        await discardContextPreview(selectedRule!.id)
-        setContextPreview(null)
-        queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
-      } catch (e) {
-        showErrorToast(extractErrorMessage(e))
-      }
-    }
-    setPickerResetKey(k => k + 1)
-  }
-
-  const handleUnifiedPreview = async () => {
-    const textDirty = !!selectedRule && editingText !== selectedRule.text
-    if (textDirty) {
-      await handlePreviewChanges()
-    } else if (contextDirty) {
-      await contextPickerRef.current?.savePreview()
-    }
-  }
-
-  const handleUnifiedApply = async () => {
-    if (previewResult) {
-      await handleConfirmSave()
-    } else if (effectiveContextPreview) {
-      await handleApplyContextPreview()
-    }
-  }
-
-  // Fluid editor: debounce text edits and auto-recompile (preview) for actionable rules.
+  // Fluid editor: debounce any draft change (text, context, OR an active suggestion's
+  // proposed text/context) and auto-recompile. User drafts and suggestion previews share
+  // this single pipeline; the suggest-fixes button is disabled when user drafts are dirty
+  // so the two never conflict.
   useEffect(() => {
     if (!selectedRule || selectedRule.rule_type !== 'actionable') return
-    if (editingText === selectedRule.text) return
+    const hasUserDraft = textDirty || contextDirty
+    const hasSuggestionDraft = !!activePreviewText || !!activeContextDraft
+    if (!hasUserDraft && !hasSuggestionDraft) {
+      // No drafts → clear any stale preview.
+      setPreviewResult(null)
+      return
+    }
+
+    // Short-circuit: if the active suggestion already carries pre-computed ops (baked
+    // in at analyze-health time), use them directly and skip the LLM round-trip.
+    if (!hasUserDraft && activePrecomputedOps && activePrecomputedOps.length > 0) {
+      setPreviewResult({
+        operations: activePrecomputedOps as PreviewRecompileResult['operations'],
+        adjustment_summary: null,
+        example_verdicts: [],
+        summary: {
+          keep: activePrecomputedOps.filter(o => (o as Record<string, unknown>).op === 'keep').length,
+          update: activePrecomputedOps.filter(o => (o as Record<string, unknown>).op === 'update').length,
+          delete: activePrecomputedOps.filter(o => (o as Record<string, unknown>).op === 'delete').length,
+          add: activePrecomputedOps.filter(o => (o as Record<string, unknown>).op === 'add').length,
+          examples_may_change: 0,
+        },
+      } as PreviewRecompileResult)
+      setIsPreviewLoading(false)
+      return
+    }
+
     const controller = new AbortController()
     const ruleId = selectedRule.id
-    const text = editingText
+
+    // Resolve effective text: user draft > suggestion preview > saved.
+    const text = textDirty ? editingText : (activePreviewText ?? selectedRule.text)
+
+    // Resolve effective context payload.
+    let ctxPayload: { relevant_context: RuleContextTag[] | null; custom_context_notes: CommunityContextNote[] } | undefined
+    if (contextDirty) {
+      ctxPayload = {
+        relevant_context: draftRelevantContext,
+        custom_context_notes: draftCustomNotes,
+      }
+    } else if (activeContextDraft) {
+      ctxPayload = {
+        relevant_context: selectedRule.relevant_context ?? null,
+        custom_context_notes: [
+          ...(selectedRule.custom_context_notes ?? []),
+          activeContextDraft.note,
+        ],
+      }
+    }
+
     const handle = window.setTimeout(async () => {
       setIsPreviewLoading(true)
       try {
-        const result = await previewRecompile(ruleId, text)
+        const result = await previewRecompile(ruleId, text, ctxPayload)
         if (!controller.signal.aborted) setPreviewResult(result)
       } catch (e) {
         if (!controller.signal.aborted) showErrorToast(extractErrorMessage(e))
@@ -400,7 +411,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       controller.abort()
       window.clearTimeout(handle)
     }
-  }, [editingText, selectedRule])
+  }, [editingText, draftRelevantContext, draftCustomNotes, selectedRule, textDirty, contextDirty, activePreviewText, activeContextDraft, activePrecomputedOps])
 
   // Trigger decisions preview when rule-text preview becomes active.
   useEffect(() => {
@@ -429,16 +440,15 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     }
   }, [previewResult, selectedRuleId, useTestSet, testSetIds]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Trigger decisions preview when analyze suggestions are present.
+  // Trigger decisions preview when an active L1 (checklist) suggestion is on the
+  // carousel — its ops are evaluated against the existing decisions.
   useEffect(() => {
-    if (!selectedRuleId || healthSuggestions.length === 0) {
+    if (!selectedRuleId || !activeLogicOps || activeLogicOps.length === 0) {
       return
     }
-    const ops = mergeSuggestionOperations(healthSuggestions)
-    if (ops.length === 0) return
     let cancelled = false
     setDecisionPreviewLoading(true)
-    previewDecisions(selectedRuleId, { checklist_override_operations: ops, limit: 50 })
+    previewDecisions(selectedRuleId, { checklist_override_operations: activeLogicOps, limit: 50 })
       .then(data => {
         if (!cancelled) setDecisionPreview(data.results)
       })
@@ -451,37 +461,17 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     return () => {
       cancelled = true
     }
-  }, [healthSuggestions, selectedRuleId])
+  }, [activeLogicOps, selectedRuleId])
 
-  // Clear decision preview when no previews are active.
+  // Clear decision preview when nothing is active.
   useEffect(() => {
-    if (!previewResult && !contextPreview && healthSuggestions.length === 0) {
+    if (!previewResult && !activeLogicOps) {
       setDecisionPreview(null)
       setDecisionPreviewLoading(false)
     }
-  }, [previewResult, contextPreview, healthSuggestions])
+  }, [previewResult, activeLogicOps])
 
-  const effectiveContextPreview: ContextPreviewResponse | null = useMemo(() => {
-    if (contextPreview) return contextPreview
-    if (!selectedRule?.pending_checklist_json) return null
-    const pendingRel = selectedRule.pending_relevant_context?.value ?? null
-    if (!sameTagSet(pendingRel, selectedRule.relevant_context)) return null
-    if (!sameNotes(selectedRule.pending_custom_context_notes, selectedRule.custom_context_notes)) return null
-    return {
-      preview_items: nestPreviewItems(selectedRule.pending_checklist_json as Record<string, unknown>[]),
-      summary: selectedRule.pending_context_adjustment_summary ?? null,
-      generated_at: selectedRule.pending_generated_at ?? '',
-      current_items: checklist,
-    }
-  }, [contextPreview, selectedRule, checklist])
-
-  const analyzePreviewOps = useMemo(
-    () => mergeSuggestionOperations(healthSuggestions),
-    [healthSuggestions],
-  )
-
-  const isAnyPreviewActive =
-    !!previewResult || !!effectiveContextPreview || analyzePreviewOps.length > 0
+  const isAnyPreviewActive = !!previewResult || (!!activeLogicOps && activeLogicOps.length > 0)
 
   if (!communityId) {
     return (
@@ -575,7 +565,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
               </button>
             </div>
 
-            {/* 3-column detail area */}
+            {/* 2-column detail area: Rule Text | (Rule Health + Automod Logic stacked) */}
             <div className="flex min-h-0 border-b border-gray-200" style={{ flex: '3 3 0%' }}>
               {/* Rule Text panel */}
               <div className="flex-1 min-w-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden">
@@ -596,6 +586,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                     value={editingText}
                     onChange={setEditingText}
                     anchor={hoveredAnchor}
+                    previewText={activePreviewText}
                     placeholder="Rule text..."
                   />
                   {selectedRule.rule_type === 'actionable' && isPreviewLoading && (
@@ -604,80 +595,38 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                       Recompiling…
                     </div>
                   )}
-                  {(() => {
-                    const textDirty = editingText !== selectedRule.text
-                    const anyDirty = textDirty || contextDirty
-                    const previewActive = !!previewResult || !!effectiveContextPreview
-                    if (!anyDirty && !previewActive) return null
-                    const isActionable = selectedRule.rule_type === 'actionable'
-                    const previewBusy = isPreviewLoading || savingContextPreview
-                    const applyBusy = isSaving || committingContext
-                    return (
-                      <div className="flex gap-2 justify-end flex-shrink-0">
-                        <button
-                          className="btn-secondary text-xs"
-                          onClick={handleUnifiedDiscard}
-                        >
-                          <X size={12} /> Discard edits
-                        </button>
-                        {previewActive ? (
-                          <button
-                            className="btn-primary text-xs"
-                            onClick={handleUnifiedApply}
-                            disabled={applyBusy}
-                          >
-                            {applyBusy ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                            {applyBusy ? 'Applying…' : 'Confirm & Save'}
-                          </button>
-                        ) : isActionable ? (
-                          <button
-                            className="btn-primary text-xs"
-                            onClick={handleUnifiedPreview}
-                            disabled={previewBusy}
-                          >
-                            {previewBusy ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                            {previewBusy ? 'Previewing…' : 'Preview'}
-                          </button>
-                        ) : (
-                          <button
-                            className="btn-primary text-xs"
-                            onClick={handleConfirmSave}
-                            disabled={isSaving || !textDirty}
-                          >
-                            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                            {isSaving ? 'Saving…' : 'Save'}
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })()}
+                  {anyDirty && (
+                    <div className="flex gap-2 justify-end flex-shrink-0">
+                      <button className="btn-secondary text-xs" onClick={handleDiscardEdit}>
+                        <X size={12} /> Discard edits
+                      </button>
+                      <button
+                        className="btn-primary text-xs"
+                        onClick={handleConfirmSave}
+                        disabled={isSaving || isPreviewLoading}
+                      >
+                        {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                        {isSaving ? 'Applying…' : 'Confirm & Save'}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Rule metadata: context + type + scope */}
                   <div className="border-t border-gray-100 pt-2 flex flex-col gap-2 flex-shrink-0">
                     {selectedRule.rule_type === 'actionable' && (
                       <div className="max-h-48 overflow-auto">
                         <RuleContextPicker
-                          key={`${selectedRule.id}-${pickerResetKey}`}
-                          ref={contextPickerRef}
-                          rule={selectedRule}
+                          key={selectedRule.id}
+                          rule={{
+                            ...selectedRule,
+                            relevant_context: draftRelevantContext,
+                            custom_context_notes: draftCustomNotes,
+                          }}
                           community_context={community?.community_context ?? null}
                           readOnly={false}
-                          onDirtyChange={setContextDirty}
-                          onSavePreview={async ({ relevant_context, custom_context_notes }) => {
-                            setSavingContextPreview(true)
-                            try {
-                              await updateRule(selectedRule.id, {
-                                relevant_context,
-                                custom_context_notes,
-                              })
-                              const preview = await previewContextAdjustment(selectedRule.id)
-                              setContextPreview(preview)
-                              queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
-                            } catch (e) {
-                              showErrorToast(extractErrorMessage(e))
-                            } finally {
-                              setSavingContextPreview(false)
-                            }
+                          onChange={({ relevant_context, custom_context_notes }) => {
+                            setDraftRelevantContext(relevant_context)
+                            setDraftCustomNotes(custom_context_notes)
                           }}
                         />
                       </div>
@@ -732,36 +681,39 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 </div>
               </div>
 
-              {/* Automod Logic panel */}
-              <div className="w-[35%] flex-shrink-0 flex flex-col border-r border-gray-200 bg-white overflow-hidden">
+              {/* Right column: Rule-wide Health stacked above Automod Logic */}
+              <div className="flex-1 min-w-0 flex flex-col bg-white overflow-hidden">
+                {/* Rule-wide Health (compact) */}
+                <div className="flex-shrink-0 border-b border-gray-200 bg-gray-50/50">
+                  <RuleHealthPanel
+                    ruleId={selectedRuleId!}
+                    highlightItemId={selectedChecklistItemId}
+                    onActiveSuggestionChange={setActiveSuggestion}
+                    userDraftDirty={textDirty || contextDirty}
+                    compact
+                  />
+                </div>
+
+                {/* Automod Logic */}
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 <PanelHeader title="Automoderator Logic">
                   {isAnyPreviewActive && (
                     <>
                       <span className="text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
-                        {effectiveContextPreview ? 'Context Preview' : previewResult ? 'Rule-Text Preview' : 'Error-Pattern Preview'}
+                        {previewResult
+                          ? (textDirty && contextDirty
+                              ? 'Rule-Text + Context Preview'
+                              : contextDirty
+                                ? 'Context Preview'
+                                : 'Rule-Text Preview')
+                          : 'Error-Pattern Preview'}
                       </span>
                       <button
                         className="btn-secondary text-xs py-0.5"
                         title="Exit preview and return to the current logic view"
-                        onClick={async () => {
-                          if (previewResult) {
-                            handleDiscardEdit()
-                          }
-                          if (contextPreview) {
-                            setContextPreview(null)
-                          }
-                          if (selectedRule?.pending_checklist_json) {
-                            try {
-                              await discardContextPreview(selectedRule.id)
-                              queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
-                            } catch (e) {
-                              showErrorToast(extractErrorMessage(e))
-                            }
-                          }
-                          if (healthSuggestions.length > 0) {
-                            setHealthSuggestions([])
-                          }
-                          setDecisionPreview(null)
+                        onClick={() => {
+                          handleDiscardEdit()
+                          setActiveSuggestion(null)
                         }}
                       >
                         <X size={11} /> Exit preview
@@ -770,17 +722,37 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   )}
                 </PanelHeader>
 
-                <div className="flex-1 overflow-auto p-3">
+                <div className="relative flex-1 overflow-auto p-3">
+                  {/* Loader overlay while a recompile preview is in flight. Sits above
+                      the previous render so the moderator sees progress without losing
+                      visual context. */}
+                  {isPreviewLoading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-indigo-200 shadow-sm text-xs text-indigo-700">
+                        <Loader2 size={12} className="animate-spin" />
+                        Compiling preview…
+                      </div>
+                    </div>
+                  )}
+                  {/* Inline placeholder when an active suggestion expects a preview but
+                      none has arrived yet (first render before the debounce fires). */}
+                  {!isPreviewLoading && (activePreviewText || activeContextDraft) && !previewResult && (
+                    <div className="flex items-center gap-2 text-xs text-indigo-500 italic mb-2">
+                      <Loader2 size={11} className="animate-spin" />
+                      Preparing preview…
+                    </div>
+                  )}
                   {previewResult ? (
-                    <ChecklistPreview operations={previewResult.operations} existingItems={checklist} />
-                  ) : effectiveContextPreview ? (
-                    <ChecklistDiff
-                      current={effectiveContextPreview.current_items}
-                      preview={effectiveContextPreview.preview_items}
-                      summary={effectiveContextPreview.summary}
-                    />
-                  ) : analyzePreviewOps.length > 0 ? (
-                    <ChecklistPreview operations={analyzePreviewOps as PreviewRecompileResult['operations']} existingItems={checklist} />
+                    <div className="space-y-2">
+                      {previewResult.adjustment_summary && (
+                        <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 text-xs text-teal-800">
+                          <p>{previewResult.adjustment_summary}</p>
+                        </div>
+                      )}
+                      <ChecklistPreview operations={previewResult.operations} existingItems={checklist} />
+                    </div>
+                  ) : activeLogicOps && activeLogicOps.length > 0 ? (
+                    <ChecklistPreview operations={activeLogicOps as PreviewRecompileResult['operations']} existingItems={checklist} />
                   ) : selectedRule.rule_type === 'actionable' ? (
                     checklist.length === 0 ? (
                       <div className="flex items-center gap-2 text-xs text-gray-400 italic p-1">
@@ -808,47 +780,65 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   <div className="mx-3 mb-2 flex-shrink-0 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
                     <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-500" />
                     <span>
-                      <strong>{selectedRule.override_count} overrides</strong> suggest this checklist may need updating. Try the <em>Analyze Error Patterns</em> button →
+                      <strong>{selectedRule.override_count} overrides</strong> suggest this checklist may need updating. Try the <em>Suggest Fixes from Errors</em> button →
                     </span>
                   </div>
                 )}
-              </div>
-
-              {/* Rule Health panel */}
-              <div className="w-[35%] flex-shrink-0 flex flex-col bg-white overflow-hidden">
-                <RuleHealthPanel
-                  ruleId={selectedRuleId!}
-                  highlightItemId={selectedChecklistItemId}
-                  onHealthSuggestionsChange={setHealthSuggestions}
-                />
+                </div>
               </div>
             </div>
 
-            {/* Decisions panel */}
-            <div className="flex-1 flex flex-col overflow-hidden bg-white min-h-0" style={{ flex: '2 2 0%' }}>
-              <PanelHeader title="Decisions">
-                {selectedChecklistItemId && (
+            {/* Decisions panel — collapsible drawer at bottom (default collapsed) */}
+            {decisionsExpanded ? (
+              <div className="flex flex-col overflow-hidden bg-white min-h-0" style={{ flex: '2 2 0%' }}>
+                <PanelHeader title="Decisions">
+                  {selectedChecklistItemId && (
+                    <button
+                      className="btn-secondary text-xs py-0.5"
+                      onClick={() => setSelectedChecklistItemId(null)}
+                      title="Clear checklist item filter"
+                    >
+                      <X size={11} /> Clear filter
+                    </button>
+                  )}
                   <button
                     className="btn-secondary text-xs py-0.5"
-                    onClick={() => setSelectedChecklistItemId(null)}
-                    title="Clear checklist item filter"
+                    onClick={() => setDecisionsExpanded(false)}
+                    title="Collapse decisions panel"
                   >
-                    <X size={11} /> Clear filter
+                    <ChevronDown size={11} /> Collapse
                   </button>
-                )}
-              </PanelHeader>
-              <DecisionsPanel
-                communityId={communityId}
-                ruleId={selectedRuleId}
-                checklistItemId={selectedChecklistItemId}
-                previewResults={decisionPreview}
-                previewLoading={decisionPreviewLoading}
-                testSetIds={testSetIds}
-                useTestSet={useTestSet}
-                onToggleUseTestSet={setUseTestSet}
-                onToggleTestSetMember={toggleTestSetMember}
-              />
-            </div>
+                </PanelHeader>
+                <DecisionsPanel
+                  communityId={communityId}
+                  ruleId={selectedRuleId}
+                  checklistItemId={selectedChecklistItemId}
+                  previewResults={decisionPreview}
+                  previewLoading={decisionPreviewLoading}
+                  testSetIds={testSetIds}
+                  useTestSet={useTestSet}
+                  onToggleUseTestSet={setUseTestSet}
+                  onToggleTestSetMember={toggleTestSetMember}
+                />
+              </div>
+            ) : (
+              <button
+                className="flex-shrink-0 px-3 py-2 border-t border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-between transition-colors"
+                onClick={() => setDecisionsExpanded(true)}
+                title="Expand decisions panel"
+              >
+                <div className="flex items-center gap-1.5">
+                  <ChevronUp size={13} className="text-gray-400" />
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Decisions</span>
+                  {selectedChecklistItemId && (
+                    <span className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5 normal-case">
+                      filtered by checklist item
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-gray-400">click to expand</span>
+              </button>
+            )}
           </>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -870,6 +860,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       {/* New rule modal */}
       {showNewRule && (
         <NewRuleModal
+          communityId={communityId}
           onClose={() => setShowNewRule(false)}
           onCreate={(title, text) => createRuleMutation.mutate({ title, text })}
           loading={createRuleMutation.isPending}
@@ -883,11 +874,13 @@ function HighlightedTextarea({
   value,
   onChange,
   anchor,
+  previewText,
   placeholder,
 }: {
   value: string
   onChange: (v: string) => void
   anchor: string | null
+  previewText?: string | null
   placeholder?: string
 }) {
   const taRef = useRef<HTMLTextAreaElement | null>(null)
@@ -901,6 +894,8 @@ function HighlightedTextarea({
   // The overlay and textarea share font/padding/border so positions line up.
   const shared =
     'absolute inset-0 p-3 text-sm font-mono leading-relaxed whitespace-pre-wrap break-words overflow-auto rounded-lg border'
+
+  const previewing = !!previewText && previewText !== value
   return (
     <div className="flex-1 relative min-h-0">
       <div
@@ -908,22 +903,54 @@ function HighlightedTextarea({
         aria-hidden
         className={`${shared} border-transparent text-gray-700 pointer-events-none`}
       >
-        {renderTextWithHighlight(value, anchor)}
+        {previewing
+          ? renderRuleTextDiff(value, previewText!)
+          : renderTextWithHighlight(value, anchor)}
         {/* trailing space ensures the last line keeps height */}
         {'​'}
       </div>
       <textarea
         ref={taRef}
-        className={`${shared} border-indigo-300 bg-transparent text-transparent caret-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500`}
+        className={`${shared} ${previewing ? 'border-emerald-400' : 'border-indigo-300'} bg-transparent text-transparent caret-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 ${previewing ? 'pointer-events-none' : ''}`}
         style={{ WebkitTextFillColor: 'transparent' }}
         value={value}
         onChange={e => onChange(e.target.value)}
         onScroll={syncScroll}
         placeholder={placeholder}
         spellCheck={false}
+        readOnly={previewing}
       />
+      {previewing && (
+        <div className="absolute top-1.5 right-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 pointer-events-none">
+          PREVIEW
+        </div>
+      )}
     </div>
   )
+}
+
+// Word-level diff renderer for the rule-text overlay when previewing a suggestion.
+function renderRuleTextDiff(oldText: string, newText: string): React.ReactNode {
+  const tokenize = (s: string) => s.split(/(\s+)/)
+  const a = tokenize(oldText)
+  const b = tokenize(newText)
+  const m = a.length, n = b.length
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = m - 1; i >= 0; i--)
+    for (let j = n - 1; j >= 0; j--)
+      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1])
+  const out: React.ReactNode[] = []
+  let i = 0, j = 0, k = 0
+  while (i < m || j < n) {
+    if (i < m && j < n && a[i] === b[j]) {
+      out.push(<span key={k++}>{a[i]}</span>); i++; j++
+    } else if (j < n && (i >= m || dp[i][j + 1] >= dp[i + 1][j])) {
+      out.push(<span key={k++} className="bg-green-100 text-green-800 font-medium">{b[j]}</span>); j++
+    } else {
+      out.push(<span key={k++} className="bg-red-100 text-red-700 line-through decoration-red-400">{a[i]}</span>); i++
+    }
+  }
+  return <>{out}</>
 }
 
 function PanelHeader({ title, children }: { title: string; children?: React.ReactNode }) {
@@ -938,10 +965,12 @@ function PanelHeader({ title, children }: { title: string; children?: React.Reac
 }
 
 function NewRuleModal({
+  communityId,
   onClose,
   onCreate,
   loading,
 }: {
+  communityId: string
   onClose: () => void
   onCreate: (title: string, text: string) => void
   loading: boolean
@@ -957,7 +986,7 @@ function NewRuleModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="card p-6 w-full max-w-lg">
+      <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold mb-4">New Rule</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -970,6 +999,11 @@ function NewRuleModal({
               autoFocus
             />
           </div>
+          <RuleTextSuggestion
+            communityId={communityId}
+            title={title}
+            onApply={(draftText) => setText(draftText)}
+          />
           <div>
             <label className="block text-sm font-medium mb-1">Rule Text</label>
             <textarea

@@ -1,19 +1,24 @@
 """Alignment endpoints: suggestions CRUD, preview-recompile, accept/dismiss."""
 
+import asyncio
+import hashlib
+import json
 import logging
+import time
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from ..config import get_anthropic_client, settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
 from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
-from ..models.schemas import SuggestionRead
+from ..models.schemas import CommunityContextNote, RuleContextTag, SuggestionRead
 from ..core.subjective import SubjectiveEvaluator
 from ..core.tree_evaluator import TreeEvaluator
 from .rules import _compile_rule_background
@@ -23,11 +28,147 @@ router = APIRouter(tags=["alignment"])
 
 class AcceptSuggestionBody(BaseModel):
     label_override: str | None = None
+    # For context suggestions: which rules the moderator opted into (in addition
+    # to the source rule). If None, only the source rule is updated.
+    affected_rule_ids: list[str] | None = None
 
 
 def get_compiler() -> RuleCompiler:
     client = get_anthropic_client()
     return RuleCompiler(client, settings)
+
+
+async def _recompile_after_text_accept(rule_id: str) -> None:
+    """Background: silently recompile the checklist after rule.text changes."""
+    from ..db.database import AsyncSessionLocal
+    from .rules import _apply_diff_operations, _re_resolve_checklist_links
+
+    async with AsyncSessionLocal() as db:
+        try:
+            rule_res = await db.execute(select(Rule).where(Rule.id == rule_id))
+            rule = rule_res.scalar_one_or_none()
+            if not rule:
+                return
+            community_res = await db.execute(
+                select(Community).where(Community.id == rule.community_id)
+            )
+            community = community_res.scalar_one_or_none()
+            if not community:
+                return
+            other_rules_res = await db.execute(
+                select(Rule).where(Rule.community_id == rule.community_id, Rule.id != rule_id)
+            )
+            other_rules = list(other_rules_res.scalars().all())
+
+            existing_res = await db.execute(
+                select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+            )
+            existing = list(existing_res.scalars().all())
+            if not existing:
+                logger.info(f"No existing checklist for rule {rule_id}; skipping silent recompile")
+                return
+
+            compiler = get_compiler()
+            ops = await compiler.recompile_with_diff(
+                rule=rule, community=community, other_rules=other_rules, existing_items=existing,
+            )
+            material_ops = [o for o in ops if o.get("op") != "keep"]
+            existing_by_id = {it.id: it for it in existing}
+            await _apply_diff_operations(db, ops, existing_by_id, rule_id)
+            await db.flush()
+            await _re_resolve_checklist_links(db, rule_id)
+            await db.commit()
+            logger.info(f"Silent recompile applied for rule {rule_id} ({len(ops)} ops)")
+
+            if material_ops:
+                _spawn_post_recompile_reevals(rule_id)
+        except Exception:
+            logger.exception(f"Silent recompile failed for rule {rule_id}")
+            await db.rollback()
+
+
+def _spawn_post_recompile_reevals(rule_id: str) -> None:
+    """Mirror the fan-out from accept_recompile: re-link orphans, re-eval errors,
+    re-eval the moderation queue. Each is debounced via its own generation counter."""
+    from .checklist import (
+        _link_uncovered_violations,
+        _link_generation,
+        _reevaluate_error_cases,
+        _reeval_generation,
+        _reevaluate_pending_queue,
+        schedule_pending_queue_reeval,
+        _detached_reeval_tasks,
+    )
+
+    link_gen = _link_generation.get(rule_id, 0) + 1
+    _link_generation[rule_id] = link_gen
+    t1 = asyncio.create_task(_link_uncovered_violations(rule_id, link_gen))
+    _detached_reeval_tasks.add(t1)
+    t1.add_done_callback(_detached_reeval_tasks.discard)
+
+    err_gen = _reeval_generation.get(rule_id, 0) + 1
+    _reeval_generation[rule_id] = err_gen
+    t2 = asyncio.create_task(_reevaluate_error_cases(rule_id, err_gen))
+    _detached_reeval_tasks.add(t2)
+    t2.add_done_callback(_detached_reeval_tasks.discard)
+
+    queue_gen = schedule_pending_queue_reeval(rule_id)
+    t3 = asyncio.create_task(_reevaluate_pending_queue(rule_id, queue_gen))
+    _detached_reeval_tasks.add(t3)
+    t3.add_done_callback(_detached_reeval_tasks.discard)
+
+
+async def _recompile_after_context_accept(rule_id: str) -> None:
+    """Background: re-run adjust_for_context after a context note changes."""
+    from ..db.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        try:
+            rule_res = await db.execute(select(Rule).where(Rule.id == rule_id))
+            rule = rule_res.scalar_one_or_none()
+            if not rule:
+                return
+            community_res = await db.execute(
+                select(Community).where(Community.id == rule.community_id)
+            )
+            community = community_res.scalar_one_or_none()
+            if not community or not community.community_context:
+                return
+
+            existing_res = await db.execute(
+                select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+            )
+            existing = list(existing_res.scalars().all())
+            if not existing:
+                return
+
+            compiler = get_compiler()
+            pinned_ids = [it.id for it in existing if getattr(it, "context_pinned", False)] or None
+            adjusted_items, summary, ops = await compiler.adjust_for_context(
+                rule=rule,
+                community=community,
+                current_items=existing,
+                community_context=community.community_context,
+                pinned_item_ids=pinned_ids,
+                relevant_context=rule.relevant_context,
+                custom_context_notes=rule.custom_context_notes,
+            )
+            if not ops:
+                logger.info(f"No context-driven ops for rule {rule_id}")
+                return
+            existing_by_id = {it.id: it for it in existing}
+            from .rules import _apply_diff_operations, _re_resolve_checklist_links
+            await _apply_diff_operations(db, ops, existing_by_id, rule_id)
+            if summary:
+                rule.context_adjustment_summary = summary
+            await db.flush()
+            await _re_resolve_checklist_links(db, rule_id)
+            await db.commit()
+            logger.info(f"Silent context-recompile applied for rule {rule_id} ({len(ops)} ops)")
+            _spawn_post_recompile_reevals(rule_id)
+        except Exception:
+            logger.exception(f"Silent context-recompile failed for rule {rule_id}")
+            await db.rollback()
 
 
 @router.get("/rules/{rule_id}/suggestions", response_model=list[SuggestionRead])
@@ -84,6 +225,51 @@ async def accept_suggestion(
             )
             if proposed:
                 rule.text = proposed
+                # Mark linked L1 superseded — silent recompile re-derives the logic fix.
+                superseded_id = c.get("supersedes_logic_suggestion_id")
+                if superseded_id:
+                    sup_res = await db.execute(
+                        select(Suggestion).where(
+                            Suggestion.id == superseded_id,
+                            Suggestion.status == "pending",
+                        )
+                    )
+                    sup = sup_res.scalar_one_or_none()
+                    if sup:
+                        sup.status = "superseded"
+                # Silent recompile: re-derive checklist from the new text.
+                background_tasks.add_task(
+                    _recompile_after_text_accept, str(suggestion.rule_id)
+                )
+
+    # Apply the suggestion if it's a context update
+    if suggestion.suggestion_type == "context" and suggestion.rule_id:
+        c = suggestion.content
+        proposed_note = c.get("proposed_note") or {}
+        if proposed_note.get("text"):
+            target_rule_ids = [suggestion.rule_id]
+            if body.affected_rule_ids:
+                # Validate that the requested rule_ids are in affects_rules
+                allowed = {r.get("rule_id") for r in (c.get("affects_rules") or [])}
+                target_rule_ids.extend([
+                    rid for rid in body.affected_rule_ids if rid in allowed
+                ])
+
+            for tgt_id in target_rule_ids:
+                tgt_res = await db.execute(select(Rule).where(Rule.id == tgt_id))
+                tgt_rule = tgt_res.scalar_one_or_none()
+                if not tgt_rule:
+                    continue
+                notes = list(tgt_rule.custom_context_notes or [])
+                notes.append({
+                    "text": proposed_note.get("text", ""),
+                    "tag": proposed_note.get("tag", ""),
+                })
+                tgt_rule.custom_context_notes = notes
+                flag_modified(tgt_rule, "custom_context_notes")
+                background_tasks.add_task(
+                    _recompile_after_context_accept, tgt_id
+                )
 
     # Apply if it's an example suggestion
     if suggestion.suggestion_type == "example" and suggestion.rule_id:
@@ -176,8 +362,156 @@ async def accept_suggestion(
     return SuggestionRead.model_validate(suggestion)
 
 
+class ContextDraft(BaseModel):
+    """Draft per-rule context state — sent by the client when previewing/committing.
+
+    Setting a `ContextDraft` on a request means the client is supplying the *intended*
+    relevant_context + custom_context_notes for this preview/commit. Absent → no context
+    change is intended.
+    """
+    relevant_context: Optional[list[RuleContextTag]] = None
+    custom_context_notes: list[CommunityContextNote] = []
+
+
 class PreviewRecompileRequest(BaseModel):
     rule_text: str
+    context: Optional[ContextDraft] = None
+
+
+def _same_relevant_context(
+    a: Optional[list], b: Optional[list],
+) -> bool:
+    """Compare relevant_context lists; treat None==None as equal, but None!=[]."""
+    if a is None and b is None:
+        return True
+    if a is None or b is None:
+        return False
+    if len(a) != len(b):
+        return False
+    def key(t):
+        if isinstance(t, dict):
+            return (t.get("dimension"), t.get("tag"))
+        return (getattr(t, "dimension", None), getattr(t, "tag", None))
+    return set(map(key, a)) == set(map(key, b))
+
+
+def _same_custom_notes(a: Optional[list], b: Optional[list]) -> bool:
+    a = a or []
+    b = b or []
+    if len(a) != len(b):
+        return False
+    def to_dict(n):
+        if isinstance(n, dict):
+            return {"text": n.get("text", ""), "tag": n.get("tag", "")}
+        return {"text": getattr(n, "text", ""), "tag": getattr(n, "tag", "")}
+    return [to_dict(n) for n in a] == [to_dict(n) for n in b]
+
+
+def _items_equal(a: ChecklistItem, b: ChecklistItem) -> bool:
+    return (
+        a.description == b.description
+        and a.rule_text_anchor == b.rule_text_anchor
+        and a.item_type == b.item_type
+        and (a.logic or {}) == (b.logic or {})
+        and a.action == b.action
+        and a.parent_id == b.parent_id
+        and a.context_influenced == b.context_influenced
+        and a.context_note == b.context_note
+        and (a.context_change_types or []) == (b.context_change_types or [])
+    )
+
+
+def _compute_ops_diff(
+    current: list[ChecklistItem], final: list[ChecklistItem],
+) -> list[dict]:
+    """Compute keep/update/add/delete ops describing how to transform current → final.
+
+    Items are matched by id. New items get "add" ops; missing items get "delete";
+    matched items get "keep" if identical, "update" otherwise.
+    """
+    current_by_id = {it.id: it for it in current}
+    final_by_id = {it.id: it for it in final}
+    ops: list[dict] = []
+    for fid, fitem in final_by_id.items():
+        if fid in current_by_id:
+            citem = current_by_id[fid]
+            if _items_equal(citem, fitem):
+                ops.append({"op": "keep", "existing_id": fid})
+            else:
+                ops.append({
+                    "op": "update",
+                    "existing_id": fid,
+                    "description": fitem.description,
+                    "rule_text_anchor": fitem.rule_text_anchor,
+                    "item_type": fitem.item_type,
+                    "logic": fitem.logic,
+                    "action": fitem.action,
+                    "context_influenced": fitem.context_influenced,
+                    "context_note": fitem.context_note,
+                    "context_change_types": fitem.context_change_types,
+                })
+        else:
+            ops.append({
+                "op": "add",
+                "description": fitem.description,
+                "rule_text_anchor": fitem.rule_text_anchor,
+                "item_type": fitem.item_type,
+                "logic": fitem.logic,
+                "action": fitem.action,
+                "context_influenced": fitem.context_influenced,
+                "context_note": fitem.context_note,
+                "context_change_types": fitem.context_change_types,
+            })
+    for cid in current_by_id:
+        if cid not in final_by_id:
+            ops.append({"op": "delete", "existing_id": cid})
+    return ops
+
+
+# In-process LRU cache for preview_recompile responses. Keyed on (rule_id, rule_text,
+# context payload, rule.updated_at). Repeat visits to the same carousel slide hit
+# instantly; the TTL ensures we don't serve stale results across longer sessions.
+_PREVIEW_CACHE_TTL_SECONDS = 600  # 10 minutes
+_PREVIEW_CACHE_MAX_ENTRIES = 64
+_preview_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _make_preview_cache_key(
+    rule_id: str,
+    rule_version_token: str,
+    rule_text: str,
+    context_payload: Any,
+) -> str:
+    payload = json.dumps(
+        {
+            "rule_id": rule_id,
+            "ver": rule_version_token,
+            "text": rule_text,
+            "ctx": context_payload,
+        },
+        sort_keys=True,
+        default=str,
+    )
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def _preview_cache_get(key: str) -> dict | None:
+    entry = _preview_cache.get(key)
+    if not entry:
+        return None
+    ts, value = entry
+    if time.monotonic() - ts > _PREVIEW_CACHE_TTL_SECONDS:
+        _preview_cache.pop(key, None)
+        return None
+    return value
+
+
+def _preview_cache_put(key: str, value: dict) -> None:
+    if len(_preview_cache) >= _PREVIEW_CACHE_MAX_ENTRIES:
+        # Evict the oldest entry (linear scan; cache is small).
+        oldest = min(_preview_cache.items(), key=lambda kv: kv[1][0])[0]
+        _preview_cache.pop(oldest, None)
+    _preview_cache[key] = (time.monotonic(), value)
 
 
 @router.post("/rules/{rule_id}/preview-recompile")
@@ -186,16 +520,36 @@ async def preview_recompile(
     body: PreviewRecompileRequest,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Preview how a draft rule text change would affect the checklist and existing examples.
+    """Preview how draft rule-text and/or context changes would affect the checklist.
+
+    Body fields:
+    - rule_text: required (send the rule's current text if no text edit is intended)
+    - context: optional ContextDraft with relevant_context + custom_context_notes
+      to apply. Absent → no context change is intended.
 
     Does NOT save anything. Returns:
-    - operations: the diff (keep/update/add/delete) that would be applied
-    - example_verdicts: for each labeled example, whether the new checklist would change the verdict
+    - operations: a single diff list (keep/update/add/delete) describing the full
+      transformation from the current checklist to the proposed one.
+    - adjustment_summary: short purpose sentence when context calibration ran.
+    - example_verdicts: per-example, whether the new checklist would change the verdict.
     """
     rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
     rule = rule_result.scalar_one_or_none()
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
+
+    # Cache lookup: same rule version + same draft inputs → return cached response.
+    # `updated_at` is the version token; if the rule changes underneath, the key shifts.
+    rule_version = str(getattr(rule, "updated_at", "") or rule.id)
+    cache_key = _make_preview_cache_key(
+        rule_id=rule_id,
+        rule_version_token=rule_version,
+        rule_text=body.rule_text,
+        context_payload=(body.context.model_dump() if body.context is not None else None),
+    )
+    cached = _preview_cache_get(cache_key)
+    if cached is not None:
+        return cached
 
     comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
     community = comm_result.scalar_one_or_none()
@@ -211,14 +565,14 @@ async def preview_recompile(
     )
     other_rules = list(other_rules_result.scalars().all())
 
-    # Fetch existing top-level checklist items
-    existing_result = await db.execute(
-        select(ChecklistItem).where(
-            ChecklistItem.rule_id == rule_id,
-            ChecklistItem.parent_id == None,  # noqa: E711
-        )
+    # Fetch ALL existing checklist items so we can apply text ops, then context ops.
+    all_result = await db.execute(
+        select(ChecklistItem)
+        .where(ChecklistItem.rule_id == rule_id)
+        .order_by(ChecklistItem.order.asc())
     )
-    existing_items = list(existing_result.scalars().all())
+    all_existing = list(all_result.scalars().all())
+    root_items = [it for it in all_existing if it.parent_id is None]
 
     # Build a draft Rule object with the preview text (not persisted)
     draft_rule = Rule(
@@ -230,13 +584,49 @@ async def preview_recompile(
         rule_type=rule.rule_type,
     )
 
+    text_changed = body.rule_text != rule.text
+    context_changed = False
+    draft_relevant: Optional[list[dict]] = None
+    draft_notes: list[dict] = []
+    if body.context is not None:
+        draft_relevant = (
+            [t.model_dump() for t in body.context.relevant_context]
+            if body.context.relevant_context is not None else None
+        )
+        draft_notes = [n.model_dump() for n in body.context.custom_context_notes]
+        context_changed = (
+            not _same_relevant_context(draft_relevant, rule.relevant_context)
+            or not _same_custom_notes(draft_notes, rule.custom_context_notes)
+        )
+
     compiler = get_compiler()
-    operations = await compiler.recompile_with_diff(
-        rule=draft_rule,
-        community=community,
-        other_rules=other_rules,
-        existing_items=existing_items,
-    )
+    final_items: list[ChecklistItem] = list(all_existing)
+    adjustment_summary: str = ""
+
+    if text_changed:
+        text_ops = await compiler.recompile_with_diff(
+            rule=draft_rule,
+            community=community,
+            other_rules=other_rules,
+            existing_items=root_items,
+        )
+        final_items = _apply_diff_to_checklist(all_existing, text_ops, rule_id)
+
+    if context_changed and community.community_context:
+        pinned_ids = [it.id for it in final_items if it.context_pinned] or None
+        adjusted_items, summary, _ctx_ops = await compiler.adjust_for_context(
+            rule=draft_rule,
+            community=community,
+            current_items=final_items,
+            community_context=community.community_context,
+            pinned_item_ids=pinned_ids,
+            relevant_context=draft_relevant,
+            custom_context_notes=draft_notes,
+        )
+        final_items = adjusted_items
+        adjustment_summary = summary
+
+    operations = _compute_ops_diff(all_existing, final_items)
 
     # Fetch up to 20 labeled examples for re-evaluation preview
     examples_result = await db.execute(
@@ -249,10 +639,8 @@ async def preview_recompile(
     )
     examples = list(examples_result.scalars().all())
 
-    # Build hypothetical new checklist by applying ops to a copy of existing items' descriptions
-    # We just report which items would change, not run actual evaluation (that would require LLM calls per example)
-    existing_by_id = {item.id: item for item in existing_items}
-    item_changes: dict[str, str] = {}  # item_id → op type
+    existing_by_id = {item.id: item for item in all_existing}
+    item_changes: dict[str, str] = {}
     added_descriptions: list[str] = []
     for op in operations:
         kind = op.get("op")
@@ -289,8 +677,9 @@ async def preview_recompile(
             "affected_checklist_items": affected_items,
         })
 
-    return {
+    response = {
         "operations": operations,
+        "adjustment_summary": adjustment_summary or None,
         "example_verdicts": example_verdicts,
         "summary": {
             "keep": sum(1 for op in operations if op.get("op") == "keep"),
@@ -300,6 +689,8 @@ async def preview_recompile(
             "examples_may_change": sum(1 for ev in example_verdicts if ev["may_change"]),
         },
     }
+    _preview_cache_put(cache_key, response)
+    return response
 
 
 def _apply_diff_to_checklist(

@@ -77,42 +77,16 @@ export interface Rule {
   applies_to: string  // "posts" | "comments" | "both"
   override_count: number
   base_checklist_json: Record<string, unknown> | null
-  context_adjustment_summary: string[] | null
+  context_adjustment_summary: string | null
   relevant_context: RuleContextTag[] | null
   custom_context_notes: CommunityContextNote[]
   pending_checklist_json: Array<Record<string, unknown>> | null
-  pending_context_adjustment_summary: string[] | null
+  pending_context_adjustment_summary: string | null
   pending_relevant_context: { value: RuleContextTag[] | null } | null
   pending_custom_context_notes: CommunityContextNote[] | null
   pending_generated_at: string | null
   created_at: string
   updated_at: string
-}
-
-export interface PreviewChecklistItem {
-  id: string
-  order: number
-  parent_id: string | null
-  description: string
-  rule_text_anchor: string | null
-  item_type: 'deterministic' | 'structural' | 'subjective'
-  logic: Record<string, unknown>
-  action: string
-  context_influenced: boolean
-  context_note: string | null
-  context_change_types: string[] | null
-  base_description: string | null
-  context_pinned: boolean
-  context_override_note: string | null
-  pinned_tags: RuleContextTag[] | null
-  children: PreviewChecklistItem[]
-}
-
-export interface ContextPreviewResponse {
-  preview_items: PreviewChecklistItem[]
-  summary: string[] | null
-  generated_at: string
-  current_items: ChecklistItem[]
 }
 
 export interface ChecklistItem {
@@ -177,6 +151,7 @@ export interface PreviewRecompileResult {
     context_influenced?: boolean
     context_note?: string | null
   }>
+  adjustment_summary?: string | null
   example_verdicts: Array<{
     example_id: string
     label: string
@@ -275,7 +250,7 @@ export const reapplyContext = (communityId: string) =>
 
 export interface ContextPreviewImpact {
   rules_affected: number
-  impacts: Array<{ rule_id: string; rule_title: string; adjustment_summary: string[] | string }>
+  impacts: Array<{ rule_id: string; rule_title: string; adjustment_summary: string }>
 }
 
 export const previewContextImpact = (communityId: string, draftContext: Partial<CommunityContext>) =>
@@ -338,6 +313,35 @@ export const listRules = (communityId: string) =>
 export const createRule = (communityId: string, data: { title: string; text: string; priority?: number }) =>
   api.post<Rule>(`/communities/${communityId}/rules`, data).then(r => r.data)
 
+export type RuleTextCitation = {
+  kind: 'context' | 'peer_rule'
+  dimension?: string
+  tag?: string
+  note_text?: string
+  community_name?: string
+  rule_title?: string
+  rule_text?: string
+  shared_tag?: string
+}
+
+export type RuleTextClause = {
+  text: string
+  citations: RuleTextCitation[]
+}
+
+export type SuggestRuleTextResponse = {
+  draft_text: string
+  clauses: RuleTextClause[]
+  suggested_relevant_context: { dimension: string; tag: string }[]
+  peer_rules_considered: number
+  target_has_context: boolean
+}
+
+export const suggestRuleText = (communityId: string, title: string, scope: string = 'both') =>
+  api
+    .post<SuggestRuleTextResponse>(`/communities/${communityId}/rules/suggest-text`, { title, scope })
+    .then(r => r.data)
+
 export const updateRule = (ruleId: string, data: Partial<Rule>) =>
   api.put<Rule>(`/rules/${ruleId}`, data).then(r => r.data)
 
@@ -349,15 +353,6 @@ export const overrideRuleType = (ruleId: string, ruleType: string, reasoning?: s
 
 export const deactivateRule = (ruleId: string) =>
   api.delete(`/rules/${ruleId}`)
-
-export const previewContextAdjustment = (ruleId: string) =>
-  api.post<ContextPreviewResponse>(`/rules/${ruleId}/context-preview`).then(r => r.data)
-
-export const commitContextAdjustment = (ruleId: string) =>
-  api.post<Rule>(`/rules/${ruleId}/context-commit`).then(r => r.data)
-
-export const discardContextPreview = (ruleId: string) =>
-  api.delete<Rule>(`/rules/${ruleId}/context-preview`).then(r => r.data)
 
 export interface BatchImportRuleItem {
   title: string
@@ -425,12 +420,29 @@ export const recompileRule = (ruleId: string) =>
 export const acceptRecompile = (ruleId: string, suggestionId: string) =>
   api.post(`/rules/${ruleId}/recompile/accept`, null, { params: { suggestion_id: suggestionId } }).then(r => r.data)
 
-export const previewRecompile = (ruleId: string, ruleText: string) =>
-  api.post<PreviewRecompileResult>(`/rules/${ruleId}/preview-recompile`, { rule_text: ruleText }).then(r => r.data)
+export interface ContextDraft {
+  relevant_context: RuleContextTag[] | null
+  custom_context_notes: CommunityContextNote[]
+}
+
+export const previewRecompile = (
+  ruleId: string,
+  ruleText: string,
+  context?: ContextDraft,
+) =>
+  api.post<PreviewRecompileResult>(`/rules/${ruleId}/preview-recompile`, {
+    rule_text: ruleText,
+    context,
+  }).then(r => r.data)
 
 export const commitRecompile = (
   ruleId: string,
-  body: { rule_text: string; title?: string; operations: Record<string, unknown>[] },
+  body: {
+    rule_text: string
+    title?: string
+    operations: Record<string, unknown>[]
+    context?: ContextDraft
+  },
 ) =>
   api.post<Rule>(`/rules/${ruleId}/commit-recompile`, body).then(r => r.data)
 
@@ -473,6 +485,12 @@ export const acceptSuggestionWithLabel = (suggestionId: string, labelOverride?: 
   api.post<Suggestion>(
     `/suggestions/${suggestionId}/accept`,
     labelOverride ? { label_override: labelOverride } : {},
+  ).then(r => r.data)
+
+export const acceptContextSuggestion = (suggestionId: string, affectedRuleIds: string[]) =>
+  api.post<Suggestion>(
+    `/suggestions/${suggestionId}/accept`,
+    { affected_rule_ids: affectedRuleIds },
   ).then(r => r.data)
 
 export const dismissSuggestion = (suggestionId: string) =>

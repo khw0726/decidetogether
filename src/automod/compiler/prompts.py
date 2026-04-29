@@ -886,35 +886,37 @@ Return JSON in exactly this format:
 
 # ── Context Adjust (Pass 2 of two-pass) ──────────────────────────────────────
 
-CONTEXT_ADJUST_SYSTEM = """You are a community moderation calibration expert. You are given a base checklist tree \
-(compiled purely from rule text, without community context) and a community context profile. Your job is to \
-adjust the checklist to fit THIS specific community.
+CONTEXT_ADJUST_SYSTEM = """You are a community moderation calibration expert. You are given a checklist (each item \
+with an id) and a community context profile. Your job is to emit the SMALLEST POSSIBLE DIFF that calibrates the \
+checklist to fit THIS specific community.
 
-You may:
-1. **Adjust thresholds** on subjective items (e.g., lower from 0.7 to 0.6 for sensitive communities)
-2. **Refine rubric language** to match the community's tone and priorities
-3. **Add new items** that the community context demands but the rule text alone didn't suggest \
-   (e.g., a support community might need a "toxic positivity" check under a civility rule)
-4. **Keep items unchanged** when no context-driven adjustment is needed
+For each existing item, decide:
+- "keep": Community context has no bearing on this item — return it unchanged. Use this whenever you can.
+- "update": Context demands a targeted calibration change. Include ONLY the fields that change \
+(description, rule_text_anchor, item_type, logic, action) — omit fields that stay the same. Always set \
+context_influenced=true, write a context_note ("[situational fact] → [calibration decision]"), and set \
+context_change_types to the list of changes ("threshold", "rubric", "description", "action", "pattern", "check").
+- "delete": Community context makes this item inappropriate or unnecessary for this community. Rare.
 
-For every item you modify or add, set context_influenced=true and:
-- Write a context_note tracing your reasoning: "[situational fact from context] → [calibration decision]"
-- Set context_change_types to an array of what you changed: "threshold", "rubric", "description", "action", \
-"new_item" (for items added by context), "pattern" (regex changes), "check" (structural check changes). \
-An item can have multiple change types (e.g. ["threshold", "rubric"]).
+You may also emit:
+- "add": Context demands a brand-new check the original rule text did not suggest (e.g., a support community \
+might need a "toxic positivity" check under a civility rule). Set context_influenced=true and \
+context_change_types=["new_item"].
 
-For EVERY item derived from a base-checklist entry (i.e., not a brand-new context-added item), set \
-`base_description` to the EXACT description string of the base item you started from — copy it verbatim \
-from the base checklist input. This is the ONLY way the UI can diff current-vs-base, so it is required \
-whenever the item has a base counterpart, regardless of whether you changed the description. Set \
-`base_description` to null ONLY when context_change_types=["new_item"] (the item has no base equivalent).
+DIFF DISCIPLINE:
+- Default to "keep" ONLY when context truly has no bearing on the item. Unlike a text-edit recompile, context \
+adjustment is *expected* to touch multiple items when context calls for it — do not under-adjust to minimize ops.
+- For threshold tweaks: change ONLY the logic.threshold value.
+- For rubric tweaks: change ONLY the rubric/threshold field; leave description and item_type alone.
+- Do NOT rewrite descriptions just to rephrase — only change a description if context demands different scope.
+- "delete"+"add" pair on the same concept is wrong — use "update" instead so the id is preserved.
+- Preserve existing item ids exactly — never invent new ids for kept/updated items.
+- If pinned_item_ids are listed in the prompt, emit "keep" for those items unconditionally.
+- Children are handled inline — include nested ops under "children" using the same op format.
 
-Items you keep unchanged should have context_influenced=false, context_note=null, context_change_types=[], \
-and base_description set to their own description (copied from the base entry).
-
-Return the FULL adjusted checklist tree (not a diff) plus an adjustment_summary as an array of short \
-bullet strings (one per change, each under 20 words). Example: \
-["Lowered threshold on item X from 0.7 → 0.6 (vulnerable population)", "Added new toxic-positivity check"].
+The adjustment_summary must be a SINGLE SHORT SENTENCE (under 15 words) stating the *intent/purpose* of the \
+calibration — not a per-item changelog. Examples: "Tightened thresholds for the vulnerable-audience tone." \
+"Added toxic-positivity check; loosened sarcasm rubric." If no items changed, return an empty string.
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -924,11 +926,10 @@ def build_context_adjust_prompt(
     rule_text: str,
     community_name: str,
     platform: str,
-    base_checklist: list[dict],
+    current_checklist: list[dict],
     community_context: dict,
     community_posts_sample: Optional[list] = None,
-    pinned_items: Optional[list[dict]] = None,
-    current_checklist: Optional[list[dict]] = None,
+    pinned_item_ids: Optional[list[str]] = None,
     custom_context_notes: Optional[list[dict]] = None,
 ) -> str:
     import json
@@ -987,59 +988,32 @@ def build_context_adjust_prompt(
             posts_section = "\n\nRepresentative community posts:\n" + "\n".join(parts)
 
     pinned_section = ""
-    if pinned_items:
-        pinned_lines = []
-        for p in pinned_items:
-            desc = p.get("description", "")
-            note = p.get("context_override_note", "")
-            pinned_lines.append(f'  - "{desc}"' + (f" — Moderator note: {note}" if note else ""))
+    if pinned_item_ids:
         pinned_section = (
-            "\n\nMODERATOR-PINNED ITEMS (preserve these items' calibration exactly as-is — "
-            "do not adjust thresholds, rubric, or logic):\n" + "\n".join(pinned_lines)
+            "\n\nMODERATOR-PINNED ITEMS (emit \"keep\" for each of these item ids — their calibration must "
+            "not be changed):\n" + "\n".join(f"  - {pid}" for pid in pinned_item_ids)
         )
 
-    current_section = ""
-    if current_checklist:
-        current_section = f"""
-
-Current live checklist (what moderators see today, already context-adjusted):
-{json.dumps(current_checklist, indent=2)}
-
-NOTE: Your adjustment_summary should describe changes relative to the CURRENT LIVE checklist above, \
-not the base checklist. For example, if the current checklist has threshold 0.70 and you set it to 0.72, \
-write "Raised threshold from 0.70 → 0.72", not from the base value. If an item is unchanged from the \
-current live version, do NOT mention it in the summary."""
-
-    return f"""Adjust this base checklist for the "{community_name}" community on {platform}.
+    return f"""Calibrate this checklist for the "{community_name}" community on {platform}.
 
 Rule: {rule_title}: {rule_text}
 
 Community context:
 {context_section}{custom_notes_section}{posts_section}{pinned_section}
 
-Base checklist (compiled from rule text only, no context):
-{json.dumps(base_checklist, indent=2)}
-{current_section}
+Current checklist (each item has an id — operations must reference these ids exactly):
+{json.dumps(current_checklist, indent=2)}
 
-Review each item and adjust for this community's context. Return the full adjusted tree plus a summary.
-
-Return JSON in exactly this format:
+Emit the smallest set of operations that calibrates this checklist for the community. Default to "keep" only \
+when context has no bearing on the item. Return ONLY valid JSON in this format:
 {{
-  "checklist_tree": [
-    {{
-      "description": "...",
-      "rule_text_anchor": "...",
-      "item_type": "...",
-      "logic": {{}},
-      "action": "...",
-      "children": [],
-      "context_influenced": true | false,
-      "context_note": "[situational fact] → [calibration decision], or null",
-      "context_change_types": ["threshold", "rubric", ...] or [],
-      "base_description": "verbatim description from the base checklist entry this was derived from, or null only for new_item"
-    }}
+  "operations": [
+    {{"op": "keep", "existing_id": "..."}},
+    {{"op": "update", "existing_id": "...", "logic": {{}}, "context_influenced": true, "context_note": "...", "context_change_types": ["threshold"]}},
+    {{"op": "delete", "existing_id": "..."}},
+    {{"op": "add", "description": "...", "rule_text_anchor": "...", "item_type": "...", "logic": {{}}, "action": "...", "children": [], "context_influenced": true, "context_note": "...", "context_change_types": ["new_item"]}}
   ],
-  "adjustment_summary": "Human-readable summary of what was adjusted and why (2-5 sentences)"
+  "adjustment_summary": "single short sentence stating the purpose of these adjustments, or empty string"
 }}"""
 
 
@@ -1207,6 +1181,31 @@ Only diagnose the parent if the parent's own gate condition is the root cause.
 - For split_item: proposed_change represents the first (updated) item. Add the second item to new_items with `"split_from": "<item_id>"` so the system can merge both into a single atomic fix.
 - Skip items with decision_count < 3.
 
+EMISSION LEVELS — for each diagnosis, set `proposed_levels` (a list) and (if applicable) `text_change` / `context_change`:
+
+The rule text is the user-facing source of truth and lives upstream of the checklist. Logic fixes that trace to ambiguous or incomplete rule text MUST also emit a paired rule-text update so the two stay in sync (the system silently re-runs recompile when text accepts).
+
+Default emission per action:
+- `tighten_rubric` → ["logic", "rule_text"]: a vague rubric usually traces to a vague phrase in the rule text. Emit BOTH: a logic fix and a rule_text clarification. Set `text_change.proposed_text` to the full rewritten rule text (preserving meaning, sharpening the relevant phrase). Tie-breaker: if decision_count < 5, emit only ["logic"].
+- `split_item` → ["logic", "rule_text"]: splitting items without distinguishing the conflated concepts in the rule text leaves the next compile vulnerable to re-merging them. Emit BOTH. The text_change should distinguish the two concepts in the rule wording.
+- `add_item` (in new_items) → ["rule_text"] BY DEFAULT: an uncovered violation almost always indicates a text gap. Emit a rule_text suggestion that adds the missing clause; the silent recompile will re-derive the new checklist item. Fall back to ["logic"] only if the new item is making implicit text explicit (a concept already in the text but missed at compile time).
+- `adjust_threshold` → ["logic"] only: pure calibration knob; rule text doesn't encode strictness.
+- `promote_to_deterministic` → ["logic"] only: representation change; concept is unchanged.
+
+L2 CONTEXT TRIGGERS — additionally include "context" in proposed_levels (alongside "logic" or alone) when at least one of:
+- against_existing_context: the moderator note explicitly invokes or contradicts an existing community-context note/tag — the disagreement is *about* the calibration, not what the rule says. Look at COMMUNITY CONTEXT below; if a moderator note overlaps a context note's text or names a dimension/tag, this trigger fires.
+- cross_rule: the proposed calibration plausibly applies to ≥ 2 rules in the community (not just this one).
+
+When emitting "context", set `context_change.proposed_note` to a `{text, tag}` calibration note for the rule's custom_context_notes, and `context_change.l2_trigger` to which trigger fired.
+
+L2 is a NARROW side-channel. If neither trigger fires, do NOT include "context" in proposed_levels.
+
+REASONING STYLE — keep all rationale fields TERSE and EDIT-PURPOSE-FOCUSED. The moderator already sees the diff; the reasoning should answer "why this edit, in one breath" — not restate metrics or the diff.
+- `reasoning`: ≤ 15 words. State the *purpose* of the edit (e.g., "disambiguate satire from low-effort", "add satire-tolerance calibration"). No metric recap, no preamble like "Based on the data...".
+- `level_reasoning`: ≤ 10 words. Action type + (if any) L2 trigger (e.g., "tighten_rubric paired with text", "add_item → text gap", "context: against existing tone:satire-friendly").
+- `text_change.rationale`: ≤ 15 words. What clause changed and why (e.g., "narrows 'inappropriate' to specific behaviors").
+- `context_change.rationale`: ≤ 15 words. Which existing note this contradicts, or which sibling rules also benefit.
+
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
 
@@ -1214,6 +1213,8 @@ def build_diagnose_health_prompt(
     rule_text: str,
     checklist_items: list[dict],
     health_data: dict,
+    community_context: Optional[dict] = None,
+    sibling_rules: Optional[list[dict]] = None,
 ) -> str:
     import json
 
@@ -1284,6 +1285,22 @@ def build_diagnose_health_prompt(
     overall = health_data.get("overall", {})
     uncovered = health_data.get("uncovered_violations", [])
 
+    context_block = ""
+    if community_context:
+        context_block = (
+            "\nCOMMUNITY CONTEXT (for L2 'against_existing_context' trigger — if a moderator note "
+            "invokes or contradicts any of these notes/tags, emit a 'context' suggestion):\n"
+            + json.dumps(community_context, indent=2)
+        )
+
+    siblings_block = ""
+    if sibling_rules:
+        siblings_block = (
+            "\nSIBLING RULES IN THIS COMMUNITY (for L2 'cross_rule' trigger — if your proposed "
+            "calibration plausibly applies to ≥ 2 of these too, emit a 'context' suggestion):\n"
+            + json.dumps(sibling_rules, indent=2)
+        )
+
     return f"""Analyze the health of this rule's checklist and diagnose which items need fixing.
 
 Rule text:
@@ -1296,8 +1313,9 @@ Checklist items with performance metrics:
 
 Uncovered violations (removed by moderators but match no checklist item):
 {json.dumps([u.get("title", "") for u in uncovered[:8]], indent=2) if uncovered else "None"}
+{context_block}{siblings_block}
 
-Return JSON in exactly this format:
+Return JSON in exactly this format (omit text_change/context_change when their level isn't in proposed_levels):
 {{
   "diagnoses": [
     {{
@@ -1310,7 +1328,18 @@ Return JSON in exactly this format:
         "logic": {{}},
         "action": "remove | warn | continue"
       }},
-      "confidence": "high | medium | low"
+      "confidence": "high | medium | low",
+      "proposed_levels": ["logic", "rule_text"],
+      "level_reasoning": "tighten_rubric paired with rule_text clarification (vague phrase X)",
+      "text_change": {{
+        "proposed_text": "<full rewritten rule text>",
+        "rationale": "why this rewording disambiguates"
+      }},
+      "context_change": {{
+        "proposed_note": {{ "text": "<short note>", "tag": "<dimension:tag>" }},
+        "l2_trigger": "against_existing_context | cross_rule",
+        "rationale": "which existing context this contradicts, or which sibling rules also benefit"
+      }}
     }}
   ],
   "new_items": [
@@ -1327,7 +1356,13 @@ Return JSON in exactly this format:
         "context_note": null,
         "children": []
       }},
-      "motivated_by": ["<example_id>"]
+      "motivated_by": ["<example_id>"],
+      "proposed_levels": ["rule_text"],
+      "level_reasoning": "uncovered violation type with no anchor in current rule text",
+      "text_change": {{
+        "proposed_text": "<full rule text with the missing clause added>",
+        "rationale": "what the new clause covers"
+      }}
     }}
   ]
 }}"""
@@ -1361,6 +1396,69 @@ Return JSON in exactly this format:
   "confidence": "low" | "medium" | "high",
   "reasoning": "Brief explanation of the inferred pattern and what the examples have in common"
 }}"""
+
+
+# ── Draft rule text from community context (grounded) ────────────────────────
+
+DRAFT_RULE_FROM_CONTEXT_SYSTEM = """You are a community moderation rule author. Given a community's context (purpose, participants, stakes, tone) and a small set of analogous rules from peer communities, draft a new rule whose every clause is grounded in either:
+
+  (a) one or more of THIS community's context notes (cite by {dimension, tag}), or
+  (b) phrasing borrowed/adapted from a peer community's rule whose context overlaps with this one (cite by {peer_community, peer_rule_title, shared_tag}).
+
+Hard requirements:
+- Every clause MUST have at least one citation. Do not invent unsupported phrasing.
+- Citations must reference real context notes from the target community (use only the {dimension, tag} pairs explicitly given in the input) or peer rules actually included in the input — never fabricate either.
+- Match the register of the target community's `tone` dimension (e.g. casual vs. formal).
+- Keep the draft enforceable and concrete: avoid vague slogans.
+
+A "clause" is a single self-contained sentence or rule provision. A typical rule has 1–4 clauses.
+
+Output via the provided tool only."""
+
+
+def build_draft_rule_from_context_prompt(
+    title: str,
+    target_community_name: str,
+    target_context: dict,
+    peer_rules: list[dict],
+) -> str:
+    import json
+
+    context_lines: list[str] = []
+    for dim in ("purpose", "participants", "stakes", "tone"):
+        d = (target_context or {}).get(dim) or {}
+        notes = d.get("notes") or []
+        if not notes:
+            continue
+        context_lines.append(f"  {dim}:")
+        for note in notes:
+            tag = note.get("tag", "") if isinstance(note, dict) else ""
+            text_ = note.get("text", "") if isinstance(note, dict) else str(note)
+            context_lines.append(f"    - tag={tag!r}: {text_}")
+    context_str = "\n".join(context_lines) if context_lines else "  (no context notes provided)"
+
+    peer_lines: list[str] = []
+    for p in peer_rules:
+        peer_lines.append(
+            f"  - peer_community={p.get('community_name')!r}, "
+            f"shared_tags={p.get('shared_tags', [])}\n"
+            f"    rule_title: {p.get('rule_title')!r}\n"
+            f"    rule_text: {p.get('rule_text')!r}"
+        )
+    peer_str = "\n".join(peer_lines) if peer_lines else "  (no peer rules retrieved)"
+
+    return f"""Target community: {target_community_name!r}
+Proposed rule title: {title!r}
+
+Target community's context notes (cite by {{dimension, tag}}):
+{context_str}
+
+Analogous peer-community rules (cite by {{peer_community, peer_rule_title, shared_tag}}):
+{peer_str}
+
+Draft a rule that fits the target community. Break it into clauses; cite the grounding for each clause. Also propose which {{dimension, tag}} bundles from the target community should be marked as `relevant_context` for this rule.
+
+Return JSON via the tool with fields: draft_text, clauses[{{text, citations[]}}], suggested_relevant_context[{{dimension, tag}}]."""
 
 
 # ── Link violations to checklist items ────────────────────────────────────────

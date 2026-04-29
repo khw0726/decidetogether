@@ -57,7 +57,11 @@ def get_compiler() -> RuleCompiler:
 
 @router.get("/communities", response_model=list[CommunityRead])
 async def list_communities(db: AsyncSession = Depends(get_db)) -> list[CommunityRead]:
-    result = await db.execute(select(Community).order_by(Community.created_at.asc()))
+    result = await db.execute(
+        select(Community)
+        .where(Community.is_reference.is_(False))
+        .order_by(Community.created_at.asc())
+    )
     communities = result.scalars().all()
     return [CommunityRead.model_validate(c) for c in communities]
 
@@ -676,7 +680,7 @@ async def generate_community_context(
 class ContextPreviewImpactItem(BaseModel):
     rule_id: str
     rule_title: str
-    adjustment_summary: list[str]
+    adjustment_summary: str
 
 
 class ContextPreviewImpactResponse(BaseModel):
@@ -733,16 +737,13 @@ async def preview_context_impact(
     for rule in rules:
         try:
             current_items = items_by_rule.get(rule.id, [])
-            current_dicts = (
-                compiler._items_to_nested_dicts(current_items)
-                if current_items else None
-            )
-            _, summary = await compiler.adjust_for_context(
+            if not current_items:
+                continue
+            _, summary, _ops = await compiler.adjust_for_context(
                 rule=rule,
                 community=community,
-                base_checklist_dicts=rule.base_checklist_json,
+                current_items=current_items,
                 community_context=draft_context,
-                current_checklist_dicts=current_dicts,
                 relevant_context=rule.relevant_context,
                 custom_context_notes=rule.custom_context_notes,
             )
@@ -800,32 +801,34 @@ async def reapply_context(
 
     for rule in rules:
         try:
-            # Collect pinned items before replacement
-            pinned_result = await db.execute(
-                select(ChecklistItem).where(
-                    ChecklistItem.rule_id == rule.id,
-                    ChecklistItem.context_pinned == True,  # noqa: E712
-                )
+            # Use the live checklist as the starting point and pin items by id.
+            current_result = await db.execute(
+                select(ChecklistItem)
+                .where(ChecklistItem.rule_id == rule.id)
+                .order_by(ChecklistItem.order.asc())
             )
-            pinned_items = [
-                {"description": p.description, "context_override_note": p.context_override_note}
-                for p in pinned_result.scalars().all()
-            ] or None
+            current_items = list(current_result.scalars().all())
+            if not current_items:
+                continue
+            pinned_item_ids = [it.id for it in current_items if it.context_pinned] or None
 
-            adjusted_items, summary = await compiler.adjust_for_context(
+            adjusted_items, summary, _ops = await compiler.adjust_for_context(
                 rule=rule,
                 community=community,
-                base_checklist_dicts=rule.base_checklist_json,
+                current_items=current_items,
                 community_context=community.community_context,
-                pinned_items=pinned_items,
+                pinned_item_ids=pinned_item_ids,
                 relevant_context=rule.relevant_context,
                 custom_context_notes=rule.custom_context_notes,
             )
 
-            # Replace existing checklist items
+            # Replace existing checklist items. Deletion frees up the existing
+            # ids, so adjusted_items (which retain ids for kept/updated entries)
+            # can be re-added without collision.
             await db.execute(
                 delete(ChecklistItem).where(ChecklistItem.rule_id == rule.id)
             )
+            await db.flush()
             for item in adjusted_items:
                 item.rule_id = rule.id
                 db.add(item)

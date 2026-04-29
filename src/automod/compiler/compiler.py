@@ -1,6 +1,7 @@
 """Rule compiler: translates human-readable rules into executable checklist trees."""
 
 import logging
+import uuid
 from typing import Any, Optional
 
 import anthropic
@@ -218,6 +219,78 @@ _SYNTHESIZE_RULE_TOOL = {
     },
 }
 
+_DRAFT_RULE_FROM_CONTEXT_TOOL = {
+    "name": "draft_rule_from_context",
+    "description": "Draft a community rule grounded in the target community's context notes and peer-community rules. Every clause must cite at least one grounding source.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "draft_text": {
+                "type": "string",
+                "description": "The full rule text as it would appear in the community rules.",
+            },
+            "clauses": {
+                "type": "array",
+                "description": "The rule decomposed into self-contained clauses, each with citations.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string"},
+                        "citations": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "kind": {
+                                        "type": "string",
+                                        "enum": ["context", "peer_rule"],
+                                    },
+                                    "dimension": {
+                                        "type": "string",
+                                        "description": "For kind=context: one of purpose|participants|stakes|tone.",
+                                    },
+                                    "tag": {
+                                        "type": "string",
+                                        "description": "For kind=context: the tag of the cited note.",
+                                    },
+                                    "community_name": {
+                                        "type": "string",
+                                        "description": "For kind=peer_rule: the name of the source community.",
+                                    },
+                                    "rule_title": {
+                                        "type": "string",
+                                        "description": "For kind=peer_rule: the title of the cited peer rule.",
+                                    },
+                                    "shared_tag": {
+                                        "type": "string",
+                                        "description": "For kind=peer_rule: a tag shared between the peer community's context and the target community's context that justifies the borrowing.",
+                                    },
+                                },
+                                "required": ["kind"],
+                            },
+                        },
+                    },
+                    "required": ["text", "citations"],
+                },
+            },
+            "suggested_relevant_context": {
+                "type": "array",
+                "description": "Which {dimension, tag} bundles from the target community should be marked relevant for this rule.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "dimension": {"type": "string"},
+                        "tag": {"type": "string"},
+                    },
+                    "required": ["dimension", "tag"],
+                },
+            },
+        },
+        "required": ["draft_text", "clauses", "suggested_relevant_context"],
+    },
+}
+
 _FILL_EXAMPLES_TOOL = {
     "name": "submit_fill_examples",
     "description": "Submit one violating example per checklist item that is missing one",
@@ -253,7 +326,7 @@ _FILL_EXAMPLES_TOOL = {
 
 _DIAGNOSE_TOOL = {
     "name": "submit_health_diagnoses",
-    "description": "Submit per-item health diagnoses with proposed fixes",
+    "description": "Submit per-item health diagnoses with proposed fixes at the appropriate level (logic / rule_text / context).",
     "input_schema": {
         "type": "object",
         "properties": {
@@ -273,6 +346,41 @@ _DIAGNOSE_TOOL = {
                             "type": "string",
                             "enum": ["high", "medium", "low"],
                         },
+                        "proposed_levels": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": ["logic", "rule_text", "context"]},
+                            "description": "Levels to emit suggestions at. Default per action: tighten_rubric/split_item → ['logic','rule_text']; adjust_threshold/promote_to_deterministic → ['logic']. Add 'context' only if an L2 trigger fires.",
+                        },
+                        "level_reasoning": {
+                            "type": "string",
+                            "description": "Brief: which action type, and (if 'context' is included) which L2 trigger fired (against_existing_context | cross_rule).",
+                        },
+                        "text_change": {
+                            "type": "object",
+                            "description": "Required when proposed_levels contains 'rule_text'. Full proposed rule text, plus rationale.",
+                            "properties": {
+                                "proposed_text": {"type": "string"},
+                                "rationale": {"type": "string"},
+                            },
+                        },
+                        "context_change": {
+                            "type": "object",
+                            "description": "Required when proposed_levels contains 'context'. Note to add/edit on the rule's custom_context_notes.",
+                            "properties": {
+                                "proposed_note": {
+                                    "type": "object",
+                                    "properties": {
+                                        "text": {"type": "string"},
+                                        "tag": {"type": "string"},
+                                    },
+                                },
+                                "l2_trigger": {
+                                    "type": "string",
+                                    "enum": ["against_existing_context", "cross_rule"],
+                                },
+                                "rationale": {"type": "string"},
+                            },
+                        },
                     },
                     "required": ["item_id", "action", "reasoning", "proposed_change", "confidence"],
                 },
@@ -289,6 +397,20 @@ _DIAGNOSE_TOOL = {
                         "split_from": {
                             "type": ["string", "null"],
                             "description": "For split_item: the item_id this was split from, so both halves are applied together.",
+                        },
+                        "proposed_levels": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": ["logic", "rule_text", "context"]},
+                            "description": "Default for add_item: ['rule_text'] when the violation has no anchor in current text (text gap); ['logic'] only if making implicit text explicit.",
+                        },
+                        "level_reasoning": {"type": "string"},
+                        "text_change": {
+                            "type": "object",
+                            "description": "Required when proposed_levels contains 'rule_text'. Full proposed rule text, plus rationale.",
+                            "properties": {
+                                "proposed_text": {"type": "string"},
+                                "rationale": {"type": "string"},
+                            },
                         },
                     },
                     "required": ["action", "reasoning", "proposed_item"],
@@ -384,22 +506,32 @@ _NO_CONTEXT_COMPILE_TOOL = {
 }
 
 _CONTEXT_ADJUST_TOOL = {
-    "name": "submit_adjusted_checklist",
-    "description": "Submit the context-adjusted checklist tree and adjustment summary",
+    "name": "submit_context_diff",
+    "description": "Submit diff operations that calibrate a checklist for a specific community context",
     "input_schema": {
         "type": "object",
         "properties": {
-            "checklist_tree": {
+            "operations": {
                 "type": "array",
                 "items": {
                     "type": "object",
                     "properties": {
+                        "op": {
+                            "type": "string",
+                            "enum": ["keep", "update", "delete", "add"],
+                        },
+                        "existing_id": {"type": "string"},
                         "description": {"type": "string"},
                         "rule_text_anchor": {"type": ["string", "null"]},
-                        "item_type": {"type": "string", "enum": ["deterministic", "structural", "subjective"]},
+                        "item_type": {
+                            "type": "string",
+                            "enum": ["deterministic", "structural", "subjective"],
+                        },
                         "logic": {"type": "object"},
-                        "action": {"type": "string", "enum": ["remove", "warn", "continue"]},
-                        "children": {"type": "array", "items": {"type": "object"}},
+                        "action": {
+                            "type": "string",
+                            "enum": ["remove", "warn", "continue"],
+                        },
                         "context_influenced": {"type": "boolean"},
                         "context_note": {"type": ["string", "null"]},
                         "context_change_types": {
@@ -408,23 +540,18 @@ _CONTEXT_ADJUST_TOOL = {
                                 "type": "string",
                                 "enum": ["threshold", "rubric", "description", "action", "new_item", "pattern", "check"],
                             },
-                            "description": "What was changed by context: threshold, rubric, description, action, new_item (added by context), pattern (regex), check (structural)",
                         },
-                        "base_description": {
-                            "type": ["string", "null"],
-                            "description": "If this item was derived from a base checklist item, the EXACT description of that base item (copy verbatim from the base checklist input). Null only for items with context_change_types=['new_item'].",
-                        },
+                        "children": {"type": "array", "items": {"type": "object"}},
                     },
-                    "required": ["description", "item_type", "logic", "action", "children", "context_influenced"],
+                    "required": ["op"],
                 },
             },
             "adjustment_summary": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "Short bullet points summarizing each adjustment (one bullet per change, under 20 words each)",
+                "type": "string",
+                "description": "Single short sentence (under 15 words) stating the purpose of these adjustments. Empty string if no changes.",
             },
         },
-        "required": ["checklist_tree", "adjustment_summary"],
+        "required": ["operations", "adjustment_summary"],
     },
 }
 
@@ -701,48 +828,47 @@ class RuleCompiler:
         self,
         rule: Rule,
         community: Community,
-        base_checklist_dicts: list[dict],
+        current_items: list[ChecklistItem],
         community_context: dict,
         community_posts_sample: Optional[list] = None,
-        pinned_items: Optional[list[dict]] = None,
-        current_checklist_dicts: Optional[list[dict]] = None,
+        pinned_item_ids: Optional[list[str]] = None,
         relevant_context: Optional[list[dict]] = None,
         custom_context_notes: Optional[list[dict]] = None,
-    ) -> tuple[list[ChecklistItem], str]:
-        """Pass 2: Adjust a base checklist using community context.
+    ) -> tuple[list[ChecklistItem], str, list[dict]]:
+        """Pass 2: Calibrate an existing checklist for community context using diff operations.
 
         Args:
-            pinned_items: List of dicts with keys: description, context_override_note.
-                          These items' calibration must be preserved as-is.
-            current_checklist_dicts: If provided, the LLM will describe changes
-                          relative to these (the live checklist) instead of the base.
+            current_items: The starting-point checklist. For initial compilation this is
+                          the Pass 1 base output; for live preview it is the live checklist.
+                          Items must have stable ids — operations reference them by id.
+            pinned_item_ids: ids of items the LLM must "keep" unconditionally.
             relevant_context: Per-rule filter. If None, all community context bundles
                           apply. If a list of {dimension, tag}, context is narrowed
                           to only those bundles. Empty list = no community context.
             custom_context_notes: Rule-specific calibration notes ([{text, tag}]) appended
                           to the community context for this rule only.
 
-        Returns (adjusted_items, adjustment_summary).
-        If no community_context is provided, returns base items unchanged.
+        Returns (adjusted_items, adjustment_summary, operations).
+        If no context applies, returns current_items unchanged with empty summary and ops.
         """
         filtered_context = _filter_context_by_relevant(community_context, relevant_context)
 
         if not filtered_context and not custom_context_notes:
-            items = self._parse_flat_items(base_checklist_dicts, rule.id)
-            return items, ""
+            return list(current_items), "", []
 
-        logger.info(f"Pass 2: Adjusting rule '{rule.title}' for community context")
+        logger.info(f"Pass 2: Calibrating rule '{rule.title}' for community context")
+
+        current_dicts = self._items_to_diff_dicts(current_items)
 
         user_prompt = prompts.build_context_adjust_prompt(
             rule_title=rule.title,
             rule_text=rule.text,
             community_name=community.name,
             platform=community.platform,
-            base_checklist=base_checklist_dicts,
+            current_checklist=current_dicts,
             community_context=filtered_context or {},
             community_posts_sample=community_posts_sample,
-            pinned_items=pinned_items,
-            current_checklist=current_checklist_dicts,
+            pinned_item_ids=pinned_item_ids,
             custom_context_notes=custom_context_notes,
         )
 
@@ -750,17 +876,157 @@ class RuleCompiler:
             prompts.CONTEXT_ADJUST_SYSTEM, user_prompt, tool=_CONTEXT_ADJUST_TOOL
         )
 
-        adjusted_items = self._parse_flat_items(
-            result.get("checklist_tree", []), rule.id
-        )
-        raw_summary = result.get("adjustment_summary", [])
-        # Normalize: accept both list and legacy string
-        if isinstance(raw_summary, str):
-            summary = [s.strip() for s in raw_summary.split(". ") if s.strip()]
+        operations = result.get("operations", []) or []
+        raw_summary = result.get("adjustment_summary", "")
+        if isinstance(raw_summary, list):
+            summary = " ".join(s.strip() for s in raw_summary if s and s.strip())
         else:
-            summary = list(raw_summary)
+            summary = (raw_summary or "").strip()
 
-        return adjusted_items, summary
+        adjusted_items = self._apply_context_ops(current_items, operations, rule.id)
+        return adjusted_items, summary, operations
+
+    def _items_to_diff_dicts(self, items: list[ChecklistItem]) -> list[dict]:
+        """Build a nested dict tree (with ids) for the diff prompt input."""
+        children_map: dict[Optional[str], list[ChecklistItem]] = {}
+        for item in sorted(items, key=lambda x: x.order):
+            children_map.setdefault(item.parent_id, []).append(item)
+
+        def build(parent_id: Optional[str]) -> list[dict]:
+            return [
+                {
+                    "id": item.id,
+                    "description": item.description,
+                    "rule_text_anchor": item.rule_text_anchor,
+                    "item_type": item.item_type,
+                    "logic": item.logic,
+                    "action": item.action,
+                    "children": build(item.id),
+                }
+                for item in children_map.get(parent_id, [])
+            ]
+
+        return build(None)
+
+    def _apply_context_ops(
+        self,
+        current_items: list[ChecklistItem],
+        operations: list[dict],
+        rule_id: str,
+    ) -> list[ChecklistItem]:
+        """Apply context-adjustment ops to current items, producing a new flat ChecklistItem list.
+
+        Operations may be nested (children inline) and reference items by existing_id.
+        Items without a corresponding op (and not descendants of a deleted op) are kept as-is.
+        """
+        items_by_id = {it.id: it for it in current_items}
+        children_of: dict[Optional[str], list[ChecklistItem]] = {}
+        for it in sorted(current_items, key=lambda x: x.order):
+            children_of.setdefault(it.parent_id, []).append(it)
+
+        result: list[ChecklistItem] = []
+        order_counter = [0]
+
+        def clone_item(
+            src: ChecklistItem,
+            parent_id: Optional[str],
+            overrides: Optional[dict] = None,
+        ) -> ChecklistItem:
+            o = overrides or {}
+            new = ChecklistItem(
+                id=src.id,
+                rule_id=rule_id,
+                order=order_counter[0],
+                parent_id=parent_id,
+                description=o.get("description", src.description),
+                rule_text_anchor=o.get("rule_text_anchor", src.rule_text_anchor),
+                item_type=o.get("item_type", src.item_type),
+                logic=o.get("logic", src.logic),
+                action=o.get("action", src.action),
+                context_influenced=o.get("context_influenced", src.context_influenced),
+                context_note=o.get("context_note", src.context_note),
+                context_change_types=o.get("context_change_types", src.context_change_types),
+                base_description=src.base_description,
+                context_pinned=src.context_pinned,
+                context_override_note=src.context_override_note,
+                pinned_tags=src.pinned_tags,
+            )
+            order_counter[0] += 1
+            return new
+
+        def make_added_item(op: dict, parent_id: Optional[str]) -> ChecklistItem:
+            new = ChecklistItem(
+                id=str(uuid.uuid4()),
+                rule_id=rule_id,
+                order=order_counter[0],
+                parent_id=parent_id,
+                description=op.get("description", ""),
+                rule_text_anchor=op.get("rule_text_anchor"),
+                item_type=op.get("item_type", "subjective"),
+                logic=op.get("logic") or {},
+                action=op.get("action", "warn"),
+                context_influenced=op.get("context_influenced", True),
+                context_note=op.get("context_note"),
+                context_change_types=op.get("context_change_types") or ["new_item"],
+            )
+            order_counter[0] += 1
+            return new
+
+        def append_subtree_unchanged(item: ChecklistItem, parent_id: Optional[str]) -> None:
+            cloned = clone_item(item, parent_id)
+            result.append(cloned)
+            for child in children_of.get(item.id, []):
+                append_subtree_unchanged(child, cloned.id)
+
+        def process_ops(ops: list[dict], parent_id: Optional[str]) -> set[str]:
+            """Process ops at one level. Returns set of existing_ids that were referenced."""
+            referenced: set[str] = set()
+            for op in ops:
+                kind = op.get("op")
+                if kind == "add":
+                    new = make_added_item(op, parent_id)
+                    result.append(new)
+                    process_ops(op.get("children") or [], new.id)
+                    continue
+
+                eid = op.get("existing_id")
+                if not eid or eid not in items_by_id:
+                    continue
+                referenced.add(eid)
+                src = items_by_id[eid]
+
+                if kind == "delete":
+                    continue  # drop subtree
+
+                if kind == "update":
+                    overrides = {
+                        k: op[k] for k in (
+                            "description", "rule_text_anchor", "item_type",
+                            "logic", "action", "context_influenced",
+                            "context_note", "context_change_types",
+                        )
+                        if k in op
+                    }
+                    cloned = clone_item(src, parent_id, overrides)
+                else:  # keep (or unknown — treat as keep)
+                    cloned = clone_item(src, parent_id)
+                result.append(cloned)
+
+                child_ops = op.get("children") or []
+                child_referenced = process_ops(child_ops, cloned.id)
+                # Children of this item not referenced by any op — keep unchanged.
+                for child in children_of.get(eid, []):
+                    if child.id not in child_referenced:
+                        append_subtree_unchanged(child, cloned.id)
+            return referenced
+
+        top_referenced = process_ops(operations, None)
+        # Top-level items not referenced by any op — keep unchanged at the end.
+        for item in children_of.get(None, []):
+            if item.id not in top_referenced:
+                append_subtree_unchanged(item, None)
+
+        return result
 
     async def compile_rule_two_pass(
         self,
@@ -774,7 +1040,7 @@ class RuleCompiler:
         relevant_context: Optional[list[dict]] = None,
         custom_context_notes: Optional[list[dict]] = None,
     ) -> tuple[list[ChecklistItem], list[dict], list[dict], str]:
-        """Two-pass compilation: base compile then context adjustment.
+        """Two-pass compilation: base compile then context adjustment via diff ops.
 
         Returns (adjusted_items, example_dicts, base_checklist_dicts, adjustment_summary).
         """
@@ -785,12 +1051,15 @@ class RuleCompiler:
 
         base_checklist_dicts = self._items_to_nested_dicts(base_items)
 
-        # Pass 2: adjust for context (filtered per-rule)
+        # Pass 2: calibrate for context via diff ops (filtered per-rule)
         filtered_context = _filter_context_by_relevant(community_context, relevant_context)
         if filtered_context or custom_context_notes:
-            adjusted_items, summary = await self.adjust_for_context(
-                rule, community, base_checklist_dicts, filtered_context or {},
-                community_posts_sample,
+            adjusted_items, summary, _ops = await self.adjust_for_context(
+                rule=rule,
+                community=community,
+                current_items=base_items,
+                community_context=filtered_context or {},
+                community_posts_sample=community_posts_sample,
                 custom_context_notes=custom_context_notes,
             )
         else:
@@ -972,14 +1241,18 @@ class RuleCompiler:
         rule: Rule,
         checklist: list[ChecklistItem],
         health_data: dict,
+        community_context: Optional[dict] = None,
+        sibling_rules: Optional[list[dict]] = None,
     ) -> dict:
-        """Diagnose per-item health issues and propose typed fixes."""
+        """Diagnose per-item health issues and propose typed fixes at the appropriate level."""
         logger.info(f"Diagnosing rule health for rule '{rule.title}'")
         checklist_dicts = [self._checklist_item_to_dict(i) for i in checklist]
         user_prompt = prompts.build_diagnose_health_prompt(
             rule_text=rule.text,
             checklist_items=checklist_dicts,
             health_data=health_data,
+            community_context=community_context,
+            sibling_rules=sibling_rules,
         )
         result = await self._call_claude(
             prompts.DIAGNOSE_HEALTH_SYSTEM, user_prompt, tool=_DIAGNOSE_TOOL
@@ -1028,6 +1301,40 @@ class RuleCompiler:
             model=self.settings.haiku_model,
         )
         return result.get("links", [])
+
+    async def draft_rule_from_context(
+        self,
+        title: str,
+        target_community_name: str,
+        target_context: dict,
+        peer_rules: list[dict],
+    ) -> dict:
+        """Draft a rule grounded in the target community's context + peer-community rules.
+
+        peer_rules entries: {community_name, rule_title, rule_text, shared_tags: [str]}.
+        Returns: {draft_text, clauses[{text, citations[]}], suggested_relevant_context[]}.
+        Validation of citations is done by the caller (api/rules.py).
+        """
+        logger.info(
+            f"Drafting rule '{title}' for community '{target_community_name}' "
+            f"with {len(peer_rules)} peer rule(s)"
+        )
+        user_prompt = prompts.build_draft_rule_from_context_prompt(
+            title=title,
+            target_community_name=target_community_name,
+            target_context=target_context or {},
+            peer_rules=peer_rules,
+        )
+        result = await self._call_claude(
+            prompts.DRAFT_RULE_FROM_CONTEXT_SYSTEM,
+            user_prompt,
+            tool=_DRAFT_RULE_FROM_CONTEXT_TOOL,
+        )
+        return {
+            "draft_text": result.get("draft_text", ""),
+            "clauses": result.get("clauses", []),
+            "suggested_relevant_context": result.get("suggested_relevant_context", []),
+        }
 
     async def synthesize_rule_from_examples(
         self,

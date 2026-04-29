@@ -1,6 +1,7 @@
+import { useMemo, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X, AlertCircle } from 'lucide-react'
-import { acceptSuggestionWithLabel, acceptRecompile, dismissSuggestion, Suggestion } from '../api/client'
+import { Check, X, AlertCircle, Link2 } from 'lucide-react'
+import { acceptContextSuggestion, acceptSuggestionWithLabel, acceptRecompile, dismissSuggestion, Suggestion } from '../api/client'
 
 interface SuggestionDiffProps {
   suggestions: Suggestion[]
@@ -13,10 +14,23 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
   const queryClient = useQueryClient()
 
   const acceptMutation = useMutation({
-    mutationFn: ({ suggestion, labelOverride }: { suggestion: Suggestion; labelOverride?: string }) =>
-      suggestion.suggestion_type === 'checklist'
-        ? acceptRecompile(ruleId, suggestion.id)
-        : acceptSuggestionWithLabel(suggestion.id, labelOverride),
+    mutationFn: ({
+      suggestion,
+      labelOverride,
+      affectedRuleIds,
+    }: {
+      suggestion: Suggestion
+      labelOverride?: string
+      affectedRuleIds?: string[]
+    }) => {
+      if (suggestion.suggestion_type === 'checklist') {
+        return acceptRecompile(ruleId, suggestion.id)
+      }
+      if (suggestion.suggestion_type === 'context') {
+        return acceptContextSuggestion(suggestion.id, affectedRuleIds ?? [])
+      }
+      return acceptSuggestionWithLabel(suggestion.id, labelOverride)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['suggestions', ruleId] })
       queryClient.invalidateQueries({ queryKey: ['checklist', ruleId] })
@@ -69,8 +83,13 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
             <SuggestionCard
               key={suggestion.id}
               suggestion={suggestion}
+              allSuggestions={pending}
               currentRuleText={currentRuleText}
-              onAccept={(labelOverride?: string) => acceptMutation.mutate({ suggestion, labelOverride })}
+              onAccept={(opts) => acceptMutation.mutate({
+                suggestion,
+                labelOverride: opts?.labelOverride,
+                affectedRuleIds: opts?.affectedRuleIds,
+              })}
               onDismiss={() => dismissMutation.mutate(suggestion.id)}
               isPending={acceptMutation.isPending || dismissMutation.isPending}
             />
@@ -87,50 +106,95 @@ export default function SuggestionDiff({ suggestions, ruleId, currentRuleText, o
   )
 }
 
+type AcceptOpts = { labelOverride?: string; affectedRuleIds?: string[] }
+
 function SuggestionCard({
   suggestion,
+  allSuggestions,
   currentRuleText,
   onAccept,
   onDismiss,
   isPending,
 }: {
   suggestion: Suggestion
+  allSuggestions: Suggestion[]
   currentRuleText?: string
-  onAccept: (labelOverride?: string) => void
+  onAccept: (opts?: AcceptOpts) => void
   onDismiss: () => void
   isPending: boolean
 }) {
   const typeLabels: Record<string, string> = {
     checklist: 'Checklist Update',
     rule_text: 'Rule Text Update',
+    context: 'Context Update',
     example: 'New Example',
     new_rule: 'New Rule',
   }
 
   const content = suggestion.content as Record<string, unknown>
 
-  // Check if this is a borderline example suggestion requiring a verdict
   const isBorderlineExample =
     suggestion.suggestion_type === 'example' && content.label === 'borderline'
+
+  // Paired-link awareness: an L1 (checklist) may point to a paired L3 (rule_text)
+  // via content.linked_suggestion_id. When that linked L3 is also pending, accepting
+  // L1 alone causes text/logic drift — warn the moderator.
+  const linkedId = content.linked_suggestion_id as string | undefined
+  const linkedPending = useMemo(
+    () => (linkedId ? allSuggestions.find(s => s.id === linkedId && s.status === 'pending') : undefined),
+    [linkedId, allSuggestions],
+  )
+  const isL1WithPendingL3 =
+    suggestion.suggestion_type === 'checklist' && linkedPending?.suggestion_type === 'rule_text'
+
+  // Affects-rules state for context suggestions
+  const affectsRules = (content.affects_rules as Array<{ rule_id: string; score: number; signals?: string[] }>) || []
+  const [optedIn, setOptedIn] = useState<Set<string>>(() => new Set(affectsRules.map(r => r.rule_id)))
 
   return (
     <div className="border border-gray-200 rounded-lg p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span className="badge badge-blue">{typeLabels[suggestion.suggestion_type] || suggestion.suggestion_type}</span>
             {isBorderlineExample && (
               <span className="badge badge-yellow">needs verdict</span>
             )}
+            {linkedId && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 inline-flex items-center gap-1" title="Linked paired suggestion">
+                <Link2 size={11} /> paired
+              </span>
+            )}
           </div>
-          <SuggestionBody type={suggestion.suggestion_type} content={content} currentRuleText={currentRuleText} />
+          <SuggestionBody
+            type={suggestion.suggestion_type}
+            content={content}
+            currentRuleText={currentRuleText}
+            optedIn={optedIn}
+            onToggleAffected={(rid) =>
+              setOptedIn(prev => {
+                const next = new Set(prev)
+                if (next.has(rid)) next.delete(rid)
+                else next.add(rid)
+                return next
+              })
+            }
+          />
+          {isL1WithPendingL3 && (
+            <div className="mt-2 bg-amber-50 border border-amber-200 rounded px-2 py-1.5 text-xs text-amber-800 flex items-start gap-1.5">
+              <AlertCircle size={12} className="mt-0.5 flex-shrink-0 text-amber-500" />
+              <span>
+                A paired <strong>rule text update</strong> is pending. Accepting this checklist fix alone will leave the rule text out of sync — prefer accepting the rule-text suggestion (a silent recompile re-derives this fix).
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex flex-col gap-1.5 flex-shrink-0">
           {isBorderlineExample ? (
             <>
               <button
                 className="btn-success text-xs py-1"
-                onClick={() => onAccept('compliant')}
+                onClick={() => onAccept({ labelOverride: 'compliant' })}
                 disabled={isPending}
                 title="Mark as compliant"
               >
@@ -139,7 +203,7 @@ function SuggestionCard({
               </button>
               <button
                 className="btn-danger text-xs py-1"
-                onClick={() => onAccept('violating')}
+                onClick={() => onAccept({ labelOverride: 'violating' })}
                 disabled={isPending}
                 title="Mark as violating"
               >
@@ -147,18 +211,26 @@ function SuggestionCard({
                 Violating
               </button>
             </>
+          ) : suggestion.suggestion_type === 'context' ? (
+            <button
+              className="btn-success text-xs py-1"
+              onClick={() => onAccept({ affectedRuleIds: Array.from(optedIn) })}
+              disabled={isPending}
+              title="Accept context note (applies to ticked rules)"
+            >
+              <Check size={12} />
+              Accept
+            </button>
           ) : (
-            <>
-              <button
-                className="btn-success text-xs py-1"
-                onClick={() => onAccept()}
-                disabled={isPending}
-                title="Accept suggestion"
-              >
-                <Check size={12} />
-                Accept
-              </button>
-            </>
+            <button
+              className="btn-success text-xs py-1"
+              onClick={() => onAccept()}
+              disabled={isPending}
+              title="Accept suggestion"
+            >
+              <Check size={12} />
+              Accept
+            </button>
           )}
           <button
             className="btn-secondary text-xs py-1"
@@ -175,7 +247,19 @@ function SuggestionCard({
   )
 }
 
-function SuggestionBody({ type, content, currentRuleText }: { type: string; content: Record<string, unknown>; currentRuleText?: string }) {
+function SuggestionBody({
+  type,
+  content,
+  currentRuleText,
+  optedIn,
+  onToggleAffected,
+}: {
+  type: string
+  content: Record<string, unknown>
+  currentRuleText?: string
+  optedIn?: Set<string>
+  onToggleAffected?: (ruleId: string) => void
+}) {
   if (type === 'rule_text') {
     return <RuleTextSuggestion content={content} currentRuleText={currentRuleText} />
   }
@@ -184,6 +268,9 @@ function SuggestionBody({ type, content, currentRuleText }: { type: string; cont
   }
   if (type === 'checklist') {
     return <ChecklistSuggestion content={content} />
+  }
+  if (type === 'context') {
+    return <ContextSuggestion content={content} optedIn={optedIn} onToggleAffected={onToggleAffected} />
   }
   if (type === 'new_rule') {
     return <NewRuleSuggestion content={content} />
@@ -196,6 +283,72 @@ function SuggestionBody({ type, content, currentRuleText }: { type: string; cont
       {description && <p className="text-sm font-medium mb-1">{description}</p>}
       {reasoning && <p className="text-xs text-gray-500">{reasoning}</p>}
     </>
+  )
+}
+
+function ContextSuggestion({
+  content,
+  optedIn,
+  onToggleAffected,
+}: {
+  content: Record<string, unknown>
+  optedIn?: Set<string>
+  onToggleAffected?: (ruleId: string) => void
+}) {
+  const proposedNote = (content.proposed_note as { text?: string; tag?: string } | undefined) || {}
+  const reasoning = (content.reasoning as string) || ''
+  const trigger = (content.l2_trigger as string) || ''
+  const affects =
+    (content.affects_rules as Array<{ rule_id: string; score: number; signals?: string[] }>) || []
+
+  const triggerLabel: Record<string, string> = {
+    against_existing_context: 'against existing context',
+    cross_rule: 'applies across rules',
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="border-l-4 border-purple-400 bg-purple-50 rounded-r p-3 space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          {proposedNote.tag && (
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">
+              {proposedNote.tag}
+            </span>
+          )}
+          {trigger && (
+            <span className="text-xs text-purple-700 italic">
+              trigger: {triggerLabel[trigger] || trigger}
+            </span>
+          )}
+        </div>
+        {proposedNote.text && (
+          <p className="text-sm text-gray-800">{proposedNote.text}</p>
+        )}
+      </div>
+      {reasoning && <p className="text-xs text-gray-500 italic">{reasoning}</p>}
+      {affects.length > 0 && (
+        <div className="border border-gray-200 rounded p-2 bg-gray-50">
+          <p className="text-xs font-semibold text-gray-700 mb-1.5">May also apply to:</p>
+          <ul className="space-y-1">
+            {affects.map(r => (
+              <li key={r.rule_id} className="flex items-start gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={optedIn?.has(r.rule_id) ?? false}
+                  onChange={() => onToggleAffected?.(r.rule_id)}
+                />
+                <span className="font-mono text-gray-700">{r.rule_id.slice(0, 8)}</span>
+                <span className="text-gray-500">score {r.score.toFixed(2)}</span>
+                {r.signals && r.signals[0] && (
+                  <span className="text-gray-400 italic truncate">{r.signals[0]}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   )
 }
 

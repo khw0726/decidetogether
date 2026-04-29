@@ -328,6 +328,27 @@ async def _migrate_rule_pending_preview(conn) -> None:
         ))
 
 
+async def _migrate_reference_corpus_fields(conn) -> None:
+    """Add is_reference + public_description to communities and title_embedding to rules."""
+    cols = await conn.execute(text("PRAGMA table_info(communities)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if col_names:
+        if "is_reference" not in col_names:
+            await conn.execute(text(
+                "ALTER TABLE communities ADD COLUMN is_reference BOOLEAN NOT NULL DEFAULT 0"
+            ))
+        if "public_description" not in col_names:
+            await conn.execute(text(
+                "ALTER TABLE communities ADD COLUMN public_description TEXT DEFAULT NULL"
+            ))
+    cols = await conn.execute(text("PRAGMA table_info(rules)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if col_names and "title_embedding" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN title_embedding BLOB DEFAULT NULL"
+        ))
+
+
 async def _migrate_flag_to_warn(conn) -> None:
     """Rename action='flag' to 'warn' in checklist_items and verdict='review' to 'warn' in decisions."""
     # Checklist items
@@ -359,6 +380,7 @@ async def init_db() -> None:
         await _migrate_rule_relevant_context(conn)
         await _migrate_checklist_pinned_tags(conn)
         await _migrate_rule_pending_preview(conn)
+        await _migrate_reference_corpus_fields(conn)
         await _migrate_flag_to_warn(conn)
         await conn.run_sync(Base.metadata.create_all)
 
