@@ -51,82 +51,86 @@ async def _link_uncovered_violations(rule_id: str, generation: int) -> None:
         logger.debug(f"Skipping debounced violation linking for rule {rule_id} (superseded)")
         return
 
-    from ..db.database import AsyncSessionLocal
+    from ..db.database import AsyncSessionLocal, write_session
 
+    # ── Read phase ─────────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:
+        rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+        rule = rule_result.scalar_one_or_none()
+        if not rule:
+            return
+
+        items_result = await db.execute(
+            select(ChecklistItem)
+            .where(ChecklistItem.rule_id == rule_id)
+            .order_by(ChecklistItem.order.asc())
+        )
+        all_items = list(items_result.scalars().all())
+        if not all_items:
+            return
+        items_by_id = {i.id: i for i in all_items}
+
+        example_ids_result = await db.execute(
+            select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
+        )
+        example_ids = [r[0] for r in example_ids_result]
+        if not example_ids:
+            return
+
+        examples_result = await db.execute(
+            select(Example).where(Example.id.in_(example_ids))
+        )
+        examples_by_id = {e.id: e for e in examples_result.scalars().all()}
+
+        links_result = await db.execute(
+            select(ExampleChecklistItemLink)
+            .where(ExampleChecklistItemLink.example_id.in_(example_ids))
+        )
+        linked_example_ids: set[str] = set()
+        for link in links_result.scalars():
+            if link.checklist_item_id and link.checklist_item_id in items_by_id:
+                linked_example_ids.add(link.example_id)
+
+        violations = []
+        for eid, example in examples_by_id.items():
+            if example.label == "violating" and eid not in linked_example_ids:
+                content = example.content or {}
+                inner = content.get("content", {})
+                violations.append({
+                    "example_id": example.id,
+                    "label": "violating",
+                    "title": (inner.get("title", "") if isinstance(inner, dict) else "") or "(no title)",
+                    "content": content,
+                })
+
+    if not violations:
+        logger.info(f"No uncovered violations to link for rule {rule_id}")
+        return
+
+    # ── LLM phase (no session, no lock) ────────────────────────────────
+    try:
+        compiler = get_compiler()
+        proposed_links = await compiler.link_violations_to_items(rule, all_items, violations)
+    except Exception as e:
+        logger.error(f"link_violations_to_items LLM call failed for rule {rule_id}: {e}")
+        return
+
+    valid_proposals = [
+        p for p in proposed_links
+        if p.get("example_id") in examples_by_id and p.get("checklist_item_id") in items_by_id
+    ]
+    if not valid_proposals:
+        return
+
+    # ── Write phase ────────────────────────────────────────────────────
+    async with write_session() as db:
         try:
-            rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-            rule = rule_result.scalar_one_or_none()
-            if not rule:
-                return
-
-            # Fetch current checklist items
-            items_result = await db.execute(
-                select(ChecklistItem)
-                .where(ChecklistItem.rule_id == rule_id)
-                .order_by(ChecklistItem.order.asc())
-            )
-            all_items = list(items_result.scalars().all())
-            if not all_items:
-                return
-            items_by_id = {i.id: i for i in all_items}
-
-            # Fetch examples linked to this rule
-            example_ids_result = await db.execute(
-                select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
-            )
-            example_ids = [r[0] for r in example_ids_result]
-            if not example_ids:
-                return
-
-            examples_result = await db.execute(
-                select(Example).where(Example.id.in_(example_ids))
-            )
-            examples_by_id = {e.id: e for e in examples_result.scalars().all()}
-
-            # Find which examples already have a valid checklist item link
-            links_result = await db.execute(
-                select(ExampleChecklistItemLink)
-                .where(ExampleChecklistItemLink.example_id.in_(example_ids))
-            )
-            linked_example_ids: set[str] = set()
-            for link in links_result.scalars():
-                if link.checklist_item_id and link.checklist_item_id in items_by_id:
-                    linked_example_ids.add(link.example_id)
-
-            # Collect uncovered violations
-            violations = []
-            for eid, example in examples_by_id.items():
-                if example.label == "violating" and eid not in linked_example_ids:
-                    content = example.content or {}
-                    inner = content.get("content", {})
-                    violations.append({
-                        "example_id": example.id,
-                        "label": "violating",
-                        "title": (inner.get("title", "") if isinstance(inner, dict) else "") or "(no title)",
-                        "content": content,
-                    })
-
-            if not violations:
-                logger.info(f"No uncovered violations to link for rule {rule_id}")
-                return
-
-            # Ask LLM to match violations to checklist items
-            compiler = get_compiler()
-            proposed_links = await compiler.link_violations_to_items(rule, all_items, violations)
-
-            # Create ExampleChecklistItemLink records for valid matches
             created = 0
-            for proposed in proposed_links:
-                ex_id = proposed.get("example_id")
-                item_id = proposed.get("checklist_item_id")
-                item_desc = proposed.get("checklist_item_description", "")
+            for proposed in valid_proposals:
+                ex_id = proposed["example_id"]
+                item_id = proposed["checklist_item_id"]
+                item_desc = proposed.get("checklist_item_description", "") or items_by_id[item_id].description
 
-                # Validate both IDs exist
-                if ex_id not in examples_by_id or item_id not in items_by_id:
-                    continue
-
-                # Check if link already exists
                 existing_result = await db.execute(
                     select(ExampleChecklistItemLink).where(
                         ExampleChecklistItemLink.example_id == ex_id,
@@ -134,22 +138,20 @@ async def _link_uncovered_violations(rule_id: str, generation: int) -> None:
                 )
                 existing = existing_result.scalar_one_or_none()
                 if existing:
-                    # Update dangling link
                     existing.checklist_item_id = item_id
-                    existing.checklist_item_description = item_desc or items_by_id[item_id].description
+                    existing.checklist_item_description = item_desc
                 else:
                     db.add(ExampleChecklistItemLink(
                         example_id=ex_id,
                         checklist_item_id=item_id,
-                        checklist_item_description=item_desc or items_by_id[item_id].description,
+                        checklist_item_description=item_desc,
                     ))
                 created += 1
 
             await db.commit()
             logger.info(f"Linked {created} uncovered violation(s) to checklist items for rule {rule_id}")
-
         except Exception as e:
-            logger.error(f"Failed to link uncovered violations for rule {rule_id}: {e}")
+            logger.error(f"Failed to persist violation links for rule {rule_id}: {e}")
             await db.rollback()
 
 
@@ -170,83 +172,104 @@ async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
         logger.debug(f"Skipping debounced re-evaluation for rule {rule_id} (superseded)")
         return
 
-    from ..db.database import AsyncSessionLocal
+    from ..db.database import AsyncSessionLocal, write_session
 
+    # ── Read phase ─────────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:
+        rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+        rule = rule_result.scalar_one_or_none()
+        if not rule:
+            return
+
+        comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+        community = comm_result.scalar_one_or_none()
+        community_name = community.name if community else ""
+
+        items_result = await db.execute(
+            select(ChecklistItem)
+            .where(ChecklistItem.rule_id == rule_id)
+            .order_by(ChecklistItem.order.asc())
+        )
+        checklist = list(items_result.scalars().all())
+        if not checklist:
+            return
+
+        decisions_result = await db.execute(
+            select(Decision).where(
+                Decision.community_id == rule.community_id,
+                Decision.moderator_verdict != "pending",
+                Decision.was_override == True,  # noqa: E712
+            )
+        )
+        # Snapshot what we need: id + post_content + existing reasoning.
+        candidate_decisions = [
+            {
+                "id": d.id,
+                "post_content": d.post_content or {},
+                "agent_reasoning": dict(d.agent_reasoning or {}),
+            }
+            for d in decisions_result.scalars().all()
+            if rule_id in (d.agent_reasoning or {})
+        ]
+
+    if not candidate_decisions:
+        logger.info(f"No override decisions to re-evaluate for rule {rule_id}")
+        return
+
+    # ── LLM phase (no session, no lock) ────────────────────────────────
+    client = get_anthropic_client()
+    subjective_evaluator = SubjectiveEvaluator(client, settings)
+    tree_evaluator = TreeEvaluator(subjective_evaluator)
+
+    updates: list[dict] = []
+    for snap in candidate_decisions:
         try:
-            rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-            rule = rule_result.scalar_one_or_none()
-            if not rule:
-                return
-
-            comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
-            community = comm_result.scalar_one_or_none()
-            community_name = community.name if community else ""
-
-            # Fetch updated checklist items
-            items_result = await db.execute(
-                select(ChecklistItem)
-                .where(ChecklistItem.rule_id == rule_id)
-                .order_by(ChecklistItem.order.asc())
+            new_result = await tree_evaluator.evaluate_rule(
+                rule=rule,
+                checklist=checklist,
+                post=snap["post_content"],
+                community_name=community_name,
+                examples=[],
             )
-            checklist = list(items_result.scalars().all())
-            if not checklist:
-                return
+            old_rule = snap["agent_reasoning"].get(rule_id, {})
+            updates.append({
+                "decision_id": snap["id"],
+                "rule_entry": {
+                    "rule_title": old_rule.get("rule_title", rule.title),
+                    "verdict": new_result["verdict"],
+                    "confidence": new_result["confidence"],
+                    "item_reasoning": new_result["reasoning"],
+                    "triggered_items": new_result["triggered_items"],
+                },
+            })
+        except Exception as e:
+            logger.warning(f"Re-evaluation failed for decision {snap['id']}: {e}")
 
-            # Find resolved decisions where this rule was evaluated and the moderator overrode
-            decisions_result = await db.execute(
-                select(Decision).where(
-                    Decision.community_id == rule.community_id,
-                    Decision.moderator_verdict != "pending",
-                    Decision.was_override == True,  # noqa: E712
-                )
+    if not updates:
+        return
+
+    # ── Write phase ────────────────────────────────────────────────────
+    async with write_session() as db:
+        try:
+            decision_rows = await db.execute(
+                select(Decision).where(Decision.id.in_([u["decision_id"] for u in updates]))
             )
-            decisions = [
-                d for d in decisions_result.scalars().all()
-                if rule_id in (d.agent_reasoning or {})
-            ]
-
-            if not decisions:
-                logger.info(f"No override decisions to re-evaluate for rule {rule_id}")
-                return
-
-            # Set up evaluator
-            client = get_anthropic_client()
-            subjective_evaluator = SubjectiveEvaluator(client, settings)
-            tree_evaluator = TreeEvaluator(subjective_evaluator)
-
+            by_id = {d.id: d for d in decision_rows.scalars().all()}
             updated = 0
-            for decision in decisions:
-                try:
-                    new_result = await tree_evaluator.evaluate_rule(
-                        rule=rule,
-                        checklist=checklist,
-                        post=decision.post_content or {},
-                        community_name=community_name,
-                        examples=[],
-                    )
-
-                    # Update the rule's reasoning in-place
-                    reasoning = dict(decision.agent_reasoning or {})
-                    old_rule = reasoning.get(rule_id, {})
-                    reasoning[rule_id] = {
-                        "rule_title": old_rule.get("rule_title", rule.title),
-                        "verdict": new_result["verdict"],
-                        "confidence": new_result["confidence"],
-                        "item_reasoning": new_result["reasoning"],
-                        "triggered_items": new_result["triggered_items"],
-                    }
-                    decision.agent_reasoning = reasoning
-                    flag_modified(decision, "agent_reasoning")
-                    updated += 1
-                except Exception as e:
-                    logger.warning(f"Re-evaluation failed for decision {decision.id}: {e}")
+            for upd in updates:
+                d = by_id.get(upd["decision_id"])
+                if not d:
+                    continue
+                reasoning = dict(d.agent_reasoning or {})
+                reasoning[rule_id] = upd["rule_entry"]
+                d.agent_reasoning = reasoning
+                flag_modified(d, "agent_reasoning")
+                updated += 1
 
             await db.commit()
             logger.info(f"Re-evaluated {updated} override decision(s) for rule {rule_id}")
-
         except Exception as e:
-            logger.error(f"Failed to re-evaluate error cases for rule {rule_id}: {e}")
+            logger.error(f"Failed to persist re-evaluations for rule {rule_id}: {e}")
             await db.rollback()
 
 
@@ -265,101 +288,131 @@ async def _reevaluate_pending_queue(rule_id: str, generation: int) -> None:
         return
 
     from ..core.actions import resolve_verdict
-    from ..db.database import AsyncSessionLocal
+    from ..db.database import AsyncSessionLocal, write_session
 
+    # ── Read phase ─────────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:
+        rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+        rule = rule_result.scalar_one_or_none()
+        if not rule:
+            return
+
+        comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+        community = comm_result.scalar_one_or_none()
+        community_name = community.name if community else ""
+
+        items_result = await db.execute(
+            select(ChecklistItem)
+            .where(ChecklistItem.rule_id == rule_id)
+            .order_by(ChecklistItem.order.asc())
+        )
+        checklist = list(items_result.scalars().all())
+        if not checklist:
+            return
+
+        decisions_result = await db.execute(
+            select(Decision).where(
+                Decision.community_id == rule.community_id,
+                Decision.moderator_verdict == "pending",
+            )
+        )
+        candidate_decisions = [
+            {
+                "id": d.id,
+                "post_content": d.post_content or {},
+                "agent_reasoning": dict(d.agent_reasoning or {}),
+            }
+            for d in decisions_result.scalars().all()
+            if rule_id in (d.agent_reasoning or {})
+        ]
+
+    if not candidate_decisions:
+        logger.info(f"No pending decisions to re-evaluate for rule {rule_id}")
+        return
+
+    # ── LLM phase (no session, no lock) ────────────────────────────────
+    client = get_anthropic_client()
+    subjective_evaluator = SubjectiveEvaluator(client, settings)
+    tree_evaluator = TreeEvaluator(subjective_evaluator)
+
+    updates: list[dict] = []
+    for snap in candidate_decisions:
         try:
-            rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
-            rule = rule_result.scalar_one_or_none()
-            if not rule:
-                return
-
-            comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
-            community = comm_result.scalar_one_or_none()
-            community_name = community.name if community else ""
-
-            items_result = await db.execute(
-                select(ChecklistItem)
-                .where(ChecklistItem.rule_id == rule_id)
-                .order_by(ChecklistItem.order.asc())
+            new_result = await tree_evaluator.evaluate_rule(
+                rule=rule,
+                checklist=checklist,
+                post=snap["post_content"],
+                community_name=community_name,
+                examples=[],
             )
-            checklist = list(items_result.scalars().all())
-            if not checklist:
-                return
 
-            decisions_result = await db.execute(
-                select(Decision).where(
-                    Decision.community_id == rule.community_id,
-                    Decision.moderator_verdict == "pending",
-                )
-            )
-            decisions = [
-                d for d in decisions_result.scalars().all()
-                if rule_id in (d.agent_reasoning or {})
+            reasoning = dict(snap["agent_reasoning"])
+            old_rule = reasoning.get(rule_id, {})
+            reasoning[rule_id] = {
+                "rule_title": old_rule.get("rule_title", rule.title),
+                "verdict": new_result["verdict"],
+                "confidence": new_result["confidence"],
+                "item_reasoning": new_result["reasoning"],
+                "triggered_items": new_result["triggered_items"],
+            }
+
+            rule_results = [
+                {"verdict": v.get("verdict", "approve"), "confidence": v.get("confidence", 0.5)}
+                for k, v in reasoning.items()
+                if k != "__community_norms__"
+            ]
+            if rule_results:
+                agg_verdict, agg_confidence = resolve_verdict(rule_results)
+            else:
+                agg_verdict, agg_confidence = "approve", 1.0
+
+            norms = reasoning.get("__community_norms__")
+            if norms and agg_verdict == "approve":
+                agg_verdict = "review"
+                agg_confidence = norms.get("confidence", agg_confidence)
+
+            triggered_rules = [
+                rid for rid, r in reasoning.items()
+                if rid != "__community_norms__" and r.get("verdict") in ("remove", "warn")
             ]
 
-            if not decisions:
-                logger.info(f"No pending decisions to re-evaluate for rule {rule_id}")
-                return
+            updates.append({
+                "decision_id": snap["id"],
+                "agent_reasoning": reasoning,
+                "agent_verdict": agg_verdict,
+                "agent_confidence": agg_confidence,
+                "triggered_rules": triggered_rules,
+            })
+        except Exception as e:
+            logger.warning(f"Pending-queue re-eval failed for decision {snap['id']}: {e}")
 
-            client = get_anthropic_client()
-            subjective_evaluator = SubjectiveEvaluator(client, settings)
-            tree_evaluator = TreeEvaluator(subjective_evaluator)
+    if not updates:
+        return
 
+    # ── Write phase ────────────────────────────────────────────────────
+    async with write_session() as db:
+        try:
+            decision_rows = await db.execute(
+                select(Decision).where(Decision.id.in_([u["decision_id"] for u in updates]))
+            )
+            by_id = {d.id: d for d in decision_rows.scalars().all()}
             updated = 0
-            for decision in decisions:
-                try:
-                    new_result = await tree_evaluator.evaluate_rule(
-                        rule=rule,
-                        checklist=checklist,
-                        post=decision.post_content or {},
-                        community_name=community_name,
-                        examples=[],
-                    )
-
-                    reasoning = dict(decision.agent_reasoning or {})
-                    old_rule = reasoning.get(rule_id, {})
-                    reasoning[rule_id] = {
-                        "rule_title": old_rule.get("rule_title", rule.title),
-                        "verdict": new_result["verdict"],
-                        "confidence": new_result["confidence"],
-                        "item_reasoning": new_result["reasoning"],
-                        "triggered_items": new_result["triggered_items"],
-                    }
-                    decision.agent_reasoning = reasoning
-                    flag_modified(decision, "agent_reasoning")
-
-                    rule_results = [
-                        {"verdict": v.get("verdict", "approve"), "confidence": v.get("confidence", 0.5)}
-                        for k, v in reasoning.items()
-                        if k != "__community_norms__"
-                    ]
-                    if rule_results:
-                        agg_verdict, agg_confidence = resolve_verdict(rule_results)
-                    else:
-                        agg_verdict, agg_confidence = "approve", 1.0
-
-                    norms = reasoning.get("__community_norms__")
-                    if norms and agg_verdict == "approve":
-                        agg_verdict = "review"
-                        agg_confidence = norms.get("confidence", agg_confidence)
-
-                    decision.agent_verdict = agg_verdict
-                    decision.agent_confidence = agg_confidence
-                    decision.triggered_rules = [
-                        rid for rid, r in reasoning.items()
-                        if rid != "__community_norms__" and r.get("verdict") in ("remove", "warn")
-                    ]
-                    flag_modified(decision, "triggered_rules")
-                    updated += 1
-                except Exception as e:
-                    logger.warning(f"Pending-queue re-eval failed for decision {decision.id}: {e}")
+            for upd in updates:
+                d = by_id.get(upd["decision_id"])
+                if not d:
+                    continue
+                d.agent_reasoning = upd["agent_reasoning"]
+                flag_modified(d, "agent_reasoning")
+                d.agent_verdict = upd["agent_verdict"]
+                d.agent_confidence = upd["agent_confidence"]
+                d.triggered_rules = upd["triggered_rules"]
+                flag_modified(d, "triggered_rules")
+                updated += 1
 
             await db.commit()
             logger.info(f"Re-evaluated {updated} pending decision(s) for rule {rule_id}")
-
         except Exception as e:
-            logger.error(f"Failed to re-evaluate pending queue for rule {rule_id}: {e}")
+            logger.error(f"Failed to persist pending-queue re-evals for rule {rule_id}: {e}")
             await db.rollback()
 
 

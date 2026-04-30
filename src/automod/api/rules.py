@@ -207,15 +207,20 @@ async def _compile_rule_read_and_llm(
 
 
 async def _compile_rule_persist(result: dict) -> None:
-    """Phase 2: Persist compilation results to DB (must be serialized for SQLite)."""
-    from ..db.database import AsyncSessionLocal
+    """Phase 2: Persist compilation results to DB (must be serialized for SQLite).
+
+    Splits into a write-only stage (items/operations/rule fields, under the
+    global write lock) and a follow-up `_fill_missing_examples` call that runs
+    its own LLM work outside the lock. If the follow-up fails the rule is
+    still committed correctly — examples can be regenerated later.
+    """
+    from ..db.database import write_session
 
     rule_id = result["rule_id"]
     rule = result["rule"]
     community = result["community"]
-    compiler = get_compiler()
 
-    async with AsyncSessionLocal() as db:
+    async with write_session() as db:
         try:
             if result["mode"] == "compile":
                 await _persist_new_items(db, result["checklist_items"], rule_id)
@@ -243,7 +248,6 @@ async def _compile_rule_persist(result: dict) -> None:
                         if matched is not None:
                             rule_obj.relevant_context = matched
                         await db.flush()
-                await _fill_missing_examples(db, rule_id, compiler, rule, community)
             else:
                 # Re-attach existing items to this session (merge returns new tracked instances)
                 existing_by_id = {}
@@ -261,7 +265,6 @@ async def _compile_rule_persist(result: dict) -> None:
                         rule_obj.relevant_context = matched
                         await db.flush()
                 await _re_resolve_checklist_links(db, rule_id)
-                await _fill_missing_examples(db, rule_id, compiler, rule, community)
 
             await db.commit()
             logger.info(f"Compilation complete for rule {rule_id}")
@@ -273,6 +276,12 @@ async def _compile_rule_persist(result: dict) -> None:
             # via compile_status='failed'. Without this, a persist-time crash would
             # silently look like a successful compile.
             raise
+
+    # Lock is released — fill missing examples runs its own LLM call outside it.
+    try:
+        await _fill_missing_examples(rule_id, rule, community)
+    except Exception as e:
+        logger.warning(f"Filling missing examples failed for rule {rule_id}: {e}")
 
 
 async def _compile_rule_background(
@@ -304,9 +313,9 @@ async def _compile_rule_background(
 
 
 async def _set_compile_status(rule_id: str, status: str, error: str | None) -> None:
-    from ..db.database import AsyncSessionLocal
+    from ..db.database import write_session
     try:
-        async with AsyncSessionLocal() as db:
+        async with write_session() as db:
             rule = (await db.execute(
                 select(Rule).where(Rule.id == rule_id)
             )).scalar_one_or_none()
@@ -386,66 +395,90 @@ async def _persist_new_examples(
                 ))
 
 
-async def _fill_missing_examples(db, rule_id: str, compiler, rule, community) -> None:
-    """Generate one violating example for each top-level checklist item that doesn't have one."""
-    items_result = await db.execute(
-        select(ChecklistItem).where(
-            ChecklistItem.rule_id == rule_id,
-            ChecklistItem.parent_id == None,  # noqa: E711
+async def _fill_missing_examples(rule_id: str, rule, community) -> None:
+    """Generate one violating example for each top-level checklist item that doesn't have one.
+
+    Self-contained: opens a short read session to snapshot what's missing, runs
+    the LLM with no session held, then opens a short write session to persist
+    results. This keeps the global write lock free during the LLM call.
+    """
+    from ..db.database import AsyncSessionLocal, write_session
+    compiler = get_compiler()
+
+    # ── Read phase ─────────────────────────────────────────────────────
+    async with AsyncSessionLocal() as db:
+        items_result = await db.execute(
+            select(ChecklistItem).where(
+                ChecklistItem.rule_id == rule_id,
+                ChecklistItem.parent_id == None,  # noqa: E711
+            )
         )
-    )
-    all_items = list(items_result.scalars())
-    if not all_items:
-        return
+        all_items = list(items_result.scalars())
+        if not all_items:
+            return
 
-    covered_result = await db.execute(
-        select(ExampleChecklistItemLink.checklist_item_id)
-        .join(Example, Example.id == ExampleChecklistItemLink.example_id)
-        .where(
-            ExampleChecklistItemLink.checklist_item_id.in_([i.id for i in all_items]),
-            Example.label.in_(["violating", "borderline"]),
+        covered_result = await db.execute(
+            select(ExampleChecklistItemLink.checklist_item_id)
+            .join(Example, Example.id == ExampleChecklistItemLink.example_id)
+            .where(
+                ExampleChecklistItemLink.checklist_item_id.in_([i.id for i in all_items]),
+                Example.label.in_(["violating", "borderline"]),
+            )
+            .distinct()
         )
-        .distinct()
-    )
-    covered_ids = {r[0] for r in covered_result}
+        covered_ids = {r[0] for r in covered_result}
 
-    items_needing = [i for i in all_items if i.id not in covered_ids]
-    if not items_needing:
-        return
+        items_needing = [i for i in all_items if i.id not in covered_ids]
+        if not items_needing:
+            return
 
-    # Limit to 3 items per rule to avoid overwhelming the calibration step.
-    # Prioritize: subjective > context-influenced > lower thresholds (more ambiguous).
-    if len(items_needing) > 3:
-        def _ambiguity_score(item: ChecklistItem) -> tuple:
-            type_rank = 0 if item.item_type == "subjective" else 1
-            context_rank = 0 if item.context_influenced else 1
-            threshold = (item.logic or {}).get("threshold", 0.7) if item.item_type == "subjective" else 1.0
-            return (type_rank, context_rank, threshold)
+        # Limit to 3 items per rule to avoid overwhelming the calibration step.
+        # Prioritize: subjective > context-influenced > lower thresholds (more ambiguous).
+        if len(items_needing) > 3:
+            def _ambiguity_score(item: ChecklistItem) -> tuple:
+                type_rank = 0 if item.item_type == "subjective" else 1
+                context_rank = 0 if item.context_influenced else 1
+                threshold = (item.logic or {}).get("threshold", 0.7) if item.item_type == "subjective" else 1.0
+                return (type_rank, context_rank, threshold)
 
-        items_needing.sort(key=_ambiguity_score)
-        items_needing = items_needing[:3]
+            items_needing.sort(key=_ambiguity_score)
+            items_needing = items_needing[:3]
 
-    example_ids_result = await db.execute(
-        select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
-    )
-    example_ids = [r[0] for r in example_ids_result]
-    existing_examples = []
-    if example_ids:
-        examples_result = await db.execute(
-            select(Example).where(Example.id.in_(example_ids))
+        example_ids_result = await db.execute(
+            select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
         )
-        existing_examples = list(examples_result.scalars())
+        example_ids = [r[0] for r in example_ids_result]
+        existing_examples = []
+        if example_ids:
+            examples_result = await db.execute(
+                select(Example).where(Example.id.in_(example_ids))
+            )
+            existing_examples = list(examples_result.scalars())
 
+        item_desc_map = {i.description: i.id for i in all_items}
+
+    # ── LLM phase (no session, no lock) ────────────────────────────────
     new_examples = await compiler.generate_examples_for_items(
         rule=rule,
         community=community,
         items=items_needing,
         existing_examples=existing_examples or None,
     )
+    if not new_examples:
+        return
 
-    item_desc_map = {i.description: i.id for i in all_items}
-    await _persist_new_examples(db, new_examples, rule_id, item_description_map=item_desc_map, community_id=rule.community_id)
-    logger.info(f"Filled {len(new_examples)} missing example(s) for rule {rule_id}")
+    # ── Write phase ────────────────────────────────────────────────────
+    async with write_session() as db:
+        try:
+            await _persist_new_examples(
+                db, new_examples, rule_id,
+                item_description_map=item_desc_map, community_id=rule.community_id,
+            )
+            await db.commit()
+            logger.info(f"Filled {len(new_examples)} missing example(s) for rule {rule_id}")
+        except Exception:
+            await db.rollback()
+            raise
 
 
 async def _apply_diff_operations(
@@ -1165,15 +1198,13 @@ async def _fill_examples_and_reeval(rule_id: str, community_id: str) -> None:
     """
     from ..db.database import AsyncSessionLocal
     try:
-        compiler = get_compiler()
         async with AsyncSessionLocal() as db:
             rule = (await db.execute(select(Rule).where(Rule.id == rule_id))).scalar_one_or_none()
             community = (await db.execute(
                 select(Community).where(Community.id == community_id)
             )).scalar_one_or_none()
-            if rule and community:
-                await _fill_missing_examples(db, rule_id, compiler, rule, community)
-                await db.commit()
+        if rule and community:
+            await _fill_missing_examples(rule_id, rule, community)
     except Exception as e:
         logger.error(f"Background follow-up failed for rule {rule_id}: {e}")
     try:

@@ -567,8 +567,6 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
               const errorPct = h && h.decision_count > 0
                 ? Math.round(h.error_rate * 100)
                 : null
-              const load = rule.context_load ?? 0
-              const heavy = load >= 1.5
               return (
                 <div
                   key={rule.id}
@@ -582,14 +580,6 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                     </span>
                     {rule.applies_to && (
                       <span className="badge badge-gray">{rule.applies_to}</span>
-                    )}
-                    {heavy && (
-                      <span
-                        className="badge bg-indigo-50 text-indigo-700 border border-indigo-200"
-                        title={`Tightly coupled to community context (load ${load.toFixed(1)})`}
-                      >
-                        ctx-heavy
-                      </span>
                     )}
                     {rule.compile_status === 'pending' && (
                       <span

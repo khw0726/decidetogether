@@ -172,9 +172,11 @@ class EvaluationEngine:
             moderator_verdict="pending",
             was_override=False,
         )
-        self.db.add(decision)
-        await self.db.commit()
-        await self.db.refresh(decision)
+        from ..db.database import db_write_lock
+        async with db_write_lock:
+            self.db.add(decision)
+            await self.db.commit()
+            await self.db.refresh(decision)
 
         return decision
 

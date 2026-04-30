@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager
+
 from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
@@ -27,6 +30,30 @@ AsyncSessionLocal = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
+
+
+# Single-writer guard for SQLite. Background tasks (compile, triage, queue
+# re-eval) routinely run in parallel; without this lock they race on the
+# single writer slot and surface as "database is locked" once busy_timeout
+# expires. Any code path that opens a session intending to write should use
+# write_session() so writers serialize at the asyncio layer instead. Code
+# that needs to commit on an already-open session (e.g. an evaluation that
+# threads its session through several phases) can `async with db_write_lock:`
+# around the commit itself.
+db_write_lock = asyncio.Lock()
+
+
+@asynccontextmanager
+async def write_session() -> AsyncGenerator[AsyncSession, None]:
+    """Yield a session while holding the global write lock.
+
+    The lock is held for the lifetime of the session (including commit), so
+    only one writer can have a transaction open at a time. Don't do LLM
+    calls inside this block — split read/LLM/write phases instead.
+    """
+    async with db_write_lock:
+        async with AsyncSessionLocal() as session:
+            yield session
 
 
 async def _migrate_example_checklist_item_links(conn) -> None:

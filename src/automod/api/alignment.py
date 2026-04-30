@@ -40,51 +40,67 @@ def get_compiler() -> RuleCompiler:
 
 async def _recompile_after_text_accept(rule_id: str) -> None:
     """Background: silently recompile the checklist after rule.text changes."""
-    from ..db.database import AsyncSessionLocal
+    from ..db.database import AsyncSessionLocal, write_session
     from .rules import _apply_diff_operations, _re_resolve_checklist_links
 
+    # ── Read phase ─────────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:
-        try:
-            rule_res = await db.execute(select(Rule).where(Rule.id == rule_id))
-            rule = rule_res.scalar_one_or_none()
-            if not rule:
-                return
-            community_res = await db.execute(
-                select(Community).where(Community.id == rule.community_id)
-            )
-            community = community_res.scalar_one_or_none()
-            if not community:
-                return
-            other_rules_res = await db.execute(
-                select(Rule).where(Rule.community_id == rule.community_id, Rule.id != rule_id)
-            )
-            other_rules = list(other_rules_res.scalars().all())
+        rule_res = await db.execute(select(Rule).where(Rule.id == rule_id))
+        rule = rule_res.scalar_one_or_none()
+        if not rule:
+            return
+        community_res = await db.execute(
+            select(Community).where(Community.id == rule.community_id)
+        )
+        community = community_res.scalar_one_or_none()
+        if not community:
+            return
+        other_rules_res = await db.execute(
+            select(Rule).where(Rule.community_id == rule.community_id, Rule.id != rule_id)
+        )
+        other_rules = list(other_rules_res.scalars().all())
 
+        existing_res = await db.execute(
+            select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+        )
+        existing = list(existing_res.scalars().all())
+        if not existing:
+            logger.info(f"No existing checklist for rule {rule_id}; skipping silent recompile")
+            return
+
+    # ── LLM phase (no session, no lock) ────────────────────────────────
+    try:
+        compiler = get_compiler()
+        ops = await compiler.recompile_with_diff(
+            rule=rule, community=community, other_rules=other_rules, existing_items=existing,
+        )
+    except Exception:
+        logger.exception(f"Silent recompile LLM failed for rule {rule_id}")
+        return
+
+    material_ops = [o for o in ops if o.get("op") != "keep"]
+
+    # ── Write phase ────────────────────────────────────────────────────
+    async with write_session() as db:
+        try:
+            # Re-fetch existing items so they're attached to the write session.
             existing_res = await db.execute(
                 select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
             )
-            existing = list(existing_res.scalars().all())
-            if not existing:
-                logger.info(f"No existing checklist for rule {rule_id}; skipping silent recompile")
-                return
-
-            compiler = get_compiler()
-            ops = await compiler.recompile_with_diff(
-                rule=rule, community=community, other_rules=other_rules, existing_items=existing,
-            )
-            material_ops = [o for o in ops if o.get("op") != "keep"]
-            existing_by_id = {it.id: it for it in existing}
+            existing_now = list(existing_res.scalars().all())
+            existing_by_id = {it.id: it for it in existing_now}
             await _apply_diff_operations(db, ops, existing_by_id, rule_id)
             await db.flush()
             await _re_resolve_checklist_links(db, rule_id)
             await db.commit()
             logger.info(f"Silent recompile applied for rule {rule_id} ({len(ops)} ops)")
-
-            if material_ops:
-                _spawn_post_recompile_reevals(rule_id)
         except Exception:
-            logger.exception(f"Silent recompile failed for rule {rule_id}")
+            logger.exception(f"Silent recompile persist failed for rule {rule_id}")
             await db.rollback()
+            return
+
+    if material_ops:
+        _spawn_post_recompile_reevals(rule_id)
 
 
 def _spawn_post_recompile_reevals(rule_id: str) -> None:
@@ -120,55 +136,75 @@ def _spawn_post_recompile_reevals(rule_id: str) -> None:
 
 async def _recompile_after_context_accept(rule_id: str) -> None:
     """Background: re-run adjust_for_context after a context note changes."""
-    from ..db.database import AsyncSessionLocal
+    from ..db.database import AsyncSessionLocal, write_session
 
+    # ── Read phase ─────────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:
-        try:
-            rule_res = await db.execute(select(Rule).where(Rule.id == rule_id))
-            rule = rule_res.scalar_one_or_none()
-            if not rule:
-                return
-            community_res = await db.execute(
-                select(Community).where(Community.id == rule.community_id)
-            )
-            community = community_res.scalar_one_or_none()
-            if not community or not community.community_context:
-                return
+        rule_res = await db.execute(select(Rule).where(Rule.id == rule_id))
+        rule = rule_res.scalar_one_or_none()
+        if not rule:
+            return
+        community_res = await db.execute(
+            select(Community).where(Community.id == rule.community_id)
+        )
+        community = community_res.scalar_one_or_none()
+        if not community or not community.community_context:
+            return
 
+        existing_res = await db.execute(
+            select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
+        )
+        existing = list(existing_res.scalars().all())
+        if not existing:
+            return
+
+    # ── LLM phase (no session, no lock) ────────────────────────────────
+    try:
+        compiler = get_compiler()
+        pinned_ids = [it.id for it in existing if getattr(it, "context_pinned", False)] or None
+        _adjusted_items, summary, ops = await compiler.adjust_for_context(
+            rule=rule,
+            community=community,
+            current_items=existing,
+            community_context=community.community_context,
+            pinned_item_ids=pinned_ids,
+            relevant_context=rule.relevant_context,
+            custom_context_notes=rule.custom_context_notes,
+        )
+    except Exception:
+        logger.exception(f"Silent context-recompile LLM failed for rule {rule_id}")
+        return
+
+    if not ops:
+        logger.info(f"No context-driven ops for rule {rule_id}")
+        return
+
+    # ── Write phase ────────────────────────────────────────────────────
+    from .rules import _apply_diff_operations, _re_resolve_checklist_links
+    async with write_session() as db:
+        try:
             existing_res = await db.execute(
                 select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
             )
-            existing = list(existing_res.scalars().all())
-            if not existing:
-                return
-
-            compiler = get_compiler()
-            pinned_ids = [it.id for it in existing if getattr(it, "context_pinned", False)] or None
-            adjusted_items, summary, ops = await compiler.adjust_for_context(
-                rule=rule,
-                community=community,
-                current_items=existing,
-                community_context=community.community_context,
-                pinned_item_ids=pinned_ids,
-                relevant_context=rule.relevant_context,
-                custom_context_notes=rule.custom_context_notes,
-            )
-            if not ops:
-                logger.info(f"No context-driven ops for rule {rule_id}")
-                return
-            existing_by_id = {it.id: it for it in existing}
-            from .rules import _apply_diff_operations, _re_resolve_checklist_links
+            existing_now = list(existing_res.scalars().all())
+            existing_by_id = {it.id: it for it in existing_now}
             await _apply_diff_operations(db, ops, existing_by_id, rule_id)
             if summary:
-                rule.context_adjustment_summary = summary
+                rule_db = (await db.execute(
+                    select(Rule).where(Rule.id == rule_id)
+                )).scalar_one_or_none()
+                if rule_db:
+                    rule_db.context_adjustment_summary = summary
             await db.flush()
             await _re_resolve_checklist_links(db, rule_id)
             await db.commit()
             logger.info(f"Silent context-recompile applied for rule {rule_id} ({len(ops)} ops)")
-            _spawn_post_recompile_reevals(rule_id)
         except Exception:
-            logger.exception(f"Silent context-recompile failed for rule {rule_id}")
+            logger.exception(f"Silent context-recompile persist failed for rule {rule_id}")
             await db.rollback()
+            return
+
+    _spawn_post_recompile_reevals(rule_id)
 
 
 @router.get("/rules/{rule_id}/suggestions", response_model=list[SuggestionRead])
