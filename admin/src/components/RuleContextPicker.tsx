@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Check } from 'lucide-react'
+import { Plus, Trash2, Sparkles } from 'lucide-react'
 import type {
   CommunityContext,
   CommunityContextNote,
   Rule,
   RuleContextTag,
 } from '../api/client'
+import { matchRuleContext } from '../api/client'
 
 interface Props {
   rule: Rule
@@ -28,6 +29,23 @@ function keyOf(dim: string, tag: string): string {
   return `${dim}::${tag}`
 }
 
+// Weight semantics shown on hover/under each slider.
+function weightLabel(w: number): { text: string; cls: string } {
+  if (w <= -0.75) return { text: 'strong counter', cls: 'text-rose-600' }
+  if (w <= -0.25) return { text: 'counter', cls: 'text-rose-500' }
+  if (w < 0.25) return { text: 'off', cls: 'text-gray-400' }
+  if (w < 0.75) return { text: 'supports', cls: 'text-indigo-500' }
+  return { text: 'strongly supports', cls: 'text-indigo-700 font-medium' }
+}
+
+function snapWeight(w: number): number {
+  // snap to nearest 0.5
+  const rounded = Math.round(w * 2) / 2
+  if (rounded < -1) return -1
+  if (rounded > 1) return 1
+  return rounded
+}
+
 function RuleContextPicker({
   rule,
   community_context,
@@ -41,8 +59,7 @@ function RuleContextPicker({
       const dim = community_context[key]
       if (!dim) continue
       for (const raw of dim.notes) {
-        const note =
-          typeof raw === 'string' ? { text: raw, tag: '' } : raw
+        const note = typeof raw === 'string' ? { text: raw, tag: '' } : raw
         if (!note.tag) continue
         out.push({ dim: key, tag: note.tag, text: note.text })
       }
@@ -50,70 +67,96 @@ function RuleContextPicker({
     return out
   }, [community_context])
 
-  const defaultSelected = useMemo(() => {
+  // Initial weights derived from rule.relevant_context.
+  // null/undefined → unmatched: every tag at +1 (mirrors the legacy "use all" semantics
+  // until the auto-match runs on first compile).
+  // [] → opted out: every tag at 0.
+  // list → use the weights present, default missing entries to 0.
+  const initialWeights = useMemo(() => {
+    const m: Record<string, number> = {}
     if (rule.relevant_context === null || rule.relevant_context === undefined) {
-      return new Set(allBundles.map(b => keyOf(b.dim, b.tag)))
+      for (const b of allBundles) m[keyOf(b.dim, b.tag)] = 1
+    } else {
+      const byKey = new Map(
+        rule.relevant_context.map(t => [keyOf(t.dimension, t.tag), t.weight ?? 1] as const),
+      )
+      for (const b of allBundles) {
+        m[keyOf(b.dim, b.tag)] = byKey.get(keyOf(b.dim, b.tag)) ?? 0
+      }
     }
-    return new Set(rule.relevant_context.map(t => keyOf(t.dimension, t.tag)))
+    return m
   }, [rule.relevant_context, allBundles])
 
-  const [selected, setSelected] = useState<Set<string>>(defaultSelected)
-  const [useAll, setUseAll] = useState<boolean>(
-    rule.relevant_context === null || rule.relevant_context === undefined,
-  )
+  const [weights, setWeights] = useState<Record<string, number>>(initialWeights)
   const [customNotes, setCustomNotes] = useState<CommunityContextNote[]>(
     rule.custom_context_notes || [],
   )
+  const [matching, setMatching] = useState(false)
+  const [matchError, setMatchError] = useState<string | null>(null)
 
   useEffect(() => {
-    setSelected(defaultSelected)
-    setUseAll(rule.relevant_context === null || rule.relevant_context === undefined)
+    setWeights(initialWeights)
     setCustomNotes(rule.custom_context_notes || [])
-  }, [rule.id, defaultSelected, rule.relevant_context, rule.custom_context_notes])
+  }, [rule.id, initialWeights, rule.custom_context_notes])
 
   const emitChange = (
-    nextSelected: Set<string>,
-    nextUseAll: boolean,
+    nextWeights: Record<string, number>,
     nextNotes: CommunityContextNote[],
   ) => {
-    const relevantContext: RuleContextTag[] | null = nextUseAll
-      ? null
-      : allBundles
-          .filter(b => nextSelected.has(keyOf(b.dim, b.tag)))
-          .map(b => ({ dimension: b.dim as string, tag: b.tag }))
+    const relevantContext: RuleContextTag[] = allBundles
+      .map(b => {
+        const w = nextWeights[keyOf(b.dim, b.tag)] ?? 0
+        return { dimension: b.dim as string, tag: b.tag, weight: w }
+      })
+      .filter(t => (t.weight ?? 0) !== 0)
     const cleanNotes = nextNotes
       .map(n => ({ text: (n.text || '').trim(), tag: (n.tag || '').trim() }))
       .filter(n => n.text)
     onChange({ relevant_context: relevantContext, custom_context_notes: cleanNotes })
   }
 
-  const toggleBundle = (dim: keyof CommunityContext, tag: string) => {
-    const k = keyOf(dim, tag)
-    const next = new Set(selected)
-    if (next.has(k)) next.delete(k)
-    else next.add(k)
-    setSelected(next)
-    setUseAll(false)
-    emitChange(next, false, customNotes)
+  const updateWeight = (dim: keyof CommunityContext, tag: string, w: number) => {
+    const next = { ...weights, [keyOf(dim, tag)]: snapWeight(w) }
+    setWeights(next)
+    emitChange(next, customNotes)
   }
 
   const handleUseAll = () => {
-    const next = new Set(allBundles.map(b => keyOf(b.dim, b.tag)))
-    setUseAll(true)
-    setSelected(next)
-    emitChange(next, true, customNotes)
+    const next: Record<string, number> = {}
+    for (const b of allBundles) next[keyOf(b.dim, b.tag)] = 1
+    setWeights(next)
+    emitChange(next, customNotes)
   }
 
   const handleUseNone = () => {
-    const next = new Set<string>()
-    setUseAll(false)
-    setSelected(next)
-    emitChange(next, false, customNotes)
+    const next: Record<string, number> = {}
+    for (const b of allBundles) next[keyOf(b.dim, b.tag)] = 0
+    setWeights(next)
+    emitChange(next, customNotes)
+  }
+
+  const handleAutoMatch = async () => {
+    setMatching(true)
+    setMatchError(null)
+    try {
+      const result = await matchRuleContext(rule.id)
+      const next: Record<string, number> = {}
+      for (const b of allBundles) next[keyOf(b.dim, b.tag)] = 0
+      for (const t of result.relevant_context || []) {
+        next[keyOf(t.dimension, t.tag)] = snapWeight(t.weight ?? 1)
+      }
+      setWeights(next)
+      emitChange(next, customNotes)
+    } catch (e: any) {
+      setMatchError(e?.response?.data?.detail || 'Auto-match failed')
+    } finally {
+      setMatching(false)
+    }
   }
 
   const updateNotes = (next: CommunityContextNote[]) => {
     setCustomNotes(next)
-    emitChange(selected, useAll, next)
+    emitChange(weights, next)
   }
 
   if (!community_context || allBundles.length === 0) {
@@ -135,11 +178,21 @@ function RuleContextPicker({
         {!readOnly && (
           <div className="flex gap-1.5">
             <button
+              className="text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-1 disabled:opacity-50"
+              onClick={handleAutoMatch}
+              type="button"
+              disabled={matching}
+              title="Let the LLM pick which tags inform this rule, with weights"
+            >
+              <Sparkles size={11} />
+              {matching ? 'Matching…' : 'Auto-match'}
+            </button>
+            <button
               className="text-xs px-2 py-0.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
               onClick={handleUseAll}
               type="button"
             >
-              All
+              All +1
             </button>
             <button
               className="text-xs px-2 py-0.5 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
@@ -152,6 +205,10 @@ function RuleContextPicker({
         )}
       </div>
 
+      {matchError && (
+        <div className="text-xs text-rose-600">{matchError}</div>
+      )}
+
       {DIMENSIONS.map(({ label, key }) => {
         const bundles = allBundles.filter(b => b.dim === key)
         if (bundles.length === 0) return null
@@ -160,30 +217,37 @@ function RuleContextPicker({
             <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
               {label}
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="space-y-1.5">
               {bundles.map(b => {
                 const k = keyOf(b.dim, b.tag)
-                const checked = selected.has(k)
+                const w = weights[k] ?? 0
+                const lbl = weightLabel(w)
                 return (
-                  <button
-                    key={k}
-                    type="button"
-                    disabled={readOnly}
-                    className={`text-xs px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                      readOnly
-                        ? checked
-                          ? 'bg-indigo-50 border-indigo-200 text-indigo-600 cursor-default'
-                          : 'bg-white border-gray-200 text-gray-300 cursor-default'
-                        : checked
-                        ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-medium transition-colors'
-                        : 'bg-white border-gray-200 text-gray-400 hover:border-indigo-300 hover:text-indigo-600 transition-colors'
-                    }`}
-                    onClick={() => !readOnly && toggleBundle(b.dim, b.tag)}
-                    title={b.text}
-                  >
-                    {checked && <Check size={10} />}
-                    {b.tag.replace(/_/g, ' ')}
-                  </button>
+                  <div key={k} className="flex items-center gap-2 text-xs">
+                    <div
+                      className={`w-32 truncate ${
+                        w === 0 ? 'text-gray-400' : 'text-gray-700 font-medium'
+                      }`}
+                      title={b.text}
+                    >
+                      {b.tag.replace(/_/g, ' ')}
+                    </div>
+                    <input
+                      type="range"
+                      min={-1}
+                      max={1}
+                      step={0.5}
+                      value={w}
+                      disabled={readOnly}
+                      onChange={e => updateWeight(b.dim, b.tag, parseFloat(e.target.value))}
+                      className="flex-1 accent-indigo-500"
+                      title={`weight ${w}`}
+                    />
+                    <div className={`w-28 text-right ${lbl.cls}`}>
+                      {w >= 0 ? '+' : ''}
+                      {w.toFixed(1)} · {lbl.text}
+                    </div>
+                  </div>
                 )
               })}
             </div>

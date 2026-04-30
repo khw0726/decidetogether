@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react'
 import {
+  CommunityContext,
   CommunityContextNote,
   DecisionPreviewResult,
   ItemHealthMetrics,
@@ -113,6 +114,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   const [editingText, setEditingText] = useState('')
   const [editingTitle, setEditingTitle] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [ruleSort, setRuleSort] = useState<'priority' | 'context_load'>('priority')
 
   const [hoveredAnchor, setHoveredAnchor] = useState<string | null>(null)
   const [selectedChecklistItemId, setSelectedChecklistItemId] = useState<string | null>(null)
@@ -246,8 +248,8 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   }, [ruleHealth])
 
   const createRuleMutation = useMutation({
-    mutationFn: ({ title, text }: { title: string; text: string }) =>
-      createRule(communityId, { title, text, priority: rules.length }),
+    mutationFn: ({ title, text, relevant_context }: { title: string; text: string; relevant_context: RuleContextTag[] | null }) =>
+      createRule(communityId, { title, text, priority: rules.length, relevant_context }),
     onSuccess: rule => {
       queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
       setSelectedRuleId(rule.id)
@@ -487,10 +489,34 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       <div className="w-64 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <h2 className="font-semibold text-sm">Rules</h2>
-          <button className="btn-primary text-xs py-1" onClick={() => setShowNewRule(true)}>
-            <Plus size={12} />
-            New
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                ruleSort === 'priority'
+                  ? 'bg-gray-100 border-gray-300 text-gray-700'
+                  : 'bg-white border-gray-200 text-gray-400 hover:text-gray-600'
+              }`}
+              onClick={() => setRuleSort('priority')}
+              title="Sort by moderator-set priority"
+            >
+              Pri
+            </button>
+            <button
+              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                ruleSort === 'context_load'
+                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                  : 'bg-white border-gray-200 text-gray-400 hover:text-indigo-600'
+              }`}
+              onClick={() => setRuleSort('context_load')}
+              title="Sort by how tightly each rule is coupled to community context"
+            >
+              Ctx
+            </button>
+            <button className="btn-primary text-xs py-1 ml-1" onClick={() => setShowNewRule(true)}>
+              <Plus size={12} />
+              New
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto py-2">
@@ -499,12 +525,21 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
           )}
           {rules
             .filter(r => r.is_active)
-            .sort((a, b) => a.priority - b.priority)
+            .sort((a, b) => {
+              if (ruleSort === 'context_load') {
+                const al = a.context_load ?? 0
+                const bl = b.context_load ?? 0
+                if (bl !== al) return bl - al
+              }
+              return a.priority - b.priority
+            })
             .map(rule => {
               const h = healthByRule[rule.id]
               const errorPct = h && h.decision_count > 0
                 ? Math.round(h.error_rate * 100)
                 : null
+              const load = rule.context_load ?? 0
+              const heavy = load >= 1.5
               return (
                 <div
                   key={rule.id}
@@ -518,6 +553,14 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                     </span>
                     {rule.applies_to && (
                       <span className="badge badge-gray">{rule.applies_to}</span>
+                    )}
+                    {heavy && (
+                      <span
+                        className="badge bg-indigo-50 text-indigo-700 border border-indigo-200"
+                        title={`Tightly coupled to community context (load ${load.toFixed(1)})`}
+                      >
+                        ctx-heavy
+                      </span>
                     )}
                     {errorPct !== null && (
                       <span
@@ -861,8 +904,11 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       {showNewRule && (
         <NewRuleModal
           communityId={communityId}
+          communityContext={community?.community_context ?? null}
           onClose={() => setShowNewRule(false)}
-          onCreate={(title, text) => createRuleMutation.mutate({ title, text })}
+          onCreate={(title, text, relevant_context) =>
+            createRuleMutation.mutate({ title, text, relevant_context })
+          }
           loading={createRuleMutation.isPending}
         />
       )}
@@ -966,22 +1012,74 @@ function PanelHeader({ title, children }: { title: string; children?: React.Reac
 
 function NewRuleModal({
   communityId,
+  communityContext,
   onClose,
   onCreate,
   loading,
 }: {
   communityId: string
+  communityContext: CommunityContext | null
   onClose: () => void
-  onCreate: (title: string, text: string) => void
+  onCreate: (title: string, text: string, relevantContext: RuleContextTag[] | null) => void
   loading: boolean
 }) {
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
+
+  const allBundles = useMemo(() => {
+    const out: { dim: keyof CommunityContext; tag: string; text: string }[] = []
+    if (!communityContext) return out
+    for (const dim of ['purpose', 'participants', 'stakes', 'tone'] as const) {
+      const d = communityContext[dim]
+      if (!d) continue
+      for (const raw of d.notes || []) {
+        const note = typeof raw === 'string' ? { text: raw, tag: '' } : raw
+        if (!note.tag) continue
+        out.push({ dim, tag: note.tag, text: note.text })
+      }
+    }
+    return out
+  }, [communityContext])
+
+  const keyOf = (dim: string, tag: string) => `${dim}::${tag}`
+
+  const toggleTag = (dim: string, tag: string) => {
+    const k = keyOf(dim, tag)
+    const next = new Set(selectedTags)
+    if (next.has(k)) next.delete(k)
+    else next.add(k)
+    setSelectedTags(next)
+  }
+
+  const applySuggestion = (
+    suggestionText: string,
+    relevantContext: { dimension: string; tag: string }[],
+    titleOverride?: string,
+  ) => {
+    setText(suggestionText)
+    if (titleOverride) setTitle(titleOverride)
+    // Auto-select shared tags so the user sees which contexts the suggestion implies.
+    const next = new Set(selectedTags)
+    for (const t of relevantContext) {
+      if (allBundles.some(b => b.dim === t.dimension && b.tag === t.tag)) {
+        next.add(keyOf(t.dimension, t.tag))
+      }
+    }
+    setSelectedTags(next)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !text.trim()) return
-    onCreate(title.trim(), text.trim())
+    // null = unmatched (auto-match runs on first compile); only emit a list if the user
+    // explicitly picked tags or accepted a suggestion's shared tags.
+    const relevantContext: RuleContextTag[] | null = selectedTags.size === 0
+      ? null
+      : allBundles
+          .filter(b => selectedTags.has(keyOf(b.dim, b.tag)))
+          .map(b => ({ dimension: b.dim as string, tag: b.tag, weight: 1 }))
+    onCreate(title.trim(), text.trim(), relevantContext)
   }
 
   return (
@@ -999,10 +1097,61 @@ function NewRuleModal({
               autoFocus
             />
           </div>
+          {/* Context picker — placed above suggestions so the user can scope what gets matched */}
+          {allBundles.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Relevant context tags
+                <span className="ml-2 text-xs font-normal text-gray-500">
+                  Pick to scope suggestions
+                  {selectedTags.size === 0
+                    ? ' — empty = match against all of this community\'s context'
+                    : ` — ${selectedTags.size} selected`}
+                </span>
+              </label>
+              <div className="space-y-1.5">
+                {(['purpose', 'participants', 'stakes', 'tone'] as const).map(dim => {
+                  const bundles = allBundles.filter(b => b.dim === dim)
+                  if (bundles.length === 0) return null
+                  return (
+                    <div key={dim} className="flex items-start gap-2">
+                      <span className="text-[10px] uppercase tracking-wider text-gray-400 mt-1 w-20 flex-shrink-0">
+                        {dim}
+                      </span>
+                      <div className="flex flex-wrap gap-1 flex-1">
+                        {bundles.map(b => {
+                          const selected = selectedTags.has(keyOf(b.dim, b.tag))
+                          return (
+                            <button
+                              key={b.tag}
+                              type="button"
+                              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                                selected
+                                  ? 'bg-indigo-100 text-indigo-700 border-indigo-300 font-medium'
+                                  : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
+                              }`}
+                              onClick={() => toggleTag(b.dim, b.tag)}
+                              title={b.text}
+                            >
+                              {b.tag.replace(/_/g, ' ')}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           <RuleTextSuggestion
             communityId={communityId}
             title={title}
-            onApply={(draftText) => setText(draftText)}
+            selectedRelevantContext={allBundles
+              .filter(b => selectedTags.has(keyOf(b.dim, b.tag)))
+              .map(b => ({ dimension: b.dim as string, tag: b.tag }))}
+            onApply={applySuggestion}
           />
           <div>
             <label className="block text-sm font-medium mb-1">Rule Text</label>
@@ -1014,6 +1163,7 @@ function NewRuleModal({
               placeholder="Write the full rule text as it would appear in the community rules..."
             />
           </div>
+
           <div className="flex gap-2 justify-end">
             <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button

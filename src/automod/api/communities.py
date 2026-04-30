@@ -14,7 +14,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..compiler.compiler import RuleCompiler
 from ..config import get_anthropic_client, settings
 from ..core.engine import EvaluationEngine
-from ..core.reddit_crawler import crawl_subreddit_comments, crawl_subreddit_posts
+from ..core.reddit_crawler import (
+    crawl_subreddit_comments,
+    crawl_subreddit_posts,
+    fetch_modlog_actions,
+)
 from ..db.database import AsyncSessionLocal, get_db
 from ..db.models import (
     ChecklistItem,
@@ -36,6 +40,8 @@ from ..models.schemas import (
     CommunitySamplePostCreate,
     CommunitySamplePostRead,
     DecisionRead,
+    ModqueuePullRequest,
+    SamplePostUpdate,
     RedditImportRequest,
     RedditImportResponse,
 )
@@ -231,15 +237,27 @@ async def get_setup_status(
 
 @router.get("/communities/{community_id}/sample-posts", response_model=list[CommunitySamplePostRead])
 async def list_sample_posts(
-    community_id: str, db: AsyncSession = Depends(get_db)
+    community_id: str,
+    status: str | None = None,
+    db: AsyncSession = Depends(get_db),
 ) -> list[CommunitySamplePostRead]:
-    result = await db.execute(
+    """List sample posts, optionally filtered by status (`pending` or `committed`)."""
+    stmt = (
         select(CommunitySamplePost)
         .where(CommunitySamplePost.community_id == community_id)
         .order_by(CommunitySamplePost.created_at.asc())
     )
+    if status:
+        if status not in ("pending", "committed"):
+            raise HTTPException(status_code=422, detail="status must be 'pending' or 'committed'")
+        stmt = stmt.where(CommunitySamplePost.status == status)
+    result = await db.execute(stmt)
     posts = result.scalars().all()
     return [CommunitySamplePostRead.model_validate(p) for p in posts]
+
+
+async def _mark_context_stale(community: Community) -> None:
+    community.context_stale = True
 
 
 @router.post("/communities/{community_id}/sample-posts", response_model=CommunitySamplePostRead, status_code=201)
@@ -249,7 +267,8 @@ async def add_sample_post(
     db: AsyncSession = Depends(get_db),
 ) -> CommunitySamplePostRead:
     result = await db.execute(select(Community).where(Community.id == community_id))
-    if not result.scalar_one_or_none():
+    community = result.scalar_one_or_none()
+    if not community:
         raise HTTPException(status_code=404, detail="Community not found")
 
     valid_labels = {"acceptable", "unacceptable"}
@@ -261,81 +280,118 @@ async def add_sample_post(
         content=body.content,
         label=body.label,
         note=body.note,
+        status="committed",
+        source="manual",
     )
     db.add(post)
+    await _mark_context_stale(community)
     await db.commit()
     await db.refresh(post)
     return CommunitySamplePostRead.model_validate(post)
 
 
-class CrawlSamplePostsResponse(BaseModel):
-    posts: list[CommunitySamplePostRead]
-    crawled_count: int
+class ModqueuePullResponse(BaseModel):
+    pending: list[CommunitySamplePostRead]
+    new_count: int
+    skipped_existing: int
 
 
 @router.post(
-    "/communities/{community_id}/sample-posts/crawl",
-    response_model=CrawlSamplePostsResponse,
+    "/communities/{community_id}/sample-posts/pull-modqueue",
+    response_model=ModqueuePullResponse,
     status_code=201,
 )
-async def crawl_sample_posts(
+async def pull_modqueue(
     community_id: str,
+    body: ModqueuePullRequest,
     db: AsyncSession = Depends(get_db),
-) -> CrawlSamplePostsResponse:
-    """Auto-crawl top posts from a Reddit community and save them as sample posts."""
+) -> ModqueuePullResponse:
+    """Fetch recent removelink/approvelink actions from the subreddit modlog and
+    stage them as *pending* sample posts. Mods review them before they are committed."""
     result = await db.execute(select(Community).where(Community.id == community_id))
     community = result.scalar_one_or_none()
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
 
     if community.platform != "reddit":
-        raise HTTPException(status_code=422, detail="Auto-crawl is only available for Reddit communities")
+        raise HTTPException(status_code=422, detail="Modqueue pull is only available for Reddit communities")
 
-    if not settings.reddit_client_id:
-        raise HTTPException(status_code=422, detail="Reddit credentials are not configured")
+    if not (settings.reddit_client_id and settings.reddit_username and settings.reddit_password):
+        raise HTTPException(status_code=422, detail="Reddit mod credentials (username/password) are required")
 
     m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
     if not m:
-        raise HTTPException(status_code=422, detail="Community name must be in r/subreddit format for auto-crawl")
+        raise HTTPException(status_code=422, detail="Community name must be in r/subreddit format")
 
-    crawled_posts = await crawl_subreddit_posts(
-        m.group(1),
+    since_unix = None
+    if body.since_days:
+        since_unix = (datetime.now(tz=timezone.utc).timestamp()) - body.since_days * 86400
+
+    actions = await fetch_modlog_actions(
+        subreddit=m.group(1),
         client_id=settings.reddit_client_id,
         client_secret=settings.reddit_client_secret,
         user_agent=settings.reddit_user_agent,
         username=settings.reddit_username,
         password=settings.reddit_password,
-        limit=15,
-        sort="top",
-        time_filter="month",
+        limit=body.limit,
+        since_unix=since_unix,
     )
 
-    saved_posts = []
-    for post_data in crawled_posts:
+    # Dedupe against existing samples (pending OR committed) for this community
+    existing_result = await db.execute(
+        select(CommunitySamplePost.content, CommunitySamplePost.source_metadata).where(
+            CommunitySamplePost.community_id == community_id,
+        )
+    )
+    existing_target_ids: set[str] = set()
+    for content, meta in existing_result.all():
+        if isinstance(content, dict) and content.get("id"):
+            existing_target_ids.add(content["id"])
+        if isinstance(meta, dict) and meta.get("target_fullname"):
+            existing_target_ids.add(meta["target_fullname"])
+
+    new_posts: list[CommunitySamplePostRead] = []
+    skipped = 0
+    for action in actions:
+        target_id = (action.get("source_metadata") or {}).get("target_fullname") or action["content"].get("id")
+        if target_id and target_id in existing_target_ids:
+            skipped += 1
+            continue
+        existing_target_ids.add(target_id)
         post = CommunitySamplePost(
             community_id=community_id,
-            content=post_data,
-            label="acceptable",
-            note="Auto-crawled from subreddit",
+            content=action["content"],
+            label=action["label"],
+            note=None,
+            status="pending",
+            source="modqueue",
+            source_metadata=action.get("source_metadata"),
         )
         db.add(post)
         await db.flush()
         await db.refresh(post)
-        saved_posts.append(CommunitySamplePostRead.model_validate(post))
+        new_posts.append(CommunitySamplePostRead.model_validate(post))
 
     await db.commit()
-    return CrawlSamplePostsResponse(
-        posts=saved_posts,
-        crawled_count=len(crawled_posts),
+    return ModqueuePullResponse(
+        pending=new_posts,
+        new_count=len(new_posts),
+        skipped_existing=skipped,
     )
 
 
-@router.delete("/communities/{community_id}/sample-posts/{post_id}", status_code=204)
-async def delete_sample_post(
+@router.post(
+    "/communities/{community_id}/sample-posts/{post_id}/approve",
+    response_model=CommunitySamplePostRead,
+)
+async def approve_sample_post(
     community_id: str,
     post_id: str,
+    body: SamplePostUpdate | None = None,
     db: AsyncSession = Depends(get_db),
-) -> None:
+) -> CommunitySamplePostRead:
+    """Promote a pending sample to committed, optionally relabeling/annotating."""
     result = await db.execute(
         select(CommunitySamplePost).where(
             CommunitySamplePost.id == post_id,
@@ -345,7 +401,52 @@ async def delete_sample_post(
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Sample post not found")
+
+    if body and body.label is not None:
+        if body.label not in ("acceptable", "unacceptable"):
+            raise HTTPException(status_code=422, detail="label must be acceptable|unacceptable")
+        post.label = body.label
+    if body and body.note is not None:
+        post.note = body.note
+
+    if post.status != "committed":
+        post.status = "committed"
+        community = (await db.execute(
+            select(Community).where(Community.id == community_id)
+        )).scalar_one_or_none()
+        if community:
+            await _mark_context_stale(community)
+
+    await db.commit()
+    await db.refresh(post)
+    return CommunitySamplePostRead.model_validate(post)
+
+
+@router.delete("/communities/{community_id}/sample-posts/{post_id}", status_code=204)
+async def delete_sample_post(
+    community_id: str,
+    post_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Delete a sample post (rejecting a pending one or removing a committed one).
+    Removing a committed sample marks the community context as stale."""
+    result = await db.execute(
+        select(CommunitySamplePost).where(
+            CommunitySamplePost.id == post_id,
+            CommunitySamplePost.community_id == community_id,
+        )
+    )
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="Sample post not found")
+    was_committed = post.status == "committed"
     await db.delete(post)
+    if was_committed:
+        community = (await db.execute(
+            select(Community).where(Community.id == community_id)
+        )).scalar_one_or_none()
+        if community:
+            await _mark_context_stale(community)
     await db.commit()
 
 
@@ -436,7 +537,8 @@ async def import_sample_post_from_url(
 ) -> CommunitySamplePostRead:
     """Fetch a Reddit post by URL and add it as a community sample post."""
     result = await db.execute(select(Community).where(Community.id == community_id))
-    if not result.scalar_one_or_none():
+    community = result.scalar_one_or_none()
+    if not community:
         raise HTTPException(status_code=404, detail="Community not found")
 
     valid_labels = {"acceptable", "unacceptable"}
@@ -478,8 +580,11 @@ async def import_sample_post_from_url(
         content=content,
         label=body.label,
         note=body.note,
+        status="committed",
+        source="url_import",
     )
     db.add(post)
+    await _mark_context_stale(community)
     await db.commit()
     await db.refresh(post)
     return CommunitySamplePostRead.model_validate(post)
@@ -561,6 +666,76 @@ async def get_community_context(
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
     return community.community_context or {}
+
+
+class TagUsageEntry(BaseModel):
+    dimension: str
+    tag: str
+    rule_count: int          # number of rules whose relevant_context includes this tag (weight != 0)
+    weight_sum: float        # Σ |weight| across those rules — implicit "priority"
+    rule_titles: list[str]   # titles of those rules, for hover-list / drill-in
+
+
+@router.get("/communities/{community_id}/context/tag-usage", response_model=list[TagUsageEntry])
+async def get_context_tag_usage(
+    community_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> list[TagUsageEntry]:
+    """Per-tag usage stats derived from rules' relevant_context.
+
+    Acts as the implicit per-tag "priority" the design dropped from the schema —
+    a tag is load-bearing iff many rules pulled it in with non-trivial weight.
+    """
+    comm_result = await db.execute(select(Community).where(Community.id == community_id))
+    community = comm_result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    rules_result = await db.execute(
+        select(Rule).where(Rule.community_id == community_id, Rule.is_active == True)
+    )
+    rules = list(rules_result.scalars().all())
+
+    bucket: dict[tuple[str, str], dict] = {}
+    for rule in rules:
+        rc = rule.relevant_context or []
+        if not isinstance(rc, list):
+            continue
+        for entry in rc:
+            if not isinstance(entry, dict):
+                continue
+            dim = entry.get("dimension")
+            tag = entry.get("tag")
+            if not dim or not tag:
+                continue
+            try:
+                w = float(entry.get("weight", 1.0))
+            except (TypeError, ValueError):
+                w = 1.0
+            if w == 0.0:
+                continue
+            slot = bucket.setdefault((dim, tag), {"count": 0, "sum": 0.0, "titles": []})
+            slot["count"] += 1
+            slot["sum"] += abs(w)
+            slot["titles"].append(rule.title)
+
+    out: list[TagUsageEntry] = []
+    # Surface every tag in the community context, including unused ones (count=0).
+    ctx = community.community_context or {}
+    for dim in ("purpose", "participants", "stakes", "tone"):
+        for note in (ctx.get(dim) or {}).get("notes") or []:
+            tag = note.get("tag", "") if isinstance(note, dict) else ""
+            if not tag:
+                continue
+            slot = bucket.get((dim, tag), {"count": 0, "sum": 0.0, "titles": []})
+            out.append(TagUsageEntry(
+                dimension=dim,
+                tag=tag,
+                rule_count=slot["count"],
+                weight_sum=round(slot["sum"], 3),
+                rule_titles=list(slot["titles"]),
+            ))
+    return out
 
 
 @router.put("/communities/{community_id}/context", response_model=dict)
@@ -649,6 +824,26 @@ async def generate_community_context(
     # Load taxonomy for tag constraint
     taxonomy = _load_taxonomy()
 
+    # Pull committed sample posts and split by label so the context generator
+    # gets labeled mod judgment alongside the activity-based crawl.
+    committed_result = await db.execute(
+        select(CommunitySamplePost)
+        .where(
+            CommunitySamplePost.community_id == community_id,
+            CommunitySamplePost.status == "committed",
+        )
+        .order_by(CommunitySamplePost.created_at.desc())
+    )
+    committed_samples = list(committed_result.scalars().all())
+    acceptable_samples = [
+        {"content": s.content, "note": s.note}
+        for s in committed_samples if s.label == "acceptable"
+    ]
+    unacceptable_samples = [
+        {"content": s.content, "note": s.note}
+        for s in committed_samples if s.label == "unacceptable"
+    ]
+
     # Generate context via LLM
     context = await compiler.generate_community_context(
         community_name=community.name,
@@ -658,6 +853,8 @@ async def generate_community_context(
         subscribers=subscribers,
         sampled_posts=sampled_posts,
         taxonomy=taxonomy,
+        acceptable_samples=acceptable_samples or None,
+        unacceptable_samples=unacceptable_samples or None,
     )
 
     # Merge with existing context (preserve manually-edited dimensions)
@@ -672,6 +869,7 @@ async def generate_community_context(
             existing[dim] = context[dim]
 
     community.community_context = existing
+    community.context_stale = False
     await db.commit()
     await db.refresh(community)
     return ContextGenerateResponse(community_context=community.community_context)

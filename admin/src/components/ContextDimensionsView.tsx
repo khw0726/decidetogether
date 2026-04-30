@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Loader2, Pencil, Eye } from 'lucide-react'
-import { CommunityContext, CommunityContextDimension, CommunityContextNote, previewContextImpact, type ContextPreviewImpact, type ContextTaxonomy, getContextTaxonomy } from '../api/client'
+import { CommunityContext, CommunityContextDimension, CommunityContextNote, previewContextImpact, type ContextPreviewImpact, type ContextTaxonomy, getContextTaxonomy, getContextTagUsage, type TagUsageEntry } from '../api/client'
 import { showErrorToast } from './Toast'
 
 export const DIMENSION_META: [string, keyof CommunityContext][] = [
@@ -53,10 +53,25 @@ export default function ContextDimensionsView({
   const [preview, setPreview] = useState<ContextPreviewImpact | null>(null)
   const [isPreviewing, setIsPreviewing] = useState(false)
   const [taxonomy, setTaxonomy] = useState<ContextTaxonomy | null>(null)
+  const [tagUsage, setTagUsage] = useState<Record<string, TagUsageEntry>>({})
 
   useEffect(() => {
     getContextTaxonomy().then(setTaxonomy).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!communityId) return
+    getContextTagUsage(communityId)
+      .then(entries => {
+        const m: Record<string, TagUsageEntry> = {}
+        for (const e of entries) m[`${e.dimension}::${e.tag}`] = e
+        setTagUsage(m)
+      })
+      .catch(() => {})
+  }, [communityId, context])
+
+  const usageFor = (dim: string, tag: string): TagUsageEntry | undefined =>
+    tagUsage[`${dim}::${tag}`]
 
   const startEdit = (key: string, dim: CommunityContextDimension) => {
     setEditingDim(key)
@@ -134,12 +149,32 @@ export default function ContextDimensionsView({
                     // Find the explanation text for this tag to show on hover
                     const notes = isEditing ? editNotes : dim.notes.map(normalizeNote)
                     const noteForTag = notes.find(n => (typeof n === 'string' ? '' : n.tag) === tag)
-                    const hoverText = noteForTag && typeof noteForTag !== 'string' && noteForTag.text
-                      ? `${tag.replace(/_/g, ' ')}: ${noteForTag.text}`
-                      : taxonomy?.[key]?.[tag] || tag.replace(/_/g, ' ')
+                    const usage = usageFor(key, tag)
+                    const usageStr = usage && usage.rule_count > 0
+                      ? ` · used by ${usage.rule_count} rule${usage.rule_count > 1 ? 's' : ''} (Σ ${usage.weight_sum.toFixed(1)})`
+                      : ' · unused by rules'
+                    const hoverText = (
+                      noteForTag && typeof noteForTag !== 'string' && noteForTag.text
+                        ? `${tag.replace(/_/g, ' ')}: ${noteForTag.text}`
+                        : taxonomy?.[key]?.[tag] || tag.replace(/_/g, ' ')
+                    ) + usageStr
+                    const heavy = usage && usage.weight_sum >= 1.5
                     return (
-                      <span key={tag} className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium" title={hoverText}>
+                      <span
+                        key={tag}
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${
+                          heavy
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : usage && usage.rule_count > 0
+                              ? 'bg-indigo-50 text-indigo-600'
+                              : 'bg-gray-100 text-gray-400'
+                        }`}
+                        title={hoverText}
+                      >
                         {tag.replace(/_/g, ' ')}
+                        {usage && usage.rule_count > 0 && (
+                          <span className="text-[9px] opacity-70">×{usage.rule_count}</span>
+                        )}
                       </span>
                     )
                   })}

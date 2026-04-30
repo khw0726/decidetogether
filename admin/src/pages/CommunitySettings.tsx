@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Plus, Trash2, AlertTriangle, Loader2, Link } from 'lucide-react'
+import { Settings, Plus, Trash2, AlertTriangle, Loader2, Link, Inbox, Check, X, RefreshCw } from 'lucide-react'
 import {
   getCommunity,
   generateCommunityContext,
@@ -9,6 +9,8 @@ import {
   addSamplePost,
   deleteSamplePost,
   importSamplePostFromUrl,
+  pullModqueue,
+  approveSamplePost,
   type CommunitySamplePost,
   type CommunityContext,
   type CommunityContextDimension,
@@ -51,8 +53,21 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
     mutationFn: (postId: string) => deleteSamplePost(communityId, postId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sample-posts', communityId] })
+      queryClient.invalidateQueries({ queryKey: ['community', communityId] })
     },
   })
+
+  const approveMutation = useMutation({
+    mutationFn: ({ postId, label }: { postId: string; label?: 'acceptable' | 'unacceptable' }) =>
+      approveSamplePost(communityId, postId, label ? { label } : undefined),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sample-posts', communityId] })
+      queryClient.invalidateQueries({ queryKey: ['community', communityId] })
+    },
+  })
+
+  const committedSamples = samplePosts.filter(p => p.status === 'committed')
+  const pendingSamples = samplePosts.filter(p => p.status === 'pending')
 
   if (!communityId) {
     return (
@@ -84,6 +99,23 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
           </p>
         </div>
 
+        {community?.context_stale && (
+          <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+            <span className="flex items-center gap-2">
+              <RefreshCw size={14} />
+              Sample posts have changed since this context was generated.
+            </span>
+            <button
+              className="btn-primary text-xs flex items-center gap-1.5"
+              onClick={() => contextMutation.mutate()}
+              disabled={contextMutation.isPending}
+            >
+              {contextMutation.isPending && <Loader2 size={11} className="animate-spin" />}
+              Regenerate
+            </button>
+          </div>
+        )}
+
         {contextMutation.isPending && !community?.community_context ? (
           <div className="card p-8 flex flex-col items-center justify-center gap-3 text-gray-500">
             <Loader2 size={24} className="animate-spin text-indigo-500" />
@@ -114,28 +146,66 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
         )}
       </section>
 
+      {/* Pending review (modqueue-sourced) */}
+      {pendingSamples.length > 0 && (
+        <section>
+          <div className="mb-3">
+            <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
+              <Inbox size={16} />
+              Pending review
+              <span className="text-xs font-normal text-gray-500">
+                ({pendingSamples.length} from modqueue)
+              </span>
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Posts pulled from the modlog. Approve to add as samples, or reject to discard.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {pendingSamples.map(post => (
+              <PendingPostCard
+                key={post.id}
+                post={post}
+                onApprove={(label) => approveMutation.mutate({ postId: post.id, label })}
+                onReject={() => deleteMutation.mutate(post.id)}
+                busy={approveMutation.isPending || deleteMutation.isPending}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Sample Posts */}
       <section>
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-base font-semibold text-gray-800">Sample Posts</h2>
             <p className="text-xs text-gray-500 mt-0.5">
-              Representative posts that signal what's acceptable or unacceptable in this community.
+              Representative posts that shape this community's context (and through it, every rule).
             </p>
           </div>
-          <AddSamplePostButton
-            communityId={communityId}
-            onAdded={() => queryClient.invalidateQueries({ queryKey: ['sample-posts', communityId] })}
-          />
+          <div className="flex items-center gap-2">
+            <PullModqueueButton
+              communityId={communityId}
+              onPulled={() => queryClient.invalidateQueries({ queryKey: ['sample-posts', communityId] })}
+            />
+            <AddSamplePostButton
+              communityId={communityId}
+              onAdded={() => {
+                queryClient.invalidateQueries({ queryKey: ['sample-posts', communityId] })
+                queryClient.invalidateQueries({ queryKey: ['community', communityId] })
+              }}
+            />
+          </div>
         </div>
 
-        {samplePosts.length === 0 ? (
+        {committedSamples.length === 0 ? (
           <div className="card p-6 text-center text-gray-400 text-sm">
-            No sample posts yet. Add posts to help the compiler understand your community's norms.
+            No sample posts yet. Add manually, import a Reddit URL, or pull recent modqueue actions.
           </div>
         ) : (
           <div className="space-y-2">
-            {samplePosts.map(post => (
+            {committedSamples.map(post => (
               <SamplePostCard
                 key={post.id}
                 post={post}
@@ -146,6 +216,191 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
           </div>
         )}
       </section>
+    </div>
+  )
+}
+
+function PendingPostCard({
+  post,
+  onApprove,
+  onReject,
+  busy,
+}: {
+  post: CommunitySamplePost
+  onApprove: (label?: 'acceptable' | 'unacceptable') => void
+  onReject: () => void
+  busy: boolean
+}) {
+  const content = (post.content as Record<string, unknown>)?.content as Record<string, unknown> | undefined
+  const title = (content?.title as string) || '(no title)'
+  const body = ((content?.body as string) || '').slice(0, 140)
+  const meta = post.source_metadata || {}
+  const action = (meta.action as string) || ''
+  const mod = (meta.mod_username as string) || ''
+  const otherLabel: 'acceptable' | 'unacceptable' =
+    post.label === 'acceptable' ? 'unacceptable' : 'acceptable'
+
+  return (
+    <div className="card px-4 py-3 flex items-start gap-3 border-amber-200 bg-amber-50/40">
+      <span
+        className={`mt-0.5 flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+          post.label === 'acceptable'
+            ? 'bg-green-100 text-green-700'
+            : 'bg-red-100 text-red-700'
+        }`}
+      >
+        {post.label}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-800 truncate">{title}</p>
+        {body && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{body}</p>}
+        <p className="text-xs text-gray-400 mt-1">
+          {action ? `${action}` : 'modqueue'}{mod ? ` by u/${mod}` : ''}
+        </p>
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          className="px-2 py-1 text-xs rounded border border-gray-200 hover:bg-gray-50 text-gray-600"
+          onClick={() => onApprove(otherLabel)}
+          disabled={busy}
+          title={`Approve as ${otherLabel} instead`}
+        >
+          Flip → {otherLabel}
+        </button>
+        <button
+          className="p-1.5 rounded text-green-700 hover:bg-green-100"
+          onClick={() => onApprove()}
+          disabled={busy}
+          title="Approve as-is"
+        >
+          <Check size={14} />
+        </button>
+        <button
+          className="p-1.5 rounded text-red-600 hover:bg-red-100"
+          onClick={onReject}
+          disabled={busy}
+          title="Reject (discard)"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function PullModqueueButton({
+  communityId,
+  onPulled,
+}: {
+  communityId: string
+  onPulled: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [limit, setLimit] = useState(25)
+  const [sinceDays, setSinceDays] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [result, setResult] = useState<{ new_count: number; skipped_existing: number } | null>(null)
+
+  const close = () => {
+    setOpen(false)
+    setError('')
+    setResult(null)
+  }
+
+  const handleSubmit = async () => {
+    setLoading(true)
+    setError('')
+    setResult(null)
+    try {
+      const r = await pullModqueue(communityId, {
+        limit,
+        since_days: sinceDays.trim() ? Number(sinceDays) : null,
+      })
+      setResult({ new_count: r.new_count, skipped_existing: r.skipped_existing })
+      onPulled()
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        'Failed to pull from modqueue.'
+      setError(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        className="btn-secondary flex items-center gap-1.5 text-sm"
+        onClick={() => setOpen(true)}
+      >
+        <Inbox size={14} />
+        Pull from modqueue
+      </button>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="card p-6 w-full max-w-md">
+        <h3 className="text-base font-semibold mb-3">Pull from modqueue</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Fetch recent removelink/approvelink actions from your subreddit's modlog. Each becomes a
+          pending sample, labeled by the action — approve them below to make them active.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium mb-1">
+              Max actions per type
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={200}
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value={limit}
+              onChange={e => setLimit(Number(e.target.value) || 25)}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1">
+              Only actions from the last N days (optional)
+            </label>
+            <input
+              type="number"
+              min={1}
+              placeholder="(no limit)"
+              className="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value={sinceDays}
+              onChange={e => setSinceDays(e.target.value)}
+            />
+          </div>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {result && (
+            <p className="text-sm text-green-700">
+              Staged {result.new_count} new pending sample{result.new_count === 1 ? '' : 's'}.
+              {result.skipped_existing > 0 && ` Skipped ${result.skipped_existing} duplicates.`}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-2 justify-end pt-4">
+          <button type="button" className="btn-secondary" onClick={close}>
+            {result ? 'Done' : 'Cancel'}
+          </button>
+          {!result && (
+            <button
+              type="button"
+              className="btn-primary flex items-center gap-1.5"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading && <Loader2 size={13} className="animate-spin" />}
+              {loading ? 'Pulling...' : 'Pull'}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

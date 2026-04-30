@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import get_anthropic_client, settings
 from ..compiler.compiler import RuleCompiler
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, CommunitySamplePost, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import (
     BulkDecisionResolve, BulkResolveResponse,
     DecisionRead, DecisionResolve, DecisionStats,
@@ -210,18 +210,6 @@ async def _resolve_single_decision(
                         checklist_item_id=item_id,
                         checklist_item_description=item.description,
                     ))
-
-    # When the agent flagged a community norm violation but the moderator approved the post,
-    # auto-add the post as an acceptable sample post to community settings.
-    agent_cited_norm_violation = "__community_norms__" in agent_reasoning
-    if mod_approved and not agent_approved and agent_cited_norm_violation:
-        sample_post = CommunitySamplePost(
-            community_id=decision.community_id,
-            content=decision.post_content,
-            label="acceptable",
-            note="Auto-added: moderator approved post that agent flagged for community norm violation",
-        )
-        db.add(sample_post)
 
     # After a remove-override with no rule linked (unlinked remove), check if we've hit
     # the M=3 threshold and auto-trigger a new-rule suggestion.

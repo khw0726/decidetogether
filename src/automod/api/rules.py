@@ -14,9 +14,9 @@ from sqlalchemy import delete as sa_delete, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_anthropic_client, settings
-from ..compiler.compiler import RuleCompiler
+from ..compiler.compiler import RuleCompiler, _filter_context_by_relevant
 from ..db.database import get_db
-from ..db.models import ChecklistItem, CommunitySamplePost, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..embeddings import embed_text, unpack_vector, cosine
 from ..models.schemas import (
     CommunityContextNote,
@@ -31,6 +31,7 @@ from ..models.schemas import (
     RuleUpdate,
     RuleTextCitation,
     RuleTextClause,
+    PeerRuleOption,
     SuggestedContextBundle,
     SuggestRuleTextRequest,
     SuggestRuleTextResponse,
@@ -125,48 +126,51 @@ async def _compile_rule_read_and_llm(
 
         community_context = community.community_context
 
-        approved_result = await db.execute(
-            select(Decision)
-            .where(Decision.community_id == community_id, Decision.moderator_verdict == "approve")
-            .order_by(Decision.created_at.desc())
-            .limit(5)
-        )
-        removed_result = await db.execute(
-            select(Decision)
-            .where(Decision.community_id == community_id, Decision.moderator_verdict == "remove")
-            .order_by(Decision.created_at.desc())
-            .limit(5)
-        )
-        sample_result = await db.execute(
-            select(CommunitySamplePost)
-            .where(CommunitySamplePost.community_id == community_id)
-            .order_by(CommunitySamplePost.created_at.desc())
-            .limit(20)
-        )
-        community_posts_sample = [
-            {"content": d.post_content, "label": "acceptable"}
-            for d in approved_result.scalars().all()
-        ] + [
-            {"content": d.post_content, "label": "unacceptable"}
-            for d in removed_result.scalars().all()
-        ] + [
-            {"content": p.content, "label": p.label, "note": p.note}
-            for p in sample_result.scalars().all()
-        ]
-
     # ── LLM phase (no session held) ────────────────────────────────────
     compiler = get_compiler()
 
+    # Auto-match relevant_context on first compile when the rule hasn't been calibrated yet.
+    # `None` is the unmatched sentinel; `[]` means the moderator explicitly opted out and we
+    # respect that. Once we match, we'll persist the result back onto the rule below.
+    matched_relevant_context: Optional[list[dict]] = None
+    effective_relevant_context = rule.relevant_context
+    if rule.relevant_context is None and community_context:
+        try:
+            matched_relevant_context = await compiler.match_relevant_context(
+                rule_title=rule.title,
+                rule_text=rule.text,
+                community_name=community.name,
+                community_context=community_context,
+            )
+            # Validate against the actual context — drop fabricated (dimension, tag) pairs.
+            valid_pairs: set[tuple[str, str]] = set()
+            for dim in ("purpose", "participants", "stakes", "tone"):
+                d = (community_context or {}).get(dim) or {}
+                for note in d.get("notes") or []:
+                    tag = note.get("tag", "") if isinstance(note, dict) else ""
+                    if tag:
+                        valid_pairs.add((dim, tag))
+            matched_relevant_context = [
+                e for e in matched_relevant_context
+                if (e.get("dimension"), e.get("tag")) in valid_pairs
+            ]
+            effective_relevant_context = matched_relevant_context
+        except Exception as e:
+            logger.warning(f"match_relevant_context failed for rule {rule_id}: {e} — falling back to all context")
+            matched_relevant_context = None
+            effective_relevant_context = None
+
     if not existing_items:
-        # Two-pass compilation: base compile then context adjustment
+        # Two-pass compilation: base compile then context adjustment.
+        # Sample posts are not passed here — they shape the community context,
+        # which the compiler reads directly.
         adjusted_items, example_dicts, base_checklist_dicts, adjustment_summary = \
             await compiler.compile_rule_two_pass(
                 rule=rule,
                 community=community,
                 other_rules=other_rules,
                 community_context=community_context,
-                community_posts_sample=community_posts_sample or None,
-                relevant_context=rule.relevant_context,
+                relevant_context=effective_relevant_context,
                 custom_context_notes=rule.custom_context_notes,
             )
         return {
@@ -179,6 +183,7 @@ async def _compile_rule_read_and_llm(
             "example_dicts": example_dicts,
             "base_checklist_json": base_checklist_dicts,
             "context_adjustment_summary": adjustment_summary,
+            "matched_relevant_context": matched_relevant_context,
         }
     else:
         operations = await compiler.recompile_with_diff(
@@ -195,6 +200,7 @@ async def _compile_rule_read_and_llm(
             "community": community,
             "operations": operations,
             "existing_items": existing_items,
+            "matched_relevant_context": matched_relevant_context,
         }
 
 
@@ -221,14 +227,19 @@ async def _compile_rule_persist(result: dict) -> None:
                     item_description_map=item_desc_map, community_id=result["community_id"],
                 )
                 await db.flush()
-                # Save two-pass artifacts on the Rule
-                if result.get("base_checklist_json") is not None:
+                # Save two-pass artifacts on the Rule, plus auto-matched relevant_context.
+                base_json = result.get("base_checklist_json")
+                matched = result.get("matched_relevant_context")
+                if base_json is not None or matched is not None:
                     rule_obj = (await db.execute(
                         select(Rule).where(Rule.id == rule_id)
                     )).scalar_one_or_none()
                     if rule_obj:
-                        rule_obj.base_checklist_json = result["base_checklist_json"]
-                        rule_obj.context_adjustment_summary = result.get("context_adjustment_summary", "")
+                        if base_json is not None:
+                            rule_obj.base_checklist_json = base_json
+                            rule_obj.context_adjustment_summary = result.get("context_adjustment_summary", "")
+                        if matched is not None:
+                            rule_obj.relevant_context = matched
                         await db.flush()
                 await _fill_missing_examples(db, rule_id, compiler, rule, community)
             else:
@@ -239,6 +250,14 @@ async def _compile_rule_persist(result: dict) -> None:
                     existing_by_id[merged.id] = merged
                 await _apply_diff_operations(db, result["operations"], existing_by_id, rule_id)
                 await db.flush()
+                matched = result.get("matched_relevant_context")
+                if matched is not None:
+                    rule_obj = (await db.execute(
+                        select(Rule).where(Rule.id == rule_id)
+                    )).scalar_one_or_none()
+                    if rule_obj:
+                        rule_obj.relevant_context = matched
+                        await db.flush()
                 await _re_resolve_checklist_links(db, rule_id)
                 await _fill_missing_examples(db, rule_id, compiler, rule, community)
 
@@ -596,8 +615,27 @@ async def suggest_rule_text(
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
 
-    target_context = community.community_context or {}
-    target_tags = _community_tag_set(target_context)
+    full_target_context = community.community_context or {}
+    full_target_tags = _community_tag_set(full_target_context)
+
+    # If the caller has pre-selected context tags (from the NewRuleModal picker),
+    # restrict matching + drafting to that subset. Otherwise fall back to the full
+    # community context.
+    selected_pairs: set[tuple[str, str]] = set()
+    for entry in body.relevant_context or []:
+        if entry.dimension and entry.tag and (entry.dimension, entry.tag) in full_target_tags:
+            selected_pairs.add((entry.dimension, entry.tag))
+
+    if selected_pairs:
+        target_tags = selected_pairs
+        # Filter the context dict down to the selected (dim, tag) bundles for the LLM prompt.
+        relevant_for_filter = [
+            {"dimension": d, "tag": t, "weight": 1.0} for (d, t) in selected_pairs
+        ]
+        target_context = _filter_context_by_relevant(full_target_context, relevant_for_filter) or {}
+    else:
+        target_tags = full_target_tags
+        target_context = full_target_context
 
     # Embed the user's title
     try:
@@ -630,6 +668,12 @@ async def suggest_rule_text(
     for rule, ref_comm, cos_score in top_n:
         peer_tags = _community_tag_set(ref_comm.community_context)
         overlap = target_tags & peer_tags
+        # A peer rule must share AT LEAST ONE context tag to surface as a suggestion —
+        # the whole point of this list is "rules from communities that share your context".
+        # When the target itself has no context tags yet, fall back to cosine-only ranking
+        # so suggestions still appear during onboarding.
+        if target_tags and not overlap:
+            continue
         union = target_tags | peer_tags
         jaccard = (len(overlap) / len(union)) if union else 0.0
         # Combined score: 0.6·cosine + 0.4·jaccard
@@ -638,7 +682,18 @@ async def suggest_rule_text(
         rescored.append((rule, ref_comm, combined, shared))
 
     rescored.sort(key=lambda t: t[2], reverse=True)
-    top_peers = rescored[:5]
+    # Deduplicate to one rule per community (highest-scored), then cap.
+    seen_communities: set[str] = set()
+    distinct_peers: list[tuple] = []
+    for entry in rescored:
+        rule, ref_comm, _score, _shared = entry
+        if ref_comm.id in seen_communities:
+            continue
+        seen_communities.add(ref_comm.id)
+        distinct_peers.append(entry)
+        if len(distinct_peers) >= 5:
+            break
+    top_peers = distinct_peers
 
     # Build peer-rules payload for the compiler
     peer_rules_payload: list[dict] = []
@@ -650,6 +705,27 @@ async def suggest_rule_text(
             "shared_tags": shared,
         })
 
+    # Build the user-facing peer_options list (used by the multi-option suggestion UI).
+    # Each option carries the source community's full context tags + the shared subset.
+    peer_options: list[PeerRuleOption] = []
+    for rule, ref_comm, _score, shared in top_peers:
+        peer_pairs = _community_tag_set(ref_comm.community_context)
+        shared_pairs = sorted(target_tags & peer_pairs)
+        peer_options.append(PeerRuleOption(
+            community_id=ref_comm.id,
+            community_name=ref_comm.name,
+            rule_title=rule.title,
+            rule_text=rule.text,
+            peer_context_tags=[
+                SuggestedContextBundle(dimension=d, tag=t)
+                for (d, t) in sorted(peer_pairs)
+            ],
+            shared_tags=[
+                SuggestedContextBundle(dimension=d, tag=t)
+                for (d, t) in shared_pairs
+            ],
+        ))
+
     compiler = get_compiler()
     try:
         result = await compiler.draft_rule_from_context(
@@ -659,8 +735,9 @@ async def suggest_rule_text(
             peer_rules=peer_rules_payload,
         )
     except Exception as e:
-        logger.error(f"draft_rule_from_context failed: {e}")
-        raise HTTPException(status_code=502, detail="LLM drafting failed")
+        # Degrade gracefully — peer-rule options can still carry the response.
+        logger.warning(f"draft_rule_from_context failed: {e} — returning peer options only")
+        result = {"draft_text": "", "clauses": [], "suggested_relevant_context": []}
 
     # Validate + hydrate citations. Reject ungrounded clauses; drop fabricated citations.
     target_note_texts = _community_tag_text_map(target_context)
@@ -713,11 +790,9 @@ async def suggest_rule_text(
             continue
         validated_clauses.append(RuleTextClause(text=c_text, citations=valid_citations))
 
-    if not validated_clauses:
-        raise HTTPException(
-            status_code=502,
-            detail="Drafting produced no grounded clauses. Try again or refine the title.",
-        )
+    # If drafting produced nothing usable, leave the LLM-draft slot empty rather than
+    # 502'ing — peer options below still give the user something to work with.
+    draft_text_out = result.get("draft_text", "") if validated_clauses else ""
 
     # Validate suggested_relevant_context against target tags.
     suggested_bundles: list[SuggestedContextBundle] = []
@@ -729,11 +804,12 @@ async def suggest_rule_text(
             suggested_bundles.append(SuggestedContextBundle(dimension=dim, tag=tag))
 
     return SuggestRuleTextResponse(
-        draft_text=result.get("draft_text", ""),
+        draft_text=draft_text_out,
         clauses=validated_clauses,
         suggested_relevant_context=suggested_bundles,
         peer_rules_considered=len(peer_rules_payload),
         target_has_context=bool(target_tags),
+        peer_options=peer_options,
     )
 
 
@@ -1180,3 +1256,161 @@ async def deactivate_rule(
         raise HTTPException(status_code=404, detail="Rule not found")
     rule.is_active = False
     await db.commit()
+
+
+class MatchContextResponse(BaseModel):
+    relevant_context: list[RuleContextTag]
+
+
+@router.post("/rules/{rule_id}/match-context", response_model=MatchContextResponse)
+async def match_rule_context(
+    rule_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> MatchContextResponse:
+    """Run the LLM auto-match for relevant context tags + weights.
+
+    Does NOT persist — caller decides whether to commit (e.g. via PUT /rules/{id}).
+    Use this when the mod wants to (re-)populate the rule editor's slider state from the
+    LLM, e.g. after a context regeneration or for a hand-authored rule that was created
+    with relevant_context = [].
+    """
+    rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = rule_result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+    community = comm_result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    community_context = community.community_context or {}
+    valid_pairs: set[tuple[str, str]] = set()
+    for dim in ("purpose", "participants", "stakes", "tone"):
+        d = community_context.get(dim) or {}
+        for note in d.get("notes") or []:
+            tag = note.get("tag", "") if isinstance(note, dict) else ""
+            if tag:
+                valid_pairs.add((dim, tag))
+    if not valid_pairs:
+        return MatchContextResponse(relevant_context=[])
+
+    compiler = get_compiler()
+    try:
+        matched = await compiler.match_relevant_context(
+            rule_title=rule.title,
+            rule_text=rule.text,
+            community_name=community.name,
+            community_context=community_context,
+        )
+    except Exception as e:
+        logger.error(f"match_relevant_context failed for rule {rule_id}: {e}")
+        raise HTTPException(status_code=502, detail="LLM match failed")
+
+    out: list[RuleContextTag] = []
+    for entry in matched:
+        dim = entry.get("dimension")
+        tag = entry.get("tag")
+        if (dim, tag) not in valid_pairs:
+            continue
+        out.append(RuleContextTag(dimension=dim, tag=tag, weight=entry.get("weight", 1.0)))
+    return MatchContextResponse(relevant_context=out)
+
+
+class PeerRule(BaseModel):
+    community_id: str
+    community_name: str
+    rule_title: str
+    rule_text: str
+    shared_tags: list[str]
+
+
+class PeerRulesGroup(BaseModel):
+    dimension: str
+    tag: str
+    rules: list[PeerRule]
+
+
+class PeerSuggestionsResponse(BaseModel):
+    groups: list[PeerRulesGroup]
+    target_tags: list[RuleContextTag]  # this community's tags, for UI
+
+
+@router.get("/communities/{community_id}/rules/peer-suggestions", response_model=PeerSuggestionsResponse)
+async def peer_rule_suggestions(
+    community_id: str,
+    per_tag_limit: int = 3,
+    min_jaccard: float = 0.2,
+    db: AsyncSession = Depends(get_db),
+) -> PeerSuggestionsResponse:
+    """Surface rules from reference communities that share context tags with this community.
+
+    Used as the empty-state of the NewRuleModal — when the moderator hasn't typed a title
+    yet, show what rules peer communities (that share this community's context) actually
+    have, grouped by which tag they share.
+    """
+    comm_result = await db.execute(select(Community).where(Community.id == community_id))
+    community = comm_result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    target_pairs = _community_tag_set(community.community_context)
+    if not target_pairs:
+        return PeerSuggestionsResponse(groups=[], target_tags=[])
+
+    # Pull all reference communities with non-empty context, plus their rules.
+    ref_result = await db.execute(
+        select(Rule, Community)
+        .join(Community, Rule.community_id == Community.id)
+        .where(Community.is_reference.is_(True))
+        .where(Rule.is_active == True)
+        .where(Community.id != community_id)
+    )
+
+    # Group rules by shared tag — a single peer rule may surface under multiple tags.
+    grouped: dict[tuple[str, str], list[PeerRule]] = {}
+    seen_per_tag: dict[tuple[str, str], set[tuple[str, str]]] = {}
+
+    for rule, ref_comm in ref_result.all():
+        peer_pairs = _community_tag_set(ref_comm.community_context)
+        if not peer_pairs:
+            continue
+        overlap = target_pairs & peer_pairs
+        if not overlap:
+            continue
+        union = target_pairs | peer_pairs
+        jaccard = len(overlap) / len(union) if union else 0.0
+        if jaccard < min_jaccard:
+            continue
+        peer_obj = PeerRule(
+            community_id=ref_comm.id,
+            community_name=ref_comm.name,
+            rule_title=rule.title,
+            rule_text=rule.text,
+            shared_tags=sorted({t for (_, t) in overlap}),
+        )
+        for pair in overlap:
+            key = pair
+            if pair in target_pairs:
+                # de-dupe by (peer_community, rule_title) within a tag bucket
+                seen = seen_per_tag.setdefault(key, set())
+                ident = (ref_comm.id, rule.title)
+                if ident in seen:
+                    continue
+                seen.add(ident)
+                grouped.setdefault(key, []).append(peer_obj)
+
+    groups: list[PeerRulesGroup] = []
+    for (dim, tag), rules in grouped.items():
+        groups.append(PeerRulesGroup(
+            dimension=dim,
+            tag=tag,
+            rules=rules[:per_tag_limit],
+        ))
+    # Sort: groups with more peer rules first, then dimension/tag alpha for stability.
+    groups.sort(key=lambda g: (-len(g.rules), g.dimension, g.tag))
+
+    target_tag_list = [
+        RuleContextTag(dimension=dim, tag=tag, weight=1.0)
+        for (dim, tag) in sorted(target_pairs)
+    ]
+    return PeerSuggestionsResponse(groups=groups, target_tags=target_tag_list)

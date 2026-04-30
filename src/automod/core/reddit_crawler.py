@@ -253,6 +253,88 @@ async def crawl_subreddit_posts(
         return []
 
 
+async def fetch_modlog_actions(
+    subreddit: str,
+    client_id: str,
+    client_secret: str,
+    user_agent: str,
+    username: str = "",
+    password: str = "",
+    limit: int = 50,
+    since_unix: float | None = None,
+) -> list[dict]:
+    """Fetch recent removelink/approvelink actions from the subreddit modlog.
+
+    Returns a list of dicts shaped:
+        {
+            "label": "acceptable" | "unacceptable",
+            "content": <PostContent dict>,
+            "source_metadata": {action_id, mod_username, action, action_at, target_fullname},
+        }
+
+    Items still pending in the modqueue (no action taken) are skipped.
+    Only post (link/selfpost) actions are returned; comment actions are skipped.
+    Requires mod credentials (username/password) for the target subreddit.
+    """
+    if not username or not password:
+        logger.warning("fetch_modlog_actions requires mod credentials")
+        return []
+
+    label_map = {"removelink": "unacceptable", "approvelink": "acceptable"}
+    results: list[dict] = []
+    seen_targets: set[str] = set()
+
+    try:
+        async with asyncpraw.Reddit(
+            client_id=client_id,
+            client_secret=client_secret,
+            user_agent=user_agent,
+            username=username,
+            password=password,
+        ) as reddit:
+            sub = await reddit.subreddit(subreddit)
+            for action_type in ("removelink", "approvelink"):
+                count = 0
+                async for entry in sub.mod.log(action=action_type, limit=limit * 4):
+                    if count >= limit:
+                        break
+                    if since_unix and entry.created_utc < since_unix:
+                        break
+                    target = entry.target_fullname or ""
+                    if not target.startswith("t3_"):
+                        continue
+                    if target in seen_targets:
+                        continue
+                    seen_targets.add(target)
+                    try:
+                        submission = await reddit.submission(id=target[3:])
+                        await submission.load()
+                    except Exception as e:
+                        logger.debug("Skipping modlog entry %s: %s", entry.id, e)
+                        continue
+                    label = label_map[action_type]
+                    content = _map_praw_post(submission, subreddit)
+                    results.append({
+                        "label": label,
+                        "content": content,
+                        "source_metadata": {
+                            "action_id": entry.id,
+                            "mod_username": str(entry.mod) if entry.mod else None,
+                            "action": action_type,
+                            "action_at": datetime.fromtimestamp(
+                                entry.created_utc, tz=timezone.utc
+                            ).isoformat(),
+                            "target_fullname": target,
+                        },
+                    })
+                    count += 1
+        logger.info("Fetched %d modlog actions from r/%s", len(results), subreddit)
+        return results
+    except Exception as exc:
+        logger.warning("Failed to fetch modlog from r/%s: %s", subreddit, exc)
+        return []
+
+
 async def sample_subreddit_for_context(
     subreddit: str,
     client_id: str,

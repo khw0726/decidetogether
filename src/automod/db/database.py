@@ -360,6 +360,31 @@ async def _migrate_flag_to_warn(conn) -> None:
     # but we can't easily filter JSON here, so leave existing decisions as-is for now)
 
 
+async def _migrate_sample_post_modqueue_fields(conn) -> None:
+    """Add status/source/source_metadata to community_sample_posts and context_stale to communities."""
+    cols = await conn.execute(text("PRAGMA table_info(community_sample_posts)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if col_names:
+        if "status" not in col_names:
+            await conn.execute(text(
+                "ALTER TABLE community_sample_posts ADD COLUMN status VARCHAR NOT NULL DEFAULT 'committed'"
+            ))
+        if "source" not in col_names:
+            await conn.execute(text(
+                "ALTER TABLE community_sample_posts ADD COLUMN source VARCHAR NOT NULL DEFAULT 'manual'"
+            ))
+        if "source_metadata" not in col_names:
+            await conn.execute(text(
+                "ALTER TABLE community_sample_posts ADD COLUMN source_metadata JSON DEFAULT NULL"
+            ))
+    cols = await conn.execute(text("PRAGMA table_info(communities)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if col_names and "context_stale" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE communities ADD COLUMN context_stale BOOLEAN NOT NULL DEFAULT 0"
+        ))
+
+
 async def init_db() -> None:
     """Create all database tables."""
     async with engine.begin() as conn:
@@ -382,6 +407,7 @@ async def init_db() -> None:
         await _migrate_rule_pending_preview(conn)
         await _migrate_reference_corpus_fields(conn)
         await _migrate_flag_to_warn(conn)
+        await _migrate_sample_post_modqueue_fields(conn)
         await conn.run_sync(Base.metadata.create_all)
 
 

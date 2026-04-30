@@ -46,7 +46,7 @@ This document collects *additional* interaction ideas beyond what is already des
 
 **C1. A/B context replay.** Replay last N decisions through {current, candidate} context; show flip count and direction. Decision-level analog of "Preview Impact" (which today is rule-level).
 
-**C2. Context-aware test panel.** In the hypothetical-post tester, surface which context tags fired and how they shifted the verdict, alongside the verdict itself.
+**C2. Context-aware test panel.** In the hypothetical-post tester, surface which context tags fired and how they shifted the verdict, alongside the verdict itself. --> For mod queue? 
 
 **C3. Adversarial probes per context note.** Auto-generate borderline posts that target a single note's calibration; use as a regression suite when context changes.
 

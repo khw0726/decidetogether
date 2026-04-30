@@ -34,6 +34,8 @@ class Community(Base):
 
     community_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     context_samples: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # True when committed sample posts have changed since context was last generated.
+    context_stale: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # Reference communities are read-only peer corpus used as grounding for rule-text
     # suggestions. They are excluded from user-facing community lists and decision flows.
@@ -251,6 +253,12 @@ class CommunitySamplePost(Base):
     content: Mapped[dict] = mapped_column(JSON, nullable=False)
     label: Mapped[str] = mapped_column(String, nullable=False)  # acceptable | unacceptable
     note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # pending = staged from modqueue, awaiting mod review; committed = active sample
+    status: Mapped[str] = mapped_column(String, nullable=False, default="committed")
+    # manual | url_import | modqueue
+    source: Mapped[str] = mapped_column(String, nullable=False, default="manual")
+    # For modqueue-sourced items: {action_id, mod_username, action, action_at}
+    source_metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     community: Mapped["Community"] = relationship("Community", back_populates="sample_posts")

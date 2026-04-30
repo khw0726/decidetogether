@@ -48,6 +48,7 @@ export interface Community {
   platform_config: Record<string, unknown> | null
   community_context: CommunityContext | null
   context_samples: ContextSamples | null
+  context_stale: boolean
   created_at: string
 }
 
@@ -57,12 +58,16 @@ export interface CommunitySamplePost {
   content: Record<string, unknown>
   label: 'acceptable' | 'unacceptable'
   note: string | null
+  status: 'pending' | 'committed'
+  source: 'manual' | 'url_import' | 'modqueue'
+  source_metadata: Record<string, unknown> | null
   created_at: string
 }
 
 export interface RuleContextTag {
   dimension: string  // "purpose" | "participants" | "stakes" | "tone"
   tag: string
+  weight?: number    // [-1, 1]; default 1.0; 0 means "ignore" (UI may also drop the entry)
 }
 
 export interface Rule {
@@ -85,8 +90,36 @@ export interface Rule {
   pending_relevant_context: { value: RuleContextTag[] | null } | null
   pending_custom_context_notes: CommunityContextNote[] | null
   pending_generated_at: string | null
+  context_load: number  // derived: sum(|weight|) across relevant_context
   created_at: string
   updated_at: string
+}
+
+export interface TagUsageEntry {
+  dimension: string
+  tag: string
+  rule_count: number
+  weight_sum: number
+  rule_titles: string[]
+}
+
+export interface PeerRule {
+  community_id: string
+  community_name: string
+  rule_title: string
+  rule_text: string
+  shared_tags: string[]
+}
+
+export interface PeerRulesGroup {
+  dimension: string
+  tag: string
+  rules: PeerRule[]
+}
+
+export interface PeerSuggestionsResponse {
+  groups: PeerRulesGroup[]
+  target_tags: RuleContextTag[]
 }
 
 export interface ChecklistItem {
@@ -261,14 +294,30 @@ export type ContextTaxonomy = Record<string, Record<string, string>>
 export const getContextTaxonomy = () =>
   api.get<ContextTaxonomy>('/communities/context-taxonomy').then(r => r.data)
 
+export const getContextTagUsage = (communityId: string) =>
+  api.get<TagUsageEntry[]>(`/communities/${communityId}/context/tag-usage`).then(r => r.data)
+
+export const matchRuleContext = (ruleId: string) =>
+  api.post<{ relevant_context: RuleContextTag[] }>(`/rules/${ruleId}/match-context`).then(r => r.data)
+
+export const getPeerRuleSuggestions = (communityId: string, perTagLimit = 3, minJaccard = 0.2) =>
+  api.get<PeerSuggestionsResponse>(`/communities/${communityId}/rules/peer-suggestions`, {
+    params: { per_tag_limit: perTagLimit, min_jaccard: minJaccard },
+  }).then(r => r.data)
+
 export const getContextSamples = (communityId: string) =>
   api.get<{ context_samples: ContextSamples }>(`/communities/${communityId}/context-samples`).then(r => r.data)
 
 export const crawlContextSamples = (communityId: string) =>
   api.post<{ context_samples: ContextSamples }>(`/communities/${communityId}/context-samples/crawl`).then(r => r.data)
 
-export const listSamplePosts = (communityId: string) =>
-  api.get<CommunitySamplePost[]>(`/communities/${communityId}/sample-posts`).then(r => r.data)
+export const listSamplePosts = (
+  communityId: string,
+  status?: 'pending' | 'committed',
+) => {
+  const qs = status ? `?status=${status}` : ''
+  return api.get<CommunitySamplePost[]>(`/communities/${communityId}/sample-posts${qs}`).then(r => r.data)
+}
 
 export const addSamplePost = (
   communityId: string,
@@ -284,6 +333,29 @@ export const importSamplePostFromUrl = (
 ) =>
   api
     .post<CommunitySamplePost>(`/communities/${communityId}/sample-posts/import-url`, data)
+    .then(r => r.data)
+
+export interface ModqueuePullResponse {
+  pending: CommunitySamplePost[]
+  new_count: number
+  skipped_existing: number
+}
+
+export const pullModqueue = (
+  communityId: string,
+  data: { limit: number; since_days?: number | null }
+) =>
+  api
+    .post<ModqueuePullResponse>(`/communities/${communityId}/sample-posts/pull-modqueue`, data)
+    .then(r => r.data)
+
+export const approveSamplePost = (
+  communityId: string,
+  postId: string,
+  data?: { label?: 'acceptable' | 'unacceptable'; note?: string }
+) =>
+  api
+    .post<CommunitySamplePost>(`/communities/${communityId}/sample-posts/${postId}/approve`, data || {})
     .then(r => r.data)
 
 // ── Setup Status ──────────────────────────────────────────────────────────────
@@ -310,7 +382,15 @@ export const getSetupStatus = (communityId: string) =>
 export const listRules = (communityId: string) =>
   api.get<Rule[]>(`/communities/${communityId}/rules`).then(r => r.data)
 
-export const createRule = (communityId: string, data: { title: string; text: string; priority?: number }) =>
+export const createRule = (
+  communityId: string,
+  data: {
+    title: string
+    text: string
+    priority?: number
+    relevant_context?: RuleContextTag[] | null
+  },
+) =>
   api.post<Rule>(`/communities/${communityId}/rules`, data).then(r => r.data)
 
 export type RuleTextCitation = {
@@ -329,17 +409,36 @@ export type RuleTextClause = {
   citations: RuleTextCitation[]
 }
 
+export type PeerRuleOption = {
+  community_id: string
+  community_name: string
+  rule_title: string
+  rule_text: string
+  peer_context_tags: { dimension: string; tag: string }[]
+  shared_tags: { dimension: string; tag: string }[]
+}
+
 export type SuggestRuleTextResponse = {
   draft_text: string
   clauses: RuleTextClause[]
   suggested_relevant_context: { dimension: string; tag: string }[]
   peer_rules_considered: number
   target_has_context: boolean
+  peer_options: PeerRuleOption[]
 }
 
-export const suggestRuleText = (communityId: string, title: string, scope: string = 'both') =>
+export const suggestRuleText = (
+  communityId: string,
+  title: string,
+  scope: string = 'both',
+  relevantContext?: RuleContextTag[],
+) =>
   api
-    .post<SuggestRuleTextResponse>(`/communities/${communityId}/rules/suggest-text`, { title, scope })
+    .post<SuggestRuleTextResponse>(`/communities/${communityId}/rules/suggest-text`, {
+      title,
+      scope,
+      relevant_context: relevantContext && relevantContext.length > 0 ? relevantContext : null,
+    })
     .then(r => r.data)
 
 export const updateRule = (ruleId: string, data: Partial<Rule>) =>
@@ -682,16 +781,6 @@ export const evaluatePost = (communityId: string, post_content: PostContent) =>
 
 export const evaluateBatch = (communityId: string, posts: PostContent[]) =>
   api.post<{ decisions: Decision[] }>(`/communities/${communityId}/evaluate/batch`, { posts }).then(r => r.data)
-
-// ── Sample Post Crawl ─────────────────────────────────────────────────────────
-
-export interface CrawlSamplePostsResponse {
-  posts: CommunitySamplePost[]
-  crawled_count: number
-}
-
-export const crawlSamplePosts = (communityId: string) =>
-  api.post<CrawlSamplePostsResponse>(`/communities/${communityId}/sample-posts/crawl`).then(r => r.data)
 
 // ── Populate Queue ────────────────────────────────────────────────────────────
 

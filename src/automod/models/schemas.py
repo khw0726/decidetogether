@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Any, Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 # ── Community ──────────────────────────────────────────────────────────────────
@@ -58,6 +58,7 @@ class CommunityRead(BaseModel):
     platform_config: Optional[dict[str, Any]] = None
     community_context: Optional[dict[str, Any]] = None
     context_samples: Optional[dict[str, Any]] = None
+    context_stale: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -77,17 +78,52 @@ class CommunitySamplePostRead(BaseModel):
     content: dict[str, Any]
     label: str
     note: Optional[str] = None
+    status: str = "committed"
+    source: str = "manual"
+    source_metadata: Optional[dict[str, Any]] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
 
 
+class ModqueuePullRequest(BaseModel):
+    limit: int = 25
+    since_days: Optional[int] = None  # only fetch actions newer than N days; null = no limit
+
+
+class SamplePostUpdate(BaseModel):
+    label: Optional[str] = None
+    note: Optional[str] = None
+
+
 # ── Rule ───────────────────────────────────────────────────────────────────────
 
 class RuleContextTag(BaseModel):
-    """A reference to one (dimension, tag) bundle from community context."""
+    """A reference to one (dimension, tag) bundle from community context.
+
+    `weight` is in [-1.0, 1.0]:
+    - +1.0 = strongly informs this rule (default for backwards compat)
+    - 0.0  = neutral / ignore (note is not passed into compile)
+    - -1.0 = counter-signal; calibrate AWAY from this note
+    """
     dimension: str  # purpose | participants | stakes | tone
     tag: str
+    weight: float = 1.0
+
+    @field_validator('weight', mode='before')
+    @classmethod
+    def _default_weight(cls, v):
+        if v is None:
+            return 1.0
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return 1.0
+        if f < -1.0:
+            return -1.0
+        if f > 1.0:
+            return 1.0
+        return f
 
 
 class RuleCreate(BaseModel):
@@ -129,6 +165,7 @@ class RuleRead(BaseModel):
     pending_relevant_context: Optional[dict[str, Any]] = None
     pending_custom_context_notes: Optional[list[CommunityContextNote]] = None
     pending_generated_at: Optional[datetime] = None
+    context_load: float = 0.0  # derived: sum(|weight|) across relevant_context tags
     created_at: datetime
     updated_at: datetime
 
@@ -144,6 +181,17 @@ class RuleRead(BaseModel):
         if isinstance(v, list):
             return " ".join(s.strip() for s in v if isinstance(s, str) and s.strip()) or None
         return v
+
+    @model_validator(mode='after')
+    def _compute_context_load(self):
+        # Derived: sum of |weight| across relevant_context tags. Genuinely opted-out rules
+        # ([] relevant_context) have load 0; un-matched rules (None) also report 0 until
+        # the first compile populates them.
+        if not self.relevant_context:
+            self.context_load = 0.0
+        else:
+            self.context_load = float(sum(abs(t.weight) for t in self.relevant_context))
+        return self
 
     model_config = {"from_attributes": True}
 
@@ -459,6 +507,10 @@ class RedditImportResponse(BaseModel):
 class SuggestRuleTextRequest(BaseModel):
     title: str
     scope: Optional[str] = "both"  # post | comment | both
+    # Optional filter — when non-empty, peer matching + LLM drafting are restricted to
+    # this subset of the target community's context tags. Lets the user steer suggestions
+    # based on which contexts they've already chosen for the new rule.
+    relevant_context: Optional[list[RuleContextTag]] = None
 
 
 class RuleTextCitation(BaseModel):
@@ -489,9 +541,25 @@ class SuggestedContextBundle(BaseModel):
     tag: str
 
 
+class PeerRuleOption(BaseModel):
+    """One peer-community rule offered as a starting point.
+
+    The user picks an option to compare how different community contexts produced
+    different rule texts. `peer_context_tags` is the source community's tags;
+    `shared_tags` are the (dimension, tag) pairs the source AND target both have.
+    """
+    community_id: str
+    community_name: str
+    rule_title: str
+    rule_text: str
+    peer_context_tags: list[SuggestedContextBundle]
+    shared_tags: list[SuggestedContextBundle]
+
+
 class SuggestRuleTextResponse(BaseModel):
     draft_text: str
     clauses: list[RuleTextClause]
     suggested_relevant_context: list[SuggestedContextBundle]
     peer_rules_considered: int
     target_has_context: bool
+    peer_options: list[PeerRuleOption] = []

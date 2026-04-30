@@ -22,7 +22,9 @@ def _filter_context_by_relevant(
     relevant_context semantics:
     - None → return context unchanged (all bundles apply, the default).
     - [] → return empty dict (moderator explicitly opted out of all community context).
-    - [{dimension, tag}, ...] → keep only notes whose (dimension, tag) appears in the list.
+    - [{dimension, tag, weight?}, ...] → keep only notes whose (dimension, tag) appears in the
+      list AND whose weight is non-zero. The weight (default +1.0) is attached to each kept
+      note as `weight` so downstream prompts can express "strongly informs" vs. "counter-signal".
     """
     if not community_context:
         return community_context
@@ -31,12 +33,27 @@ def _filter_context_by_relevant(
     if not relevant_context:
         return {}
 
-    allowed: dict[str, set[str]] = {}
+    # (dim, tag) -> weight (last write wins for duplicates).
+    weights: dict[tuple[str, str], float] = {}
     for entry in relevant_context:
-        dim = entry.get("dimension") if isinstance(entry, dict) else getattr(entry, "dimension", None)
-        tag = entry.get("tag") if isinstance(entry, dict) else getattr(entry, "tag", None)
-        if dim and tag:
-            allowed.setdefault(dim, set()).add(tag)
+        if isinstance(entry, dict):
+            dim = entry.get("dimension")
+            tag = entry.get("tag")
+            w = entry.get("weight", 1.0)
+        else:
+            dim = getattr(entry, "dimension", None)
+            tag = getattr(entry, "tag", None)
+            w = getattr(entry, "weight", 1.0)
+        if not dim or not tag:
+            continue
+        try:
+            wf = float(w) if w is not None else 1.0
+        except (TypeError, ValueError):
+            wf = 1.0
+        # Drop zero-weight entries so they don't reach the prompt at all.
+        if wf == 0.0:
+            continue
+        weights[(dim, tag)] = max(-1.0, min(1.0, wf))
 
     filtered: dict = {}
     for dim in ["purpose", "participants", "stakes", "tone"]:
@@ -45,8 +62,13 @@ def _filter_context_by_relevant(
         kept_notes = []
         for note in notes:
             tag = note.get("tag", "") if isinstance(note, dict) else ""
-            if tag and tag in allowed.get(dim, set()):
-                kept_notes.append(note)
+            if not tag:
+                continue
+            if (dim, tag) not in weights:
+                continue
+            kept = dict(note)
+            kept["weight"] = weights[(dim, tag)]
+            kept_notes.append(kept)
         if kept_notes:
             filtered[dim] = {"notes": kept_notes}
             if "manually_edited" in d:
@@ -288,6 +310,42 @@ _DRAFT_RULE_FROM_CONTEXT_TOOL = {
             },
         },
         "required": ["draft_text", "clauses", "suggested_relevant_context"],
+    },
+}
+
+_MATCH_RELEVANT_CONTEXT_TOOL = {
+    "name": "submit_relevant_context",
+    "description": "Pick the (dimension, tag) bundles from the community context that actually inform how this rule should be moderated, with a per-tag weight in [-1.0, 1.0].",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "relevant_context": {
+                "type": "array",
+                "description": "Tags that inform this rule. Omit tags that have no bearing. Use negative weights for counter-signals (the tag explicitly suggests calibrating AWAY).",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "dimension": {
+                            "type": "string",
+                            "enum": ["purpose", "participants", "stakes", "tone"],
+                        },
+                        "tag": {"type": "string"},
+                        "weight": {
+                            "type": "number",
+                            "description": "Strength and direction of influence on this rule. +1 = strongly informs; +0.5 = supports; -0.5 = counter-signal; -1 = strong counter-signal. Avoid 0 — drop the tag instead.",
+                            "minimum": -1.0,
+                            "maximum": 1.0,
+                        },
+                        "rationale": {
+                            "type": "string",
+                            "description": "One short clause explaining why this tag matters for this rule.",
+                        },
+                    },
+                    "required": ["dimension", "tag", "weight"],
+                },
+            },
+        },
+        "required": ["relevant_context"],
     },
 }
 
@@ -693,7 +751,6 @@ class RuleCompiler:
         existing_items: Optional[list[ChecklistItem]] = None,
         existing_examples: Optional[list[Example]] = None,
         community_context: Optional[dict] = None,
-        community_posts_sample: Optional[list[dict]] = None,
     ) -> tuple[list[ChecklistItem], list[dict]]:
         """Compile actionable rule into checklist tree + examples.
 
@@ -722,7 +779,6 @@ class RuleCompiler:
             existing_checklist=existing_checklist_dicts,
             existing_examples=existing_example_dicts,
             community_context=community_context,
-            community_posts_sample=community_posts_sample,
         )
 
         compiled = await self._call_claude(prompts.COMPILE_SYSTEM, user_prompt, tool=_COMPILE_TOOL)
@@ -830,7 +886,6 @@ class RuleCompiler:
         community: Community,
         current_items: list[ChecklistItem],
         community_context: dict,
-        community_posts_sample: Optional[list] = None,
         pinned_item_ids: Optional[list[str]] = None,
         relevant_context: Optional[list[dict]] = None,
         custom_context_notes: Optional[list[dict]] = None,
@@ -867,7 +922,6 @@ class RuleCompiler:
             platform=community.platform,
             current_checklist=current_dicts,
             community_context=filtered_context or {},
-            community_posts_sample=community_posts_sample,
             pinned_item_ids=pinned_item_ids,
             custom_context_notes=custom_context_notes,
         )
@@ -1036,7 +1090,6 @@ class RuleCompiler:
         existing_items: Optional[list[ChecklistItem]] = None,
         existing_examples: Optional[list[Example]] = None,
         community_context: Optional[dict] = None,
-        community_posts_sample: Optional[list] = None,
         relevant_context: Optional[list[dict]] = None,
         custom_context_notes: Optional[list[dict]] = None,
     ) -> tuple[list[ChecklistItem], list[dict], list[dict], str]:
@@ -1059,7 +1112,6 @@ class RuleCompiler:
                 community=community,
                 current_items=base_items,
                 community_context=filtered_context or {},
-                community_posts_sample=community_posts_sample,
                 custom_context_notes=custom_context_notes,
             )
         else:
@@ -1077,6 +1129,8 @@ class RuleCompiler:
         subscribers: Optional[int] = None,
         sampled_posts: Optional[dict[str, list[dict]]] = None,
         taxonomy: Optional[dict] = None,
+        acceptable_samples: Optional[list[dict]] = None,
+        unacceptable_samples: Optional[list[dict]] = None,
     ) -> dict:
         """Generate structured community context (purpose/participants/stakes/tone) from metadata + sampled posts."""
         logger.info(f"Generating community context for '{community_name}'")
@@ -1088,6 +1142,8 @@ class RuleCompiler:
             subscribers=subscribers,
             sampled_posts=sampled_posts,
             taxonomy=taxonomy,
+            acceptable_samples=acceptable_samples,
+            unacceptable_samples=unacceptable_samples,
         )
         result = await self._call_claude(
             prompts.GENERATE_CONTEXT_SYSTEM,
@@ -1301,6 +1357,65 @@ class RuleCompiler:
             model=self.settings.haiku_model,
         )
         return result.get("links", [])
+
+    async def match_relevant_context(
+        self,
+        rule_title: str,
+        rule_text: str,
+        community_name: str,
+        community_context: dict,
+    ) -> list[dict]:
+        """Pick relevant (dimension, tag) tags + weights for a rule via LLM.
+
+        Returns a list of {dimension, tag, weight} dicts. Caller should validate that
+        every (dimension, tag) returned actually exists in community_context — fabricated
+        pairs are dropped at the API layer.
+        """
+        # Quick out: no tagged notes at all means nothing to match against.
+        has_any_tag = False
+        for dim in ("purpose", "participants", "stakes", "tone"):
+            d = (community_context or {}).get(dim) or {}
+            for note in d.get("notes") or []:
+                tag = note.get("tag", "") if isinstance(note, dict) else ""
+                if tag:
+                    has_any_tag = True
+                    break
+            if has_any_tag:
+                break
+        if not has_any_tag:
+            return []
+
+        logger.info(f"Matching relevant context tags for rule '{rule_title}' in '{community_name}'")
+        user_prompt = prompts.build_match_relevant_context_prompt(
+            rule_title=rule_title,
+            rule_text=rule_text,
+            community_name=community_name,
+            community_context=community_context or {},
+        )
+        result = await self._call_claude(
+            prompts.MATCH_RELEVANT_CONTEXT_SYSTEM,
+            user_prompt,
+            tool=_MATCH_RELEVANT_CONTEXT_TOOL,
+            model=self.settings.haiku_model,
+        )
+        raw = result.get("relevant_context") or []
+        out: list[dict] = []
+        for entry in raw:
+            if not isinstance(entry, dict):
+                continue
+            dim = entry.get("dimension")
+            tag = entry.get("tag")
+            if not dim or not tag:
+                continue
+            try:
+                w = float(entry.get("weight", 1.0))
+            except (TypeError, ValueError):
+                w = 1.0
+            w = max(-1.0, min(1.0, w))
+            if w == 0.0:
+                continue
+            out.append({"dimension": dim, "tag": tag, "weight": w})
+        return out
 
     async def draft_rule_from_context(
         self,

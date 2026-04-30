@@ -10,6 +10,38 @@ def _extract_note(note) -> tuple[str, str]:
     return str(note), ""
 
 
+def _extract_note_weight(note) -> Optional[float]:
+    """Return the rule-level weight attached to a note by the context filter, or None."""
+    if not isinstance(note, dict):
+        return None
+    w = note.get("weight")
+    if w is None:
+        return None
+    try:
+        return float(w)
+    except (TypeError, ValueError):
+        return None
+
+
+def _weight_label(w: Optional[float]) -> str:
+    """Render a per-note weight as a short, prompt-friendly label.
+
+    Shown in brackets after the note text so the LLM can read the calibration intensity:
+      strong-counter / counter / neutral-leaning / weak-supports / supports / strongly-supports
+    """
+    if w is None:
+        return ""
+    if w <= -0.75:
+        return " (STRONG COUNTER-SIGNAL: calibrate AWAY from this)"
+    if w <= -0.25:
+        return " (counter-signal: de-emphasise)"
+    if w < 0.25:
+        return " (weak / neutral influence)"
+    if w < 0.75:
+        return " (supports this rule)"
+    return " (STRONGLY informs this rule)"
+
+
 # ── Triage ─────────────────────────────────────────────────────────────────────
 
 TRIAGE_SYSTEM = """You are a moderation rule classifier. Your task is to classify community rules into one of four categories:
@@ -311,7 +343,6 @@ def build_compile_prompt(
     existing_checklist: Optional[list] = None,
     existing_examples: Optional[list] = None,
     community_context: Optional[dict] = None,
-    community_posts_sample: Optional[list] = None,
 ) -> str:
     import json
 
@@ -333,46 +364,17 @@ def build_compile_prompt(
                 for note in notes:
                     text, tag = _extract_note(note)
                     tag_suffix = f" [{tag}]" if tag else ""
-                    ctx_lines.append(f"    - {text}{tag_suffix}")
+                    weight_suffix = _weight_label(_extract_note_weight(note))
+                    ctx_lines.append(f"    - {text}{tag_suffix}{weight_suffix}")
         if ctx_lines:
             context_section = "\n\nCommunity context for calibration:\n" + "\n".join(ctx_lines)
-
-    posts_section = ""
-    if community_posts_sample:
-        acceptable = [p for p in community_posts_sample if p.get("label") == "acceptable"]
-        unacceptable = [p for p in community_posts_sample if p.get("label") == "unacceptable"]
-        parts = []
-        if acceptable:
-            snippets = []
-            for p in acceptable[:4]:
-                c = p.get("content", {}).get("content", {})
-                title = c.get("title", "")
-                body = (c.get("body", "") or "")
-                note = p.get("note", "")
-                snippets.append(f'    - "{title}" — {body}' + (f' [{note}]' if note else ''))
-            parts.append("  Acceptable posts:\n" + "\n".join(snippets))
-        if unacceptable:
-            snippets = []
-            for p in unacceptable[:4]:
-                c = p.get("content", {}).get("content", {})
-                title = c.get("title", "")
-                body = (c.get("body", "") or "")
-                note = p.get("note", "")
-                snippets.append(f'    - "{title}" — {body}' + (f' [{note}]' if note else ''))
-            parts.append("  Removed/unacceptable posts:\n" + "\n".join(snippets))
-        if parts:
-            posts_section = (
-                "\n\nRepresentative community posts (use these to calibrate subjective rubric "
-                "language/thresholds and to generate borderline examples realistic to this community's "
-                "actual content style):\n" + "\n".join(parts)
-            )
 
     return f"""{COMPILE_FEW_SHOT_EXAMPLES}
 
 Now compile the following rule for the "{community_name}" community on {platform}.
 
 Community context (other rules, for background):
-{other_rules_summary if other_rules_summary else "No other rules yet."}{context_section}{posts_section}
+{other_rules_summary if other_rules_summary else "No other rules yet."}{context_section}
 {existing_context}
 
 Rule to compile:
@@ -670,6 +672,8 @@ def build_generate_context_prompt(
     subscribers: Optional[int] = None,
     sampled_posts: Optional[dict[str, list[dict]]] = None,
     taxonomy: Optional[dict] = None,
+    acceptable_samples: Optional[list[dict]] = None,
+    unacceptable_samples: Optional[list[dict]] = None,
 ) -> str:
     import json
 
@@ -713,6 +717,44 @@ def build_generate_context_prompt(
         if parts:
             posts_section = "\n\nSAMPLED POSTS — What the community actually does:\n\n" + "\n\n".join(parts)
 
+    def _render_labeled_samples(items: list[dict], header: str) -> str:
+        if not items:
+            return ""
+        lines = []
+        for s in items:
+            content = s.get("content") or {}
+            inner = content.get("content") if isinstance(content, dict) else None
+            title = (inner or {}).get("title", "") if isinstance(inner, dict) else ""
+            body = (inner or {}).get("body", "") if isinstance(inner, dict) else ""
+            note = s.get("note") or ""
+            snippet = (title or body or "")[:200]
+            line = f"    - {snippet}"
+            if note:
+                line += f"  (mod note: {note})"
+            lines.append(line)
+        return f"  {header}:\n" + "\n".join(lines)
+
+    labeled_section = ""
+    labeled_parts: list[str] = []
+    acc_block = _render_labeled_samples(
+        acceptable_samples or [],
+        "Mod-curated ACCEPTABLE posts (mods affirmed these as exemplary or approved them in the queue)",
+    )
+    if acc_block:
+        labeled_parts.append(acc_block)
+    rej_block = _render_labeled_samples(
+        unacceptable_samples or [],
+        "Mod-curated UNACCEPTABLE posts (mods removed these — concrete violations)",
+    )
+    if rej_block:
+        labeled_parts.append(rej_block)
+    if labeled_parts:
+        labeled_section = (
+            "\n\nMOD-CURATED LABELED POSTS — Direct moderator judgment "
+            "(higher signal than generic activity samples; weight these heavily):\n\n"
+            + "\n\n".join(labeled_parts)
+        )
+
     taxonomy_section = ""
     if taxonomy:
         parts = []
@@ -728,7 +770,7 @@ COMMUNITY METADATA:
   {meta_section}
   Description: {description or '(none)'}
   Rules: {rules_summary or '(none)'}
-{posts_section}
+{posts_section}{labeled_section}
 {taxonomy_section}
 
 Based on ALL of the above, generate community context.
@@ -928,7 +970,6 @@ def build_context_adjust_prompt(
     platform: str,
     current_checklist: list[dict],
     community_context: dict,
-    community_posts_sample: Optional[list] = None,
     pinned_item_ids: Optional[list[str]] = None,
     custom_context_notes: Optional[list[dict]] = None,
 ) -> str:
@@ -944,7 +985,8 @@ def build_context_adjust_prompt(
             for note in notes:
                 text, tag = _extract_note(note)
                 tag_suffix = f" [{tag}]" if tag else ""
-                ctx_lines.append(f"    - {text}{tag_suffix}")
+                weight_suffix = _weight_label(_extract_note_weight(note))
+                ctx_lines.append(f"    - {text}{tag_suffix}{weight_suffix}")
     context_section = "\n".join(ctx_lines)
 
     custom_notes_section = ""
@@ -963,30 +1005,6 @@ def build_context_adjust_prompt(
                 "guidance):\n" + "\n".join(custom_lines)
             )
 
-    posts_section = ""
-    if community_posts_sample:
-        acceptable = [p for p in community_posts_sample if p.get("label") == "acceptable"]
-        unacceptable = [p for p in community_posts_sample if p.get("label") == "unacceptable"]
-        parts = []
-        if acceptable:
-            snippets = []
-            for p in acceptable[:4]:
-                c = p.get("content", {}).get("content", {})
-                title = c.get("title", "")
-                body = (c.get("body", "") or "")
-                snippets.append(f'    - "{title}" — {body}')
-            parts.append("  Acceptable posts:\n" + "\n".join(snippets))
-        if unacceptable:
-            snippets = []
-            for p in unacceptable[:4]:
-                c = p.get("content", {}).get("content", {})
-                title = c.get("title", "")
-                body = (c.get("body", "") or "")
-                snippets.append(f'    - "{title}" — {body}')
-            parts.append("  Removed/unacceptable posts:\n" + "\n".join(snippets))
-        if parts:
-            posts_section = "\n\nRepresentative community posts:\n" + "\n".join(parts)
-
     pinned_section = ""
     if pinned_item_ids:
         pinned_section = (
@@ -999,7 +1017,7 @@ def build_context_adjust_prompt(
 Rule: {rule_title}: {rule_text}
 
 Community context:
-{context_section}{custom_notes_section}{posts_section}{pinned_section}
+{context_section}{custom_notes_section}{pinned_section}
 
 Current checklist (each item has an id — operations must reference these ids exactly):
 {json.dumps(current_checklist, indent=2)}
@@ -1459,6 +1477,56 @@ Analogous peer-community rules (cite by {{peer_community, peer_rule_title, share
 Draft a rule that fits the target community. Break it into clauses; cite the grounding for each clause. Also propose which {{dimension, tag}} bundles from the target community should be marked as `relevant_context` for this rule.
 
 Return JSON via the tool with fields: draft_text, clauses[{{text, citations[]}}], suggested_relevant_context[{{dimension, tag}}]."""
+
+
+# ── Match relevant community-context tags to a rule ──────────────────────────
+
+MATCH_RELEVANT_CONTEXT_SYSTEM = """You are a community moderation calibration assistant. Given one rule (title + text) and the full set of community-context notes (tagged across four dimensions: purpose, participants, stakes, tone), pick the subset of (dimension, tag) bundles that actually inform how this rule should be moderated, and assign a weight to each.
+
+Weight semantics — pick a value in [-1.0, 1.0]:
+- +1.0  STRONGLY informs this rule (this tag is load-bearing for getting the calibration right)
+- +0.5  supports this rule (relevant; bend the rule's enforcement toward this)
+- -0.5  counter-signal (the tag suggests calibrating AWAY from a strict reading)
+- -1.0  STRONG counter-signal (explicitly de-emphasise; the community has decided this dimension overrides typical strictness)
+
+Rules of thumb:
+- Be SELECTIVE. Most rules are informed by 0–4 tags, not all of them. If a tag has no bearing on this specific rule, OMIT IT (do not assign weight 0).
+- Stakes notes are usually load-bearing for safety/health/legal rules; tone notes are usually load-bearing for civility/wording rules; purpose notes shape topical-fit rules; participants notes shape onboarding/inclusion rules.
+- Negative weights are appropriate when a community context says "we are MORE permissive than typical" for a dimension this rule otherwise governs.
+- Do NOT invent tags. Only return (dimension, tag) pairs explicitly listed in the input.
+
+Output via the provided tool only."""
+
+
+def build_match_relevant_context_prompt(
+    rule_title: str,
+    rule_text: str,
+    community_name: str,
+    community_context: dict,
+) -> str:
+    lines: list[str] = []
+    for dim in ("purpose", "participants", "stakes", "tone"):
+        d = (community_context or {}).get(dim) or {}
+        notes = d.get("notes") or []
+        if not notes:
+            continue
+        lines.append(f"  {dim}:")
+        for note in notes:
+            text_, tag = _extract_note(note)
+            if not tag:
+                continue
+            lines.append(f"    - tag={tag!r}: {text_}")
+    ctx_str = "\n".join(lines) if lines else "  (no tagged context notes — return an empty list)"
+
+    return f"""Community: {community_name!r}
+
+Rule title: {rule_title!r}
+Rule text: {rule_text!r}
+
+Community context (these are the only valid (dimension, tag) pairs you may cite):
+{ctx_str}
+
+Pick the subset of (dimension, tag) bundles that actually inform how THIS rule should be moderated, and assign a weight in [-1.0, 1.0] to each. Omit irrelevant tags entirely. Return via the tool."""
 
 
 # ── Link violations to checklist items ────────────────────────────────────────
