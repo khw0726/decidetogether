@@ -411,6 +411,36 @@ class SuggestionRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── Rule Intent Chat ───────────────────────────────────────────────────────────
+
+
+class RuleIntentMessageCreate(BaseModel):
+    text: str
+    decision_id: Optional[str] = None
+
+
+class RuleIntentMessageRead(BaseModel):
+    id: str
+    rule_id: str
+    body: str
+    author: str
+    decision_id: Optional[str] = None
+    suggestion_id: Optional[str] = None
+    no_suggestion_reason: Optional[str] = None
+    created_at: datetime
+    # Joined view of the linked suggestion's current status, if any.
+    suggestion_status: Optional[str] = None
+    suggestion_content: Optional[dict[str, Any]] = None
+
+    model_config = {"from_attributes": True}
+
+
+class RuleIntentMessageResponse(BaseModel):
+    """Response for a single POST: the message + (optional) the suggestion it produced."""
+    message: RuleIntentMessageRead
+    suggestion: Optional[SuggestionRead] = None
+
+
 # ── Batch Import ───────────────────────────────────────────────────────────────
 
 class RuleBatchImportItem(BaseModel):

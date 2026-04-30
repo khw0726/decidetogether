@@ -257,6 +257,26 @@ class Suggestion(Base):
     )
 
 
+class RuleIntentMessage(Base):
+    __tablename__ = "rule_intent_messages"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    rule_id: Mapped[str] = mapped_column(String, ForeignKey("rules.id"), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    author: Mapped[str] = mapped_column(String, nullable=False, default="moderator")
+    decision_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("decisions.id"), nullable=True
+    )
+    suggestion_id: Mapped[Optional[str]] = mapped_column(
+        String, ForeignKey("suggestions.id"), nullable=True
+    )
+    # Free-form one-line note from the translator LLM when no rule_text edit is implied
+    # (e.g., "noted, no change needed"). Lets the UI show *why* a message produced no
+    # suggestion without having to re-call the LLM.
+    no_suggestion_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class CommunitySamplePost(Base):
     __tablename__ = "community_sample_posts"
 

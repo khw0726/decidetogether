@@ -6,6 +6,7 @@ from .alignment import router as alignment_router
 from .decisions import router as decisions_router
 from .evaluation import router as evaluation_router
 from .health import router as health_router
+from .intent import router as intent_router
 
 __all__ = [
     "communities_router",
@@ -16,4 +17,5 @@ __all__ = [
     "decisions_router",
     "evaluation_router",
     "health_router",
+    "intent_router",
 ]

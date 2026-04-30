@@ -549,6 +549,34 @@ _CONTEXT_ADJUST_TOOL = {
     },
 }
 
+_INTENT_TRANSLATION_TOOL = {
+    "name": "submit_intent_translation",
+    "description": "Decide whether a moderator's casual intent message implies a rule_text edit, and if so, propose the minimal new rule text.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "decision": {
+                "type": "string",
+                "enum": ["propose", "no_change"],
+            },
+            "proposed_text": {
+                "type": "string",
+                "description": "Full proposed rule text. Required when decision=propose.",
+            },
+            "rationale": {
+                "type": "string",
+                "description": "One short sentence describing what the edit changes and why. Required when decision=propose.",
+            },
+            "no_change_reason": {
+                "type": "string",
+                "description": "One short line explaining why no edit is needed. Required when decision=no_change.",
+            },
+        },
+        "required": ["decision"],
+    },
+}
+
+
 _LINK_VIOLATIONS_TOOL = {
     "name": "submit_violation_links",
     "description": "Submit links between uncovered violations and checklist items",
@@ -1354,6 +1382,54 @@ class RuleCompiler:
             "draft_text": result.get("draft_text", ""),
             "clauses": result.get("clauses", []),
             "suggested_relevant_context": result.get("suggested_relevant_context", []),
+        }
+
+    async def translate_intent_to_suggestion(
+        self,
+        rule: Rule,
+        community: Community,
+        new_message: str,
+        recent_messages: Optional[list[dict]] = None,
+        anchored_post: Optional[dict] = None,
+    ) -> dict:
+        """Translate a casual moderator intent message into either a rule_text suggestion or a no-change reason.
+
+        Returns:
+            {"decision": "propose", "proposed_text": str, "rationale": str}
+            or {"decision": "no_change", "no_change_reason": str}
+        """
+        logger.info(f"Translating intent message for rule '{rule.title}'")
+        user_prompt = prompts.build_intent_translation_prompt(
+            rule_title=rule.title,
+            rule_text=rule.text,
+            community_name=community.name,
+            new_message=new_message,
+            recent_messages=recent_messages,
+            anchored_post=anchored_post,
+        )
+        result = await self._call_claude(
+            prompts.INTENT_TRANSLATION_SYSTEM,
+            user_prompt,
+            tool=_INTENT_TRANSLATION_TOOL,
+            model=self.settings.sonnet_model,
+        )
+        decision = result.get("decision", "no_change")
+        if decision == "propose":
+            proposed = (result.get("proposed_text") or "").strip()
+            rationale = (result.get("rationale") or "").strip()
+            if not proposed or proposed == rule.text.strip():
+                return {
+                    "decision": "no_change",
+                    "no_change_reason": rationale or "Proposal matched current rule text.",
+                }
+            return {
+                "decision": "propose",
+                "proposed_text": proposed,
+                "rationale": rationale,
+            }
+        return {
+            "decision": "no_change",
+            "no_change_reason": (result.get("no_change_reason") or "No edit implied.").strip(),
         }
 
     async def synthesize_rule_from_examples(
