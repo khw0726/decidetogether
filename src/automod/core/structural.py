@@ -5,6 +5,34 @@ from typing import Any
 from ..db.models import ChecklistItem
 
 
+# Single source of truth for the structural-check field schema. The compiler
+# prompts and the admin UI both read this so the LLM can't propose unknown
+# fields and moderators can only pick from what we actually evaluate.
+#
+# value_type drives the operator picker in the UI:
+#   - "number"  → numeric comparisons (<, <=, >, >=, ==, !=)
+#   - "string"  → string comparisons (==, !=, in)
+#   - "bool"    → equality only (==, !=)
+STRUCTURAL_FIELDS: list[dict[str, str]] = [
+    {"field": "account_age_days", "value_type": "number",
+     "description": "Days since the author created their account."},
+    {"field": "karma", "value_type": "number",
+     "description": "Total karma (comment + link) for the author."},
+    {"field": "subreddit_karma", "value_type": "number",
+     "description": "Author's karma within this specific community."},
+    {"field": "post_type", "value_type": "string",
+     "description": "Type of submission: 'self', 'link', or 'comment'."},
+    {"field": "flair", "value_type": "string",
+     "description": "Post flair text, if any."},
+    {"field": "channel", "value_type": "string",
+     "description": "Community / subreddit name (e.g. 'r/example')."},
+    {"field": "is_oc", "value_type": "bool",
+     "description": "Whether the post is marked as original content."},
+]
+
+STRUCTURAL_FIELD_NAMES: set[str] = {f["field"] for f in STRUCTURAL_FIELDS}
+
+
 def evaluate_structural(item: ChecklistItem, post: dict[str, Any]) -> tuple[bool, str]:
     """Evaluate structural checks against post metadata.
 

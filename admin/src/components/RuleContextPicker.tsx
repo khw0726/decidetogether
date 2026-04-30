@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2, Sparkles } from 'lucide-react'
+import Tooltip from './Tooltip'
 import type {
   CommunityContext,
   CommunityContextNote,
@@ -31,17 +32,15 @@ function keyOf(dim: string, tag: string): string {
 
 // Weight semantics shown on hover/under each slider.
 function weightLabel(w: number): { text: string; cls: string } {
-  if (w <= -0.75) return { text: 'strong counter', cls: 'text-rose-600' }
-  if (w <= -0.25) return { text: 'counter', cls: 'text-rose-500' }
-  if (w < 0.25) return { text: 'off', cls: 'text-gray-400' }
-  if (w < 0.75) return { text: 'supports', cls: 'text-indigo-500' }
-  return { text: 'strongly supports', cls: 'text-indigo-700 font-medium' }
+  if (w < 0.25) return { text: 'ignore', cls: 'text-gray-400' }
+  if (w < 0.75) return { text: 'informs', cls: 'text-indigo-500' }
+  return { text: 'strongly informs', cls: 'text-indigo-700 font-medium' }
 }
 
 function snapWeight(w: number): number {
-  // snap to nearest 0.5
+  // snap to nearest 0.5, clamp to [0, 1]
   const rounded = Math.round(w * 2) / 2
-  if (rounded < -1) return -1
+  if (rounded < 0) return 0
   if (rounded > 1) return 1
   return rounded
 }
@@ -81,7 +80,8 @@ function RuleContextPicker({
         rule.relevant_context.map(t => [keyOf(t.dimension, t.tag), t.weight ?? 1] as const),
       )
       for (const b of allBundles) {
-        m[keyOf(b.dim, b.tag)] = byKey.get(keyOf(b.dim, b.tag)) ?? 0
+        const raw = byKey.get(keyOf(b.dim, b.tag)) ?? 0
+        m[keyOf(b.dim, b.tag)] = snapWeight(raw)
       }
     }
     return m
@@ -224,17 +224,21 @@ function RuleContextPicker({
                 const lbl = weightLabel(w)
                 return (
                   <div key={k} className="flex items-center gap-2 text-xs">
-                    <div
-                      className={`w-32 truncate ${
-                        w === 0 ? 'text-gray-400' : 'text-gray-700 font-medium'
-                      }`}
-                      title={b.text}
+                    <Tooltip
+                      content={b.text || <span className="italic text-gray-300">No description</span>}
+                      className="w-32"
                     >
-                      {b.tag.replace(/_/g, ' ')}
-                    </div>
+                      <span
+                        className={`truncate border-b border-dotted border-gray-300 cursor-help ${
+                          w === 0 ? 'text-gray-400' : 'text-gray-700 font-medium'
+                        }`}
+                      >
+                        {b.tag.replace(/_/g, ' ')}
+                      </span>
+                    </Tooltip>
                     <input
                       type="range"
-                      min={-1}
+                      min={0}
                       max={1}
                       step={0.5}
                       value={w}
@@ -244,7 +248,6 @@ function RuleContextPicker({
                       title={`weight ${w}`}
                     />
                     <div className={`w-28 text-right ${lbl.cls}`}>
-                      {w >= 0 ? '+' : ''}
                       {w.toFixed(1)} · {lbl.text}
                     </div>
                   </div>

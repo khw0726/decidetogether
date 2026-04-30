@@ -32,6 +32,29 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["health"])
 
 
+def _dedup_by_post(decisions: list) -> list:
+    """Collapse decisions sharing a post_platform_id, keeping the most recently
+    resolved one. Health metrics treat a post as one moderation event regardless
+    of how many times it was re-ingested or re-evaluated; without this dedup,
+    crawler overlap or manual re-runs inflate FP/FN rates.
+    """
+    by_post: dict[str, Any] = {}
+    extras: list = []
+    for d in decisions:
+        pid = d.post_platform_id
+        if not pid:
+            extras.append(d)
+            continue
+        existing = by_post.get(pid)
+        if existing is None:
+            by_post[pid] = d
+            continue
+        # Prefer the more-recently resolved decision
+        if d.resolved_at and (not existing.resolved_at or d.resolved_at > existing.resolved_at):
+            by_post[pid] = d
+    return list(by_post.values()) + extras
+
+
 def get_compiler() -> RuleCompiler:
     client = get_anthropic_client()
     return RuleCompiler(client, settings)
@@ -68,7 +91,7 @@ async def get_rules_health_summary(
             Decision.moderator_verdict != "pending",
         )
     )
-    all_resolved = list(decisions_result.scalars().all())
+    all_resolved = _dedup_by_post(list(decisions_result.scalars().all()))
 
     # Rule-level FN: examples linked to a rule by the moderator where the agent
     # did not trigger that rule. Mirrors get_rule_health's rule_fn_count.
@@ -113,16 +136,25 @@ async def get_rules_health_summary(
                 if iid in rule_item_ids
             )
 
+            # Decision-level error: a decision counts as one error if ANY of its
+            # item-level evaluations disagreed with the moderator. Per-item counts
+            # would let a single decision contribute >1 errors and push the rate
+            # above 100%.
+            decision_errored = False
             for item_id, item_data in item_reasoning.items():
                 if item_id not in rule_item_ids:
                     continue
                 triggered = item_data.get("triggered", False)
                 # FP: item triggered but mod approved
                 if triggered and mod_verdict == "approve":
-                    error_count += 1
+                    decision_errored = True
+                    break
                 # FN: item missed but mod acted (removed/warned), and rule was relevant
-                elif not triggered and mod_verdict in ("remove", "warn") and any_item_triggered:
-                    error_count += 1
+                if not triggered and mod_verdict in ("remove", "warn") and any_item_triggered:
+                    decision_errored = True
+                    break
+            if decision_errored:
+                error_count += 1
 
         # Rule-level FN: mod explicitly linked this rule to a violation the agent missed.
         # Match get_rule_health: denominator grows with these cases too.
@@ -165,7 +197,7 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
             Decision.moderator_verdict != "pending",
         )
     )
-    all_resolved = list(decisions_result.scalars().all())
+    all_resolved = _dedup_by_post(list(decisions_result.scalars().all()))
 
     # Filter to decisions where this rule was evaluated
     rule_decisions = [
@@ -207,11 +239,11 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
         )
 
         # Per-rule override: this rule's verdict disagrees with the moderator.
-        # Treat the rule as "wanting to act" if either the tree resolved to an action
-        # OR any item flagged — the latter aligns the rule-level FP count with the
-        # per-item FP counts shown in the health panel (otherwise 2 items can be
-        # marked unhealthy while the rule-level box reads 0).
-        rule_would_act = rule_verdict in ("remove", "warn", "review") or any_item_triggered
+        # Treat the rule as "wanting to act" iff any item flagged. This is the same
+        # predicate the sidebar summary uses, so rule-wide FP and sidebar error_count
+        # stay aligned. (Older versions also accepted rule_verdict == "review", but
+        # that's only ever set by the community-norms path, not by an actual rule.)
+        rule_would_act = any_item_triggered
         mod_would_act = mod_verdict in ("remove", "warn")
         if rule_would_act != mod_would_act:
             override_count += 1
@@ -478,6 +510,17 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
     items_by_id = {item.id: item for item in checklist}
 
     health_data = await get_rule_health(rule_id, db)
+
+    # Discard prior pending suggestions for this rule before generating new ones —
+    # users find stale fixes confusing when they overlap with a fresh batch. Accepted
+    # / dismissed records are kept for audit.
+    from sqlalchemy import delete as sa_delete
+    await db.execute(
+        sa_delete(Suggestion)
+        .where(Suggestion.rule_id == rule_id)
+        .where(Suggestion.status == "pending")
+    )
+    await db.flush()
 
     # Load community context + sibling rules so the diagnoser can fire L2 triggers.
     community_result = await db.execute(select(Community).where(Community.id == rule.community_id))
@@ -831,8 +874,7 @@ async def preview_fixes(
                 rule=rule,
                 checklist=hypothetical,
                 post=decision.post_content or {},
-                community_name=community_name,
-                examples=[],
+                community_name=community_name
             )
             new_verdict = new_result["verdict"]
             new_confidence = new_result["confidence"]
@@ -942,8 +984,7 @@ async def reevaluate_decisions(
                 rule=rule,
                 checklist=checklist,
                 post=decision.post_content or {},
-                community_name=community_name,
-                examples=[],
+                community_name=community_name
             )
 
             reasoning = dict(decision.agent_reasoning or {})

@@ -41,17 +41,67 @@ interface PreviewNodeProps {
   forceDelete?: boolean
 }
 
+function ConfidenceBar({ from, to }: { from: number; to: number }) {
+  // Render a single bar with the prior threshold marker (gray) and the new
+  // threshold marker (indigo). Useful when an `update` op moves the confidence
+  // gate up or down — the diff direction is what matters.
+  const clamp = (v: number) => Math.max(0, Math.min(1, v))
+  const a = clamp(from), b = clamp(to)
+  const lo = Math.min(a, b), hi = Math.max(a, b)
+  const dir = b >= a ? 'up' : 'down'
+  return (
+    <div className="flex items-center gap-1.5 text-[10px]">
+      <span className="text-gray-400">conf</span>
+      <div className="relative w-24 h-1.5 bg-gray-200 rounded">
+        <div
+          className={`absolute top-0 h-1.5 ${dir === 'up' ? 'bg-emerald-300' : 'bg-rose-300'}`}
+          style={{ left: `${lo * 100}%`, width: `${(hi - lo) * 100}%` }}
+        />
+        <div
+          className="absolute -top-0.5 w-0.5 h-2.5 bg-gray-500"
+          style={{ left: `${a * 100}%` }}
+          title={`old ${a.toFixed(2)}`}
+        />
+        <div
+          className="absolute -top-0.5 w-0.5 h-2.5 bg-indigo-700"
+          style={{ left: `${b * 100}%` }}
+          title={`new ${b.toFixed(2)}`}
+        />
+      </div>
+      <span className="text-gray-500 font-mono">
+        {a.toFixed(2)} → <span className="text-indigo-700 font-semibold">{b.toFixed(2)}</span>
+      </span>
+    </div>
+  )
+}
+
+function pickThreshold(logic: unknown): number | null {
+  if (!logic || typeof logic !== 'object') return null
+  const l = logic as Record<string, unknown>
+  for (const k of ['threshold', 'confidence_threshold', 'min_confidence']) {
+    const v = l[k]
+    if (typeof v === 'number') return v
+  }
+  return null
+}
+
 function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
   const indent = depth * 16
   const effectiveOp = forceDelete ? 'delete' : op.op
 
   // For updates, show the compiler's new description; otherwise keep existing
-  const description =
-    effectiveOp === 'update' && op.description ? op.description : item.description
-  const displayType =
-    effectiveOp === 'update' && op.item_type ? op.item_type : item.item_type
-  const displayAction =
-    effectiveOp === 'update' && op.action ? op.action : item.action
+  const newDescription =
+    effectiveOp === 'update' && op.description ? op.description : null
+  const displayDescription = newDescription ?? item.description
+  const newType =
+    effectiveOp === 'update' && op.item_type ? op.item_type : null
+  const displayType = newType ?? item.item_type
+  const newAction =
+    effectiveOp === 'update' && op.action ? op.action : null
+  const displayAction = newAction ?? item.action
+
+  const oldThreshold = pickThreshold(item.logic)
+  const newThreshold = effectiveOp === 'update' ? pickThreshold(op.logic) : null
 
   const opMeta = OP_LABEL[effectiveOp]
   const nodeClass = NODE_CLASSES[effectiveOp] ?? NODE_CLASSES.keep
@@ -61,6 +111,69 @@ function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
       : effectiveOp === 'keep'
       ? 'text-gray-500'
       : 'text-gray-800'
+
+  // Build a list of changed-field rows for `update` ops so the moderator can see
+  // what specifically changed without diffing the JSON in their head.
+  const updateRows: { label: string; node: React.ReactNode }[] = []
+  if (effectiveOp === 'update') {
+    if (newDescription && newDescription !== item.description) {
+      updateRows.push({
+        label: 'description',
+        node: (
+          <div className="text-[11px] leading-snug">
+            <span className="line-through text-red-500/80">{item.description}</span>
+            {' → '}
+            <span className="text-emerald-700 font-medium">{newDescription}</span>
+          </div>
+        ),
+      })
+    }
+    if (newType && newType !== item.item_type) {
+      updateRows.push({
+        label: 'type',
+        node: (
+          <div className="flex items-center gap-1 text-[11px]">
+            <TypeBadge itemType={item.item_type} />
+            <span className="text-gray-400">→</span>
+            <TypeBadge itemType={newType} />
+          </div>
+        ),
+      })
+    }
+    if (newAction && newAction !== item.action) {
+      updateRows.push({
+        label: 'verdict',
+        node: (
+          <div className="flex items-center gap-1 text-[11px]">
+            <ActionBadge action={item.action} />
+            <span className="text-gray-400">→</span>
+            <ActionBadge action={newAction} />
+          </div>
+        ),
+      })
+    }
+    if (newThreshold != null && oldThreshold != null && Math.abs(newThreshold - oldThreshold) > 1e-6) {
+      updateRows.push({
+        label: 'threshold',
+        node: <ConfidenceBar from={oldThreshold} to={newThreshold} />,
+      })
+    } else if (newThreshold != null && oldThreshold == null) {
+      updateRows.push({
+        label: 'threshold',
+        node: <ConfidenceBar from={0} to={newThreshold} />,
+      })
+    }
+    if (op.children) {
+      updateRows.push({
+        label: 'children',
+        node: (
+          <span className="text-[11px] text-amber-700">
+            {(op.children as unknown[]).length} child item(s) replaced
+          </span>
+        ),
+      })
+    }
+  }
 
   return (
     <div style={{ marginLeft: indent }}>
@@ -77,8 +190,20 @@ function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
                   {opMeta.text}
                 </span>
               )}
-              <span className={`text-sm font-medium ${descClass}`}>{description}</span>
+              <span className={`text-sm font-medium ${descClass}`}>{displayDescription}</span>
             </div>
+            {updateRows.length > 0 && (
+              <div className="mt-2 space-y-1 border-t border-amber-200/70 pt-1.5">
+                {updateRows.map(({ label, node }) => (
+                  <div key={label} className="flex items-start gap-2">
+                    <span className="text-[10px] uppercase tracking-wider text-amber-700/80 w-20 flex-shrink-0 mt-0.5">
+                      {label}
+                    </span>
+                    <div className="flex-1 min-w-0">{node}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex-shrink-0 w-16 flex flex-col items-end text-xs text-gray-400">

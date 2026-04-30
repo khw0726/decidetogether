@@ -43,6 +43,7 @@ import RuleHealthPanel from '../components/RuleHealthPanel'
 import { RuleTextSuggestion } from '../components/RuleTextSuggestion'
 import TestModal from '../components/TestModal'
 import { showErrorToast } from '../components/Toast'
+import Tooltip from '../components/Tooltip'
 
 function extractErrorMessage(error: unknown): string {
   if (error && typeof error === 'object') {
@@ -87,8 +88,8 @@ function sameTagSet(
   if (!a || !b) return false
   if (a.length !== b.length) return false
   const mk = (t: RuleContextTag) => `${t.dimension}::${t.tag}`
-  const sa = new Set(a.map(mk))
-  return b.every(t => sa.has(mk(t)))
+  const ma = new Map(a.map(t => [mk(t), t.weight ?? 1] as const))
+  return b.every(t => ma.has(mk(t)) && ma.get(mk(t)) === (t.weight ?? 1))
 }
 
 function sameNotes(
@@ -116,7 +117,6 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   const [editingText, setEditingText] = useState('')
   const [editingTitle, setEditingTitle] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [ruleSort, setRuleSort] = useState<'priority' | 'context_load'>('priority')
 
   const [hoveredAnchor, setHoveredAnchor] = useState<string | null>(null)
   const [selectedChecklistItemId, setSelectedChecklistItemId] = useState<string | null>(null)
@@ -382,6 +382,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     if (!hasUserDraft && !hasSuggestionDraft) {
       // No drafts → clear any stale preview.
       setPreviewResult(null)
+      setIsPreviewLoading(false)
       return
     }
 
@@ -435,7 +436,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       } catch (e) {
         if (!controller.signal.aborted) showErrorToast(extractErrorMessage(e))
       } finally {
-        if (!controller.signal.aborted) setIsPreviewLoading(false)
+        setIsPreviewLoading(false)
       }
     }, 600)
     return () => {
@@ -502,6 +503,14 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     }
   }, [previewResult, activeLogicOps])
 
+  // Auto-expand the decisions panel when a logic preview kicks off so the
+  // moderator can watch the impact on past decisions without manually opening it.
+  useEffect(() => {
+    if (isPreviewLoading || previewResult || (activeLogicOps && activeLogicOps.length > 0)) {
+      setDecisionsExpanded(true)
+    }
+  }, [isPreviewLoading, previewResult, activeLogicOps])
+
   const isAnyPreviewActive = !!previewResult || (!!activeLogicOps && activeLogicOps.length > 0)
 
   if (!communityId) {
@@ -518,34 +527,10 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       <div className="w-64 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <h2 className="font-semibold text-sm">Rules</h2>
-          <div className="flex items-center gap-1">
-            <button
-              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                ruleSort === 'priority'
-                  ? 'bg-gray-100 border-gray-300 text-gray-700'
-                  : 'bg-white border-gray-200 text-gray-400 hover:text-gray-600'
-              }`}
-              onClick={() => setRuleSort('priority')}
-              title="Sort by moderator-set priority"
-            >
-              Pri
-            </button>
-            <button
-              className={`text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
-                ruleSort === 'context_load'
-                  ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                  : 'bg-white border-gray-200 text-gray-400 hover:text-indigo-600'
-              }`}
-              onClick={() => setRuleSort('context_load')}
-              title="Sort by how tightly each rule is coupled to community context"
-            >
-              Ctx
-            </button>
-            <button className="btn-primary text-xs py-1 ml-1" onClick={() => setShowNewRule(true)}>
-              <Plus size={12} />
-              New
-            </button>
-          </div>
+          <button className="btn-primary text-xs py-1" onClick={() => setShowNewRule(true)}>
+            <Plus size={12} />
+            New
+          </button>
         </div>
 
         <div className="flex-1 overflow-auto py-2">
@@ -554,14 +539,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
           )}
           {rules
             .filter(r => r.is_active)
-            .sort((a, b) => {
-              if (ruleSort === 'context_load') {
-                const al = a.context_load ?? 0
-                const bl = b.context_load ?? 0
-                if (bl !== al) return bl - al
-              }
-              return a.priority - b.priority
-            })
+            .sort((a, b) => a.priority - b.priority)
             .map(rule => {
               const h = healthByRule[rule.id]
               const errorPct = h && h.decision_count > 0
@@ -1166,19 +1144,22 @@ function NewRuleModal({
                         {bundles.map(b => {
                           const selected = selectedTags.has(keyOf(b.dim, b.tag))
                           return (
-                            <button
+                            <Tooltip
                               key={b.tag}
-                              type="button"
-                              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                                selected
-                                  ? 'bg-indigo-100 text-indigo-700 border-indigo-300 font-medium'
-                                  : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
-                              }`}
-                              onClick={() => toggleTag(b.dim, b.tag)}
-                              title={b.text}
+                              content={b.text || <span className="italic text-gray-300">No description</span>}
                             >
-                              {b.tag.replace(/_/g, ' ')}
-                            </button>
+                              <button
+                                type="button"
+                                className={`text-xs px-2 py-0.5 rounded-full border transition-colors border-dashed ${
+                                  selected
+                                    ? 'bg-indigo-100 text-indigo-700 border-indigo-400 font-medium'
+                                    : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-300 hover:text-indigo-600'
+                                }`}
+                                onClick={() => toggleTag(b.dim, b.tag)}
+                              >
+                                {b.tag.replace(/_/g, ' ')}
+                              </button>
+                            </Tooltip>
                           )
                         })}
                       </div>

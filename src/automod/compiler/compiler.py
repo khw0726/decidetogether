@@ -7,7 +7,7 @@ from typing import Any, Optional
 import anthropic
 
 from ..config import Settings
-from ..db.models import ChecklistItem, Community, Example, Rule
+from ..db.models import ChecklistItem, Community, Rule
 from . import prompts
 
 logger = logging.getLogger(__name__)
@@ -50,10 +50,11 @@ def _filter_context_by_relevant(
             wf = float(w) if w is not None else 1.0
         except (TypeError, ValueError):
             wf = 1.0
-        # Drop zero-weight entries so they don't reach the prompt at all.
-        if wf == 0.0:
+        # Non-positive weights mean "this dimension is not relevant to this rule" —
+        # drop them so they don't reach the prompt at all.
+        if wf <= 0.0:
             continue
-        weights[(dim, tag)] = max(-1.0, min(1.0, wf))
+        weights[(dim, tag)] = min(1.0, wf)
 
     filtered: dict = {}
     for dim in ["purpose", "participants", "stakes", "tone"]:
@@ -138,27 +139,8 @@ _COMPILE_TOOL = {
                     ],
                 },
             },
-            "examples": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {
-                            "type": "string",
-                            "enum": ["compliant", "violating", "borderline"],
-                        },
-                        "content": {"type": "object"},
-                        "relevance_note": {"type": "string"},
-                        "related_checklist_item_description": {
-                            "type": ["string"],
-                            "description": "Exact description of the checklist item this example primarily tests",
-                        },
-                    },
-                    "required": ["label", "content", "relevance_note"],
-                },
-            },
         },
-        "required": ["checklist_tree", "examples"],
+        "required": ["checklist_tree"],
     },
 }
 
@@ -349,39 +331,6 @@ _MATCH_RELEVANT_CONTEXT_TOOL = {
     },
 }
 
-_FILL_EXAMPLES_TOOL = {
-    "name": "submit_fill_examples",
-    "description": "Submit one violating example per checklist item that is missing one",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "examples": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {
-                            "type": "string",
-                            "enum": ["violating", "borderline"],
-                        },
-                        "content": {"type": "object"},
-                        "relevance_note": {"type": "string"},
-                        "related_checklist_item_description": {
-                            "type": "string",
-                            "description": "Exact description of the checklist item this example primarily tests",
-                        },
-                    },
-                    "required": [
-                        "label", "content", "relevance_note",
-                        "related_checklist_item_description",
-                    ],
-                },
-            },
-        },
-        "required": ["examples"],
-    },
-}
-
 _DIAGNOSE_TOOL = {
     "name": "submit_health_diagnoses",
     "description": "Submit per-item health diagnoses with proposed fixes at the appropriate level (logic / rule_text / context).",
@@ -545,21 +494,8 @@ _NO_CONTEXT_COMPILE_TOOL = {
                     "required": ["description", "item_type", "logic", "action", "children"],
                 },
             },
-            "examples": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {"type": "string", "enum": ["compliant", "violating", "borderline"]},
-                        "content": {"type": "object"},
-                        "relevance_note": {"type": "string"},
-                        "related_checklist_item_description": {"type": ["string", "null"]},
-                    },
-                    "required": ["label", "content", "relevance_note"],
-                },
-            },
         },
-        "required": ["checklist_tree", "examples"],
+        "required": ["checklist_tree"],
     },
 }
 
@@ -703,17 +639,11 @@ class RuleCompiler:
             "logic": item.logic,
             "action": item.action,
             "order": item.order,
+            "user_edited_logic": bool(item.user_edited_logic),
         }
         if item.parent_id:
             d["parent_id"] = item.parent_id
         return d
-
-    def _example_to_dict(self, example: Example) -> dict:
-        return {
-            "id": example.id,
-            "label": example.label,
-            "content": example.content,
-        }
 
     def _parse_checklist_items(
         self, items_data: list[dict], rule_id: str, parent_id: Optional[str] = None, order_offset: int = 0
@@ -749,13 +679,9 @@ class RuleCompiler:
         community: Community,
         other_rules: list[Rule],
         existing_items: Optional[list[ChecklistItem]] = None,
-        existing_examples: Optional[list[Example]] = None,
         community_context: Optional[dict] = None,
-    ) -> tuple[list[ChecklistItem], list[dict]]:
-        """Compile actionable rule into checklist tree + examples.
-
-        Returns (checklist_items, example_dicts) to be persisted by caller.
-        """
+    ) -> list[ChecklistItem]:
+        """Compile actionable rule into a checklist tree."""
         logger.info(f"Compiling rule '{rule.title}' for community '{community.name}'")
 
         other_rules_summary = self._make_other_rules_summary(
@@ -766,10 +692,6 @@ class RuleCompiler:
         if existing_items:
             existing_checklist_dicts = [self._checklist_item_to_dict(i) for i in existing_items]
 
-        existing_example_dicts = None
-        if existing_examples:
-            existing_example_dicts = [self._example_to_dict(e) for e in existing_examples]
-
         user_prompt = prompts.build_compile_prompt(
             rule_title=rule.title,
             rule_text=rule.text,
@@ -777,21 +699,16 @@ class RuleCompiler:
             platform=community.platform,
             other_rules_summary=other_rules_summary,
             existing_checklist=existing_checklist_dicts,
-            existing_examples=existing_example_dicts,
             community_context=community_context,
         )
 
         compiled = await self._call_claude(prompts.COMPILE_SYSTEM, user_prompt, tool=_COMPILE_TOOL)
 
-        # Parse checklist tree
         checklist_items = self._parse_flat_items(
             compiled.get("checklist_tree", []), rule.id
         )
 
-        # Return examples as raw dicts (caller persists them)
-        examples = compiled.get("examples", [])
-
-        return checklist_items, examples
+        return checklist_items
 
     def _items_to_nested_dicts(self, items: list[ChecklistItem]) -> list[dict]:
         """Convert flat ChecklistItem list to nested dict tree for serialization."""
@@ -839,12 +756,8 @@ class RuleCompiler:
         community: Community,
         other_rules: list[Rule],
         existing_items: Optional[list[ChecklistItem]] = None,
-        existing_examples: Optional[list[Example]] = None,
-    ) -> tuple[list[ChecklistItem], list[dict]]:
-        """Pass 1: Compile rule without community context (context-free baseline).
-
-        Returns (checklist_items, example_dicts).
-        """
+    ) -> list[ChecklistItem]:
+        """Pass 1: Compile rule without community context (context-free baseline)."""
         logger.info(f"Pass 1: Compiling rule '{rule.title}' without context")
 
         other_rules_summary = self._make_other_rules_summary(
@@ -855,10 +768,6 @@ class RuleCompiler:
         if existing_items:
             existing_checklist_dicts = [self._checklist_item_to_dict(i) for i in existing_items]
 
-        existing_example_dicts = None
-        if existing_examples:
-            existing_example_dicts = [self._example_to_dict(e) for e in existing_examples]
-
         user_prompt = prompts.build_no_context_compile_prompt(
             rule_title=rule.title,
             rule_text=rule.text,
@@ -866,19 +775,13 @@ class RuleCompiler:
             platform=community.platform,
             other_rules_summary=other_rules_summary,
             existing_checklist=existing_checklist_dicts,
-            existing_examples=existing_example_dicts,
         )
 
         compiled = await self._call_claude(
             prompts.NO_CONTEXT_COMPILE_SYSTEM, user_prompt, tool=_NO_CONTEXT_COMPILE_TOOL
         )
 
-        checklist_items = self._parse_flat_items(
-            compiled.get("checklist_tree", []), rule.id
-        )
-        examples = compiled.get("examples", [])
-
-        return checklist_items, examples
+        return self._parse_flat_items(compiled.get("checklist_tree", []), rule.id)
 
     async def adjust_for_context(
         self,
@@ -889,6 +792,7 @@ class RuleCompiler:
         pinned_item_ids: Optional[list[str]] = None,
         relevant_context: Optional[list[dict]] = None,
         custom_context_notes: Optional[list[dict]] = None,
+        other_rules: Optional[list[Rule]] = None,
     ) -> tuple[list[ChecklistItem], str, list[dict]]:
         """Pass 2: Calibrate an existing checklist for community context using diff operations.
 
@@ -915,6 +819,10 @@ class RuleCompiler:
 
         current_dicts = self._items_to_diff_dicts(current_items)
 
+        other_rules_summary = self._make_other_rules_summary(
+            [r for r in (other_rules or []) if r.id != rule.id]
+        )
+
         user_prompt = prompts.build_context_adjust_prompt(
             rule_title=rule.title,
             rule_text=rule.text,
@@ -924,6 +832,7 @@ class RuleCompiler:
             community_context=filtered_context or {},
             pinned_item_ids=pinned_item_ids,
             custom_context_notes=custom_context_notes,
+            other_rules_summary=other_rules_summary,
         )
 
         result = await self._call_claude(
@@ -1102,18 +1011,17 @@ class RuleCompiler:
         community: Community,
         other_rules: list[Rule],
         existing_items: Optional[list[ChecklistItem]] = None,
-        existing_examples: Optional[list[Example]] = None,
         community_context: Optional[dict] = None,
         relevant_context: Optional[list[dict]] = None,
         custom_context_notes: Optional[list[dict]] = None,
-    ) -> tuple[list[ChecklistItem], list[dict], list[dict], str]:
+    ) -> tuple[list[ChecklistItem], list[dict], str]:
         """Two-pass compilation: base compile then context adjustment via diff ops.
 
-        Returns (adjusted_items, example_dicts, base_checklist_dicts, adjustment_summary).
+        Returns (adjusted_items, base_checklist_dicts, adjustment_summary).
         """
         # Pass 1: context-free
-        base_items, examples = await self.compile_rule_base(
-            rule, community, other_rules, existing_items, existing_examples,
+        base_items = await self.compile_rule_base(
+            rule, community, other_rules, existing_items,
         )
 
         base_checklist_dicts = self._items_to_nested_dicts(base_items)
@@ -1127,12 +1035,13 @@ class RuleCompiler:
                 current_items=base_items,
                 community_context=filtered_context or {},
                 custom_context_notes=custom_context_notes,
+                other_rules=other_rules,
             )
         else:
             adjusted_items = base_items
             summary = ""
 
-        return adjusted_items, examples, base_checklist_dicts, summary
+        return adjusted_items, base_checklist_dicts, summary
 
     async def generate_community_context(
         self,
@@ -1259,52 +1168,34 @@ class RuleCompiler:
         rule: Rule,
         community: Community,
         existing_items: list[ChecklistItem],
+        force_item_type: Optional[str] = None,
     ) -> dict:
-        """Infer item_type and logic for a manually-added checklist item description."""
-        logger.info(f"Inferring item type/logic for: {description!r}")
+        """Infer item_type and logic for a manually-added checklist item description.
+
+        When force_item_type is set, the LLM is told to generate logic for that
+        specific type (so the moderator's type choice in the UI is honored).
+        Otherwise both type and logic are inferred.
+        """
+        logger.info(
+            f"Inferring item logic for: {description!r}"
+            + (f" (forced type: {force_item_type})" if force_item_type else "")
+        )
         existing_dicts = [self._checklist_item_to_dict(i) for i in existing_items]
         user_prompt = prompts.build_infer_item_prompt(
             description=description,
             rule_text=rule.text,
             community_name=community.name,
             existing_items=existing_dicts,
+            force_item_type=force_item_type,
         )
         result = await self._call_claude(
             prompts.INFER_ITEM_SYSTEM, user_prompt, tool=_INFER_ITEM_TOOL
         )
+        item_type = force_item_type or result.get("item_type", "subjective")
         return {
-            "item_type": result.get("item_type", "subjective"),
+            "item_type": item_type,
             "logic": result.get("logic", {}),
         }
-
-    async def generate_examples_for_items(
-        self,
-        rule: Rule,
-        community: Community,
-        items: list[ChecklistItem],
-        existing_examples: Optional[list] = None,
-    ) -> list[dict]:
-        """Generate one violating example and one borderline example per checklist item in the given list."""
-        logger.info(
-            f"Generating {len(items)} missing violating example(s) for rule '{rule.title}'"
-        )
-        item_dicts = [self._checklist_item_to_dict(i) for i in items]
-        existing_dicts = (
-            [self._example_to_dict(e) for e in existing_examples]
-            if existing_examples
-            else None
-        )
-        user_prompt = prompts.build_fill_examples_prompt(
-            rule_text=rule.text,
-            community_name=community.name,
-            platform=community.platform,
-            items_needing_examples=item_dicts,
-            existing_examples=existing_dicts,
-        )
-        result = await self._call_claude(
-            prompts.FILL_EXAMPLES_SYSTEM, user_prompt, tool=_FILL_EXAMPLES_TOOL
-        )
-        return result.get("examples", [])
 
     async def diagnose_rule_health(
         self,

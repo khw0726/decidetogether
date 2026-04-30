@@ -428,6 +428,16 @@ async def _migrate_rule_compile_status(conn) -> None:
         ))
 
 
+async def _migrate_checklist_user_edited_logic(conn) -> None:
+    """Add user_edited_logic column to checklist_items if missing."""
+    cols = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if "user_edited_logic" not in col_names and col_names:
+        await conn.execute(text(
+            "ALTER TABLE checklist_items ADD COLUMN user_edited_logic BOOLEAN NOT NULL DEFAULT 0"
+        ))
+
+
 async def init_db() -> None:
     """Create all database tables."""
     async with engine.begin() as conn:
@@ -452,6 +462,7 @@ async def init_db() -> None:
         await _migrate_flag_to_warn(conn)
         await _migrate_sample_post_modqueue_fields(conn)
         await _migrate_rule_compile_status(conn)
+        await _migrate_checklist_user_edited_logic(conn)
         await conn.run_sync(Base.metadata.create_all)
 
 

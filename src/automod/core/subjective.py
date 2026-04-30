@@ -6,7 +6,7 @@ from typing import Any
 import anthropic
 
 from ..config import Settings
-from ..db.models import ChecklistItem, Example
+from ..db.models import ChecklistItem
 from ..compiler.prompts import SUBJECTIVE_EVAL_SYSTEM, build_subjective_eval_prompt
 from . import eval_cache
 
@@ -76,35 +76,11 @@ class SubjectiveEvaluator:
             "threshold": item.logic.get("threshold", 0.7),
         }
 
-    def _prepare_example_dicts(self, examples: list[Example]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Split examples into primary (clear) and borderline (calibration) dicts."""
-        compliant = [
-            {"label": ex.label, "content": ex.content}
-            for ex in examples
-            if ex.label == "compliant"
-        ]
-        violating = [
-            {"label": ex.label, "content": ex.content}
-            for ex in examples
-            if ex.label == "violating"
-        ]
-
-        # Keep equal counts of compliant/violating examples (up to 4 total => 2 each)
-        n = min(len(compliant), len(violating), 2)
-        primary = compliant[:n] + violating[:n]
-        borderline = [
-            {"label": ex.label, "content": ex.content}
-            for ex in examples
-            if ex.label == "borderline"
-        ][:8]
-        return primary, borderline
-
     async def evaluate_batch(
         self,
         items: list[ChecklistItem],
         post: dict[str, Any],
         community_name: str,
-        examples: list[Example],
     ) -> list[dict[str, Any]]:
         """Batch evaluate multiple subjective items in a single LLM call.
 
@@ -132,14 +108,11 @@ class SubjectiveEvaluator:
 
         items = uncached_items  # only call the LLM on cache misses below
         items_dicts = [self._prepare_item_dict(item) for item in items]
-        primary_dicts, borderline_dicts = self._prepare_example_dicts(examples)
 
         user_prompt = build_subjective_eval_prompt(
             post_content=post,
             items_with_rubrics=items_dicts,
             community_name=community_name,
-            examples=primary_dicts,
-            borderline_examples=borderline_dicts,
         )
         content = self._build_content(post, user_prompt)
 
@@ -180,8 +153,6 @@ class SubjectiveEvaluator:
                 post_content=post,
                 items_with_rubrics=escalated_items_dicts,
                 community_name=community_name,
-                examples=primary_dicts,
-                borderline_examples=borderline_dicts,
             )
             escalation_content = self._build_content(post, escalation_prompt)
             try:

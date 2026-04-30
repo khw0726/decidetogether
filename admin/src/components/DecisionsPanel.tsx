@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
-import { Inbox, Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ExternalLink, Inbox, Loader2 } from 'lucide-react'
 import {
   Decision,
   DecisionPreviewResult,
   listDecisions,
 } from '../api/client'
 import PostCard from './PostCard'
+import RuleReasoningBlock from './RuleReasoningBlock'
 
 interface DecisionsPanelProps {
   communityId: string
@@ -61,6 +63,7 @@ export default function DecisionsPanel({
   onToggleUseTestSet,
   onToggleTestSetMember,
 }: DecisionsPanelProps) {
+  const navigate = useNavigate()
   const testSetSet = new Set(testSetIds)
   const { data: decisions = [], isLoading } = useQuery({
     queryKey: ['decisions-for-rule', communityId, ruleId, checklistItemId],
@@ -82,19 +85,25 @@ export default function DecisionsPanel({
     )
   }
 
-  if (previewResults) {
+  if (previewLoading || previewResults) {
     return (
-      <div className="flex-1 overflow-auto p-3">
-        <PreviewList items={previewResults} />
-      </div>
-    )
-  }
-
-  if (previewLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center gap-2 text-xs text-gray-400">
-        <Loader2 size={14} className="animate-spin" />
-        Previewing effect on past decisions…
+      <div className="relative flex-1 overflow-auto p-3">
+        {previewResults ? (
+          <PreviewList items={previewResults} />
+        ) : (
+          <div className="flex items-center justify-center gap-2 text-xs text-gray-400 py-6">
+            <Loader2 size={14} className="animate-spin" />
+            Previewing effect on past decisions…
+          </div>
+        )}
+        {previewLoading && previewResults && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-indigo-200 shadow-sm text-xs text-indigo-700">
+              <Loader2 size={12} className="animate-spin" />
+              Re-evaluating decisions…
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -140,8 +149,17 @@ export default function DecisionsPanel({
         <DecisionRow
           key={d.id}
           decision={d}
+          ruleId={ruleId}
           isPinned={testSetSet.has(d.id)}
           onTogglePinned={onToggleTestSetMember}
+          onOpenInQueue={() => {
+            const params = new URLSearchParams({
+              status: 'resolved',
+              decision_id: d.id,
+            })
+            if (ruleId) params.set('rule_id', ruleId)
+            navigate(`/decisions?${params.toString()}`)
+          }}
         />
       ))}
     </div>
@@ -150,13 +168,20 @@ export default function DecisionsPanel({
 
 function DecisionRow({
   decision,
+  ruleId,
   isPinned,
   onTogglePinned,
+  onOpenInQueue,
 }: {
   decision: Decision
+  ruleId: string
   isPinned?: boolean
   onTogglePinned?: (decisionId: string) => void
+  onOpenInQueue?: () => void
 }) {
+  const ruleReasoning = (decision.agent_reasoning || {})[ruleId] as
+    | { verdict?: string; confidence?: number; rule_title?: string; item_reasoning?: Record<string, unknown> }
+    | undefined
   return (
     <div className={`border rounded-lg p-3 bg-white ${isPinned ? 'border-indigo-300 ring-1 ring-indigo-100' : 'border-gray-200'}`}>
       <div className="flex items-center gap-2 mb-2">
@@ -174,8 +199,30 @@ function DecisionRow({
         <span className="text-[10px] text-gray-400 ml-auto">
           {Math.round(decision.agent_confidence * 100)}% confidence
         </span>
+        {onOpenInQueue && (
+          <button
+            type="button"
+            onClick={onOpenInQueue}
+            className="text-[10px] text-indigo-500 hover:text-indigo-700 inline-flex items-center gap-0.5"
+            title="Open this decision in the moderation queue (resolved view)"
+          >
+            <ExternalLink size={11} /> open in queue
+          </button>
+        )}
       </div>
       <PostCard post={decision.post_content} compact />
+      {ruleReasoning && (
+        <div className="mt-2">
+          <RuleReasoningBlock
+            ruleId={ruleId}
+            ruleTitle={ruleReasoning.rule_title}
+            verdict={ruleReasoning.verdict || 'approve'}
+            confidence={ruleReasoning.confidence}
+            itemReasoning={ruleReasoning.item_reasoning}
+            defaultOpen={false}
+          />
+        </div>
+      )}
       {decision.moderator_notes && (
         <p className="text-xs text-gray-500 mt-2 italic border-t border-gray-100 pt-2">
           {decision.moderator_reasoning_category && (

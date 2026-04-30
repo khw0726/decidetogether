@@ -366,9 +366,11 @@ function FixSlide({
         )}
       </div>
 
-      {/* Purpose */}
-      {(levelReasoning || reasoning) && (
-        <p className="text-xs text-gray-700">{levelReasoning || reasoning}</p>
+      {/* Purpose — prefer the human `reasoning` (≤25-word explanation of why this fix
+          addresses the observed errors); fall back to the codified `level_reasoning`
+          only if the LLM didn't produce a human one. */}
+      {(reasoning || levelReasoning) && (
+        <p className="text-xs text-gray-700">{reasoning || levelReasoning}</p>
       )}
 
       {/* For rule_text and L1 (checklist) slides, the live preview is shown in the

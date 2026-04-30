@@ -1,7 +1,295 @@
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus, Sparkles, Pin, PinOff, Loader2, Gauge, FileText, Type, Zap, PlusCircle, Search } from 'lucide-react'
-import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem, setContextOverride, Rule, ItemHealthMetrics } from '../api/client'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus, Sparkles, Pin, PinOff, Loader2, Gauge, FileText, Type, Zap, PlusCircle, Search, RefreshCw } from 'lucide-react'
+import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem, setContextOverride, Rule, ItemHealthMetrics, StructuralFieldSpec, getStructuralFields } from '../api/client'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+
+// Default empty logic per item type — used when the user switches the
+// type radio so the editor has a coherent shape to render.
+function defaultLogicFor(itemType: 'deterministic' | 'structural' | 'subjective'): Record<string, unknown> {
+  if (itemType === 'deterministic') {
+    return { type: 'deterministic', patterns: [{ regex: '', case_sensitive: false }], match_mode: 'any', negate: false, field: 'all' }
+  }
+  if (itemType === 'structural') {
+    return { type: 'structural', checks: [{ field: '', operator: '==', value: '' }], match_mode: 'all' }
+  }
+  return { type: 'subjective', prompt_template: '', rubric: '', threshold: 0.7 }
+}
+
+// Operator options driven by the structural field's value_type. Numeric
+// fields get the full comparison set; strings/bools get equality + membership.
+function operatorsFor(valueType: string | undefined): string[] {
+  if (valueType === 'number') return ['<', '<=', '>', '>=', '==', '!=']
+  if (valueType === 'bool') return ['==', '!=']
+  return ['==', '!=', 'in']
+}
+
+// Coerce a raw input value into the type the field expects so the
+// backend doesn't compare a string against a number at evaluation time.
+function coerceStructuralValue(raw: string, valueType: string | undefined): unknown {
+  if (valueType === 'number') {
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : raw
+  }
+  if (valueType === 'bool') {
+    if (raw === 'true') return true
+    if (raw === 'false') return false
+    return raw
+  }
+  return raw
+}
+
+// ── LogicEditor ─────────────────────────────────────────────────────────────
+// Editable counterpart to LogicInspector. The parent owns the logic state and
+// passes onChange so the Save handler can ship the final shape unchanged.
+
+function LogicEditor({
+  itemType,
+  logic,
+  onChange,
+  structuralFields,
+}: {
+  itemType: 'deterministic' | 'structural' | 'subjective'
+  logic: Record<string, unknown>
+  onChange: (next: Record<string, unknown>) => void
+  structuralFields: StructuralFieldSpec[]
+}) {
+  if (itemType === 'deterministic') {
+    const patterns = (logic.patterns as Array<{ regex: string; case_sensitive?: boolean }>) ?? []
+    const matchMode = (logic.match_mode as string) ?? 'any'
+    const negate = Boolean(logic.negate)
+    const field = (logic.field as string) ?? 'all'
+    const setPatterns = (next: Array<{ regex: string; case_sensitive?: boolean }>) =>
+      onChange({ ...logic, patterns: next })
+    return (
+      <div className="space-y-2 text-xs">
+        <div className="flex flex-wrap gap-3 items-center">
+          <label className="flex items-center gap-1">
+            <span className="text-gray-500">Match</span>
+            <select
+              className="border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+              value={matchMode}
+              onChange={e => onChange({ ...logic, match_mode: e.target.value })}
+            >
+              <option value="any">any</option>
+              <option value="all">all</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1">
+            <span className="text-gray-500">Field</span>
+            <select
+              className="border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+              value={field}
+              onChange={e => onChange({ ...logic, field: e.target.value })}
+            >
+              <option value="all">all</option>
+              <option value="title">title</option>
+              <option value="body">body</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={negate}
+              onChange={e => onChange({ ...logic, negate: e.target.checked })}
+            />
+            <span className="text-gray-500">Negate</span>
+          </label>
+        </div>
+        <div className="space-y-1">
+          {patterns.map((p, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <input
+                className="flex-1 border border-gray-300 rounded px-2 py-1 font-mono text-indigo-700"
+                placeholder="regex pattern"
+                value={p.regex}
+                onChange={e => {
+                  const next = [...patterns]
+                  next[i] = { ...next[i], regex: e.target.value }
+                  setPatterns(next)
+                }}
+              />
+              <label className="flex items-center gap-1 text-gray-500">
+                <input
+                  type="checkbox"
+                  checked={Boolean(p.case_sensitive)}
+                  onChange={e => {
+                    const next = [...patterns]
+                    next[i] = { ...next[i], case_sensitive: e.target.checked }
+                    setPatterns(next)
+                  }}
+                />
+                Aa
+              </label>
+              <button
+                type="button"
+                className="p-1 text-gray-400 hover:text-red-600"
+                onClick={() => setPatterns(patterns.filter((_, j) => j !== i))}
+                title="Remove pattern"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
+            onClick={() => setPatterns([...patterns, { regex: '', case_sensitive: false }])}
+          >
+            <Plus size={12} /> Add pattern
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (itemType === 'structural') {
+    const checks = (logic.checks as Array<{ field: string; operator: string; value: unknown }>) ?? []
+    const matchMode = (logic.match_mode as string) ?? 'all'
+    const fieldByName = new Map(structuralFields.map(f => [f.field, f]))
+    const setChecks = (next: typeof checks) => onChange({ ...logic, checks: next })
+    return (
+      <div className="space-y-2 text-xs">
+        <label className="flex items-center gap-1">
+          <span className="text-gray-500">Match</span>
+          <select
+            className="border border-gray-300 rounded px-1.5 py-0.5 bg-white"
+            value={matchMode}
+            onChange={e => onChange({ ...logic, match_mode: e.target.value })}
+          >
+            <option value="all">all</option>
+            <option value="any">any</option>
+          </select>
+        </label>
+        <div className="space-y-1">
+          {checks.map((c, i) => {
+            const spec = fieldByName.get(c.field)
+            const ops = operatorsFor(spec?.value_type)
+            return (
+              <div key={i}>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    className="border border-gray-300 rounded px-1.5 py-1 bg-white font-mono text-amber-700"
+                    value={c.field}
+                    onChange={e => {
+                      const next = [...checks]
+                      const newSpec = fieldByName.get(e.target.value)
+                      const newOps = operatorsFor(newSpec?.value_type)
+                      // Keep operator if still valid for the new field, else reset.
+                      const op = newOps.includes(c.operator) ? c.operator : newOps[0]
+                      next[i] = { ...next[i], field: e.target.value, operator: op }
+                      setChecks(next)
+                    }}
+                  >
+                    <option value="">— field —</option>
+                    {structuralFields.map(f => (
+                      <option key={f.field} value={f.field}>{f.field}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="border border-gray-300 rounded px-1.5 py-1 bg-white font-mono"
+                    value={c.operator}
+                    onChange={e => {
+                      const next = [...checks]
+                      next[i] = { ...next[i], operator: e.target.value }
+                      setChecks(next)
+                    }}
+                  >
+                    {ops.map(op => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                  {spec?.value_type === 'bool' ? (
+                    <select
+                      className="border border-gray-300 rounded px-1.5 py-1 bg-white font-mono text-green-700"
+                      value={String(c.value)}
+                      onChange={e => {
+                        const next = [...checks]
+                        next[i] = { ...next[i], value: coerceStructuralValue(e.target.value, 'bool') }
+                        setChecks(next)
+                      }}
+                    >
+                      <option value="true">true</option>
+                      <option value="false">false</option>
+                    </select>
+                  ) : (
+                    <input
+                      className="flex-1 border border-gray-300 rounded px-2 py-1 font-mono text-green-700"
+                      placeholder={spec?.value_type === 'number' ? '0' : 'value'}
+                      value={c.value === null || c.value === undefined ? '' : String(c.value)}
+                      onChange={e => {
+                        const next = [...checks]
+                        next[i] = { ...next[i], value: coerceStructuralValue(e.target.value, spec?.value_type) }
+                        setChecks(next)
+                      }}
+                    />
+                  )}
+                  <button
+                    type="button"
+                    className="p-1 text-gray-400 hover:text-red-600"
+                    onClick={() => setChecks(checks.filter((_, j) => j !== i))}
+                    title="Remove check"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                {spec && (
+                  <p className="text-[10px] text-gray-400 ml-1 mt-0.5">{spec.description}</p>
+                )}
+              </div>
+            )
+          })}
+          <button
+            type="button"
+            className="text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-1"
+            onClick={() => setChecks([...checks, { field: structuralFields[0]?.field ?? '', operator: '==', value: '' }])}
+          >
+            <Plus size={12} /> Add check
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Subjective
+  const prompt = (logic.prompt_template as string) ?? ''
+  const rubric = (logic.rubric as string) ?? ''
+  const threshold = (logic.threshold as number) ?? 0.7
+  return (
+    <div className="space-y-2 text-xs">
+      <label className="flex items-center gap-2">
+        <span className="text-gray-500">Threshold</span>
+        <input
+          type="number"
+          min={0}
+          max={1}
+          step={0.05}
+          className="w-20 border border-gray-300 rounded px-1.5 py-0.5 font-mono"
+          value={threshold}
+          onChange={e => onChange({ ...logic, threshold: Number(e.target.value) })}
+        />
+        <span className="text-gray-400">(0–1; higher = stricter)</span>
+      </label>
+      <div>
+        <label className="block text-gray-500 mb-1">Rubric</label>
+        <textarea
+          rows={4}
+          className="w-full border border-gray-300 rounded px-2 py-1 leading-relaxed"
+          placeholder="What signals indicate a YES verdict on this item?"
+          value={rubric}
+          onChange={e => onChange({ ...logic, rubric: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="block text-gray-500 mb-1">Prompt template (optional)</label>
+        <textarea
+          rows={2}
+          className="w-full border border-gray-300 rounded px-2 py-1 leading-relaxed"
+          placeholder="Override the default item prompt (rarely needed)"
+          value={prompt}
+          onChange={e => onChange({ ...logic, prompt_template: e.target.value })}
+        />
+      </div>
+    </div>
+  )
+}
 
 // ── Health Chip ──────────────────────────────────────────────────────────────
 
@@ -621,10 +909,14 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
 function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: string | null; onDone: () => void }) {
   const [description, setDescription] = useState('')
   const [action, setAction] = useState('warn')
+  // The moderator picks the type up-front; the server fills in the matching
+  // logic (regex / structural checks / rubric) for that type, and the user
+  // can then tweak it via the edit form.
+  const [itemType, setItemType] = useState<'deterministic' | 'structural' | 'subjective'>('subjective')
   const queryClient = useQueryClient()
 
   const mutation = useMutation({
-    mutationFn: () => createChecklistItem(ruleId, { description, action, parent_id: parentId }),
+    mutationFn: () => createChecklistItem(ruleId, { description, action, parent_id: parentId, item_type: itemType }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checklist', ruleId] })
       onDone()
@@ -641,8 +933,19 @@ function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: s
         onChange={e => setDescription(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' && description.trim()) mutation.mutate(); if (e.key === 'Escape') onDone() }}
       />
-      <div className="flex items-center gap-2">
-        <span className="text-gray-400 italic">Type inferred automatically</span>
+      <div className="flex items-center gap-2 flex-wrap">
+        <label className="flex items-center gap-1">
+          <span className="text-gray-500">Type</span>
+          <select
+            className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none"
+            value={itemType}
+            onChange={e => setItemType(e.target.value as typeof itemType)}
+          >
+            <option value="subjective">subjective</option>
+            <option value="deterministic">deterministic</option>
+            <option value="structural">structural</option>
+          </select>
+        </label>
         <select
           className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none ml-auto"
           value={action}
@@ -658,13 +961,16 @@ function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: s
           disabled={!description.trim() || mutation.isPending}
         >
           <Check size={12} />
-          {mutation.isPending ? 'Inferring...' : 'Add'}
+          {mutation.isPending ? 'Generating...' : 'Add'}
         </button>
         <button className="btn-secondary text-xs py-1" onClick={onDone}>
           <X size={12} />
           Cancel
         </button>
       </div>
+      <p className="text-[11px] text-gray-500">
+        Server fills in the logic for the chosen type — open the item to edit it after.
+      </p>
     </div>
   )
 }
@@ -679,10 +985,32 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
   const [addingChild, setAddingChild] = useState(false)
   const [editedDescription, setEditedDescription] = useState(item.description)
   const [editedFailAction, setEditedFailAction] = useState(item.action)
+  const [editedItemType, setEditedItemType] = useState<'deterministic' | 'structural' | 'subjective'>(item.item_type)
+  const [editedLogic, setEditedLogic] = useState<Record<string, unknown>>(item.logic ?? defaultLogicFor(item.item_type))
+
+  // Structural field schema is needed only inside the editor; cache it
+  // app-wide so opening multiple items doesn't refetch.
+  const structuralFieldsQuery = useQuery({
+    queryKey: ['structural-fields'],
+    queryFn: getStructuralFields,
+    staleTime: Infinity,
+  })
 
   const queryClient = useQueryClient()
   const mutation = useMutation({
-    mutationFn: (data: Partial<ChecklistItem>) => updateChecklistItem(item.id, data),
+    mutationFn: (data: Partial<ChecklistItem> & { user_edited_logic?: boolean }) =>
+      updateChecklistItem(item.id, data as Partial<ChecklistItem>),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['checklist', ruleId] })
+      setEditing(false)
+    },
+  })
+
+  const regenerateMutation = useMutation({
+    // Sending user_edited_logic=false (with no logic in the body) tells the
+    // server to clear the pin and re-infer item_type/logic from the current
+    // description. The list re-fetches and the editor closes.
+    mutationFn: () => updateChecklistItem(item.id, { user_edited_logic: false } as Partial<ChecklistItem>),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['checklist', ruleId] })
       setEditing(false)
@@ -712,10 +1040,20 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
   const indent = depth * 16
 
   const handleSave = () => {
-    mutation.mutate({
+    // Detect whether the user actually changed type or logic. If they did,
+    // ship those fields so the backend flips user_edited_logic = true and
+    // skips re-inference. If they only touched the description, leave them
+    // out so the existing re-infer-on-description-change behavior still
+    // works for non-pinned items.
+    const typeChanged = editedItemType !== item.item_type
+    const logicChanged = JSON.stringify(editedLogic) !== JSON.stringify(item.logic ?? {})
+    const payload: Partial<ChecklistItem> & { user_edited_logic?: boolean } = {
       description: editedDescription,
       action: editedFailAction as 'remove' | 'warn' | 'continue',
-    })
+    }
+    if (typeChanged) payload.item_type = editedItemType
+    if (typeChanged || logicChanged) payload.logic = editedLogic
+    mutation.mutate(payload)
   }
 
   const isSelected = selectedItemId === item.id
@@ -771,6 +1109,14 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {typeBadge}
+              {item.user_edited_logic && (
+                <span
+                  className="badge bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  title="Logic was hand-edited; recompile leaves it alone"
+                >
+                  USER-EDITED
+                </span>
+              )}
               {!editing && (
                 <span className="text-sm font-medium text-gray-800">{item.description}</span>
               )}
@@ -782,11 +1128,11 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
             )}
 
             {editing ? (
-              <div className="mt-2 space-y-2">
+              <div className="mt-2 space-y-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Description</label>
                   <textarea
-                    rows={4}
+                    rows={3}
                     className="w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     value={editedDescription}
                     onChange={e => setEditedDescription(e.target.value)}
@@ -806,7 +1152,41 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
                     </select>
                   </div>
                 )}
-                <div className="flex gap-2">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Type</label>
+                  <div className="flex gap-3 text-xs">
+                    {(['deterministic', 'structural', 'subjective'] as const).map(t => (
+                      <label key={t} className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`item-type-${item.id}`}
+                          value={t}
+                          checked={editedItemType === t}
+                          onChange={() => {
+                            setEditedItemType(t)
+                            // Switching types resets logic to the default shape for the
+                            // new type — partial cross-type logic objects would render
+                            // garbage in the editor.
+                            setEditedLogic(defaultLogicFor(t))
+                          }}
+                        />
+                        <span>{t}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Logic</label>
+                  <div className="border border-gray-200 rounded px-2 py-2 bg-gray-50">
+                    <LogicEditor
+                      itemType={editedItemType}
+                      logic={editedLogic}
+                      onChange={setEditedLogic}
+                      structuralFields={structuralFieldsQuery.data ?? []}
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-wrap">
                   <button className="btn-primary text-xs py-1" onClick={handleSave} disabled={mutation.isPending}>
                     <Check size={12} />
                     {mutation.isPending ? 'Saving...' : 'Save'}
@@ -815,6 +1195,17 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
                     <X size={12} />
                     Cancel
                   </button>
+                  {item.user_edited_logic && (
+                    <button
+                      className="btn-secondary text-xs py-1 ml-auto"
+                      title="Discard your hand-edited logic and re-infer from the description"
+                      onClick={() => regenerateMutation.mutate()}
+                      disabled={regenerateMutation.isPending}
+                    >
+                      <RefreshCw size={12} />
+                      {regenerateMutation.isPending ? 'Regenerating...' : 'Regenerate from description'}
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -851,7 +1242,16 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
                 </button>
                 <button
                   className="p-1 text-gray-400 hover:text-gray-700 rounded"
-                  onClick={() => setEditing(true)}
+                  onClick={() => {
+                    // Reseed the editor from the current item so reopening
+                    // after a server-side change (e.g. recompile) doesn't
+                    // show stale state from the previous edit session.
+                    setEditedDescription(item.description)
+                    setEditedFailAction(item.action)
+                    setEditedItemType(item.item_type)
+                    setEditedLogic(item.logic ?? defaultLogicFor(item.item_type))
+                    setEditing(true)
+                  }}
                   title="Edit item"
                 >
                   <Edit2 size={14} />

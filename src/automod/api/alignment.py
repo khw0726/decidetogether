@@ -158,6 +158,15 @@ async def _recompile_after_context_accept(rule_id: str) -> None:
         if not existing:
             return
 
+        other_rules_res = await db.execute(
+            select(Rule).where(
+                Rule.community_id == community.id,
+                Rule.id != rule_id,
+                Rule.is_active == True,  # noqa: E712
+            )
+        )
+        other_rules = list(other_rules_res.scalars().all())
+
     # ── LLM phase (no session, no lock) ────────────────────────────────
     try:
         compiler = get_compiler()
@@ -170,6 +179,7 @@ async def _recompile_after_context_accept(rule_id: str) -> None:
             pinned_item_ids=pinned_ids,
             relevant_context=rule.relevant_context,
             custom_context_notes=rule.custom_context_notes,
+            other_rules=other_rules,
         )
     except Exception:
         logger.exception(f"Silent context-recompile LLM failed for rule {rule_id}")
@@ -681,6 +691,7 @@ async def preview_recompile(
             pinned_item_ids=pinned_ids,
             relevant_context=draft_relevant,
             custom_context_notes=draft_notes,
+            other_rules=other_rules,
         )
         final_items = adjusted_items
         adjustment_summary = summary
@@ -930,8 +941,7 @@ async def evaluate_examples_with_draft(
                 rule=draft_rule,
                 checklist=hypothetical,
                 post=ex.content,
-                community_name=community.name,
-                examples=[],
+                community_name=community.name
             )
             new_verdict = rule_result_data["verdict"]
             new_confidence = rule_result_data["confidence"]
@@ -1050,8 +1060,7 @@ async def preview_decisions(
                 rule=draft_rule,
                 checklist=hypothetical,
                 post=decision.post_content or {},
-                community_name=community.name,
-                examples=[],
+                community_name=community.name
             )
             new_verdict = new_result["verdict"]
             new_confidence = new_result["confidence"]

@@ -59,7 +59,7 @@ export interface CommunitySamplePost {
   label: 'acceptable' | 'unacceptable'
   note: string | null
   status: 'pending' | 'committed'
-  source: 'manual' | 'url_import' | 'modqueue'
+  source: 'manual' | 'url_import'
   source_metadata: Record<string, unknown> | null
   created_at: string
 }
@@ -141,8 +141,15 @@ export interface ChecklistItem {
   context_pinned: boolean
   context_override_note: string | null
   pinned_tags: RuleContextTag[] | null
+  user_edited_logic: boolean
   updated_at: string
   children: ChecklistItem[]
+}
+
+export interface StructuralFieldSpec {
+  field: string
+  value_type: 'number' | 'string' | 'bool'
+  description: string
 }
 
 export interface Example {
@@ -182,9 +189,11 @@ export interface PreviewRecompileResult {
     description?: string
     rule_text_anchor?: string | null
     item_type?: string
+    logic?: Record<string, unknown>
     action?: string
     context_influenced?: boolean
     context_note?: string | null
+    children?: Array<Record<string, unknown>>
   }>
   adjustment_summary?: string | null
   example_verdicts: Array<{
@@ -337,29 +346,6 @@ export const importSamplePostFromUrl = (
     .post<CommunitySamplePost>(`/communities/${communityId}/sample-posts/import-url`, data)
     .then(r => r.data)
 
-export interface ModqueuePullResponse {
-  pending: CommunitySamplePost[]
-  new_count: number
-  skipped_existing: number
-}
-
-export const pullModqueue = (
-  communityId: string,
-  data: { limit: number; since_days?: number | null }
-) =>
-  api
-    .post<ModqueuePullResponse>(`/communities/${communityId}/sample-posts/pull-modqueue`, data)
-    .then(r => r.data)
-
-export const approveSamplePost = (
-  communityId: string,
-  postId: string,
-  data?: { label?: 'acceptable' | 'unacceptable'; note?: string }
-) =>
-  api
-    .post<CommunitySamplePost>(`/communities/${communityId}/sample-posts/${postId}/approve`, data || {})
-    .then(r => r.data)
-
 // ── Setup Status ──────────────────────────────────────────────────────────────
 
 export interface BorderlineItem {
@@ -497,6 +483,9 @@ export const fetchRedditRules = (subreddit: string) =>
 export const getChecklist = (ruleId: string) =>
   api.get<ChecklistItem[]>(`/rules/${ruleId}/checklist`).then(r => r.data)
 
+export const getStructuralFields = () =>
+  api.get<StructuralFieldSpec[]>('/checklist/structural-fields').then(r => r.data)
+
 export const createChecklistItem = (ruleId: string, data: {
   description: string
   item_type?: string
@@ -632,6 +621,7 @@ export const listDecisions = (
     verdict?: string
     rule_id?: string
     checklist_item_id?: string
+    content_type?: 'post' | 'comment'
     limit?: number
     offset?: number
   },

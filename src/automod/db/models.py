@@ -130,6 +130,12 @@ class ChecklistItem(Base):
     # When pinned: which (dimension, tag) bundles justified preserving this calibration.
     # Used for orphan detection on context regeneration.
     pinned_tags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    # When True, the moderator hand-edited item_type/logic. The compiler
+    # treats the item as fixed: keep-only ops in recompile, no re-inference
+    # on description change, and the prompt marks it [USER-EDITED] so the
+    # LLM doesn't propose duplicate coverage. Cleared via the "Regenerate"
+    # action in the UI.
+    user_edited_logic: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
     rule: Mapped["Rule"] = relationship("Rule", back_populates="checklist_items", foreign_keys=[rule_id])

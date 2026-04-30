@@ -35,6 +35,7 @@ async def list_decisions(
     rule_id: str | None = None,
     checklist_item_id: str | None = None,
     verdict: str | None = None,
+    content_type: str | None = None,
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
@@ -45,8 +46,8 @@ async def list_decisions(
     if not comm_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Community not found")
 
-    # Over-fetch when post-filtering in Python for checklist_item_id.
-    effective_limit = limit * 4 if checklist_item_id else limit
+    # Over-fetch when post-filtering in Python for checklist_item_id or content_type.
+    effective_limit = limit * 4 if (checklist_item_id or content_type) else limit
 
     query = (
         select(Decision)
@@ -67,10 +68,13 @@ async def list_decisions(
     # Filter by rule_id (check JSON column)
     if rule_id:
         # Include decisions where:
-        #   (a) the agent triggered this rule (triggered_rules contains rule_id), OR
+        #   (a) the agent evaluated this rule (rule_id is a key in agent_reasoning), OR
         #   (b) the moderator linked this rule when resolving the override
         #       (Example from moderator_decision → ExampleRuleLink to this rule,
         #        where example.content.id == decision.post_platform_id).
+        # Note: we use agent_reasoning, not triggered_rules — a rule whose tree
+        # resolved to "approve"/"review" but had ≥1 item fire is still relevant
+        # (it's the same set the health endpoints walk to count FP/FN).
         linked_post_ids_result = await db.execute(
             select(Example.content)
             .join(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
@@ -83,16 +87,30 @@ async def list_decisions(
             for (content,) in linked_post_ids_result.all()
             if (content or {}).get("id")
         }
-        triggered_clause = Decision.triggered_rules.contains([rule_id])
+        evaluated_clause = func.json_extract(
+            Decision.agent_reasoning, f'$."{rule_id}"'
+        ).isnot(None)
         if linked_post_ids:
             query = query.where(
-                or_(triggered_clause, Decision.post_platform_id.in_(linked_post_ids))
+                or_(evaluated_clause, Decision.post_platform_id.in_(linked_post_ids))
             )
         else:
-            query = query.where(triggered_clause)
+            query = query.where(evaluated_clause)
 
     result = await db.execute(query)
     decisions = list(result.scalars().all())
+
+    # Post-filter by content type. The post_type lives at post_content.context.post_type
+    # (set by the crawler/import path); JSON-extract isn't worth the dialect dance for a
+    # 50-row page, so we filter in Python.
+    if content_type in ("post", "comment"):
+        def _is_comment(d: Decision) -> bool:
+            ctx = (d.post_content or {}).get("context") or {}
+            return (ctx.get("post_type") or "") == "comment"
+        decisions = [
+            d for d in decisions
+            if (_is_comment(d) if content_type == "comment" else not _is_comment(d))
+        ]
 
     # Post-filter by checklist_item_id: keep decisions where this item triggered
     # under any (or the specified) rule in agent_reasoning.
@@ -113,8 +131,9 @@ async def list_decisions(
                 if isinstance(item_data, dict) and item_data.get("triggered"):
                     filtered.append(d)
                     break
-        decisions = filtered[:limit]
+        decisions = filtered
 
+    decisions = decisions[:limit]
     return [DecisionRead.model_validate(d) for d in decisions]
 
 

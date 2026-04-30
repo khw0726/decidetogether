@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronDown, ChevronUp, CheckCircle, XCircle, AlertTriangle, Filter, Inbox, Loader2, Sparkles, Download, X,
@@ -11,14 +12,24 @@ import {
 } from '../api/client'
 import PostCard from '../components/PostCard'
 import NewRuleSuggestionModal from '../components/NewRuleSuggestionModal'
+import RuleReasoningBlock from '../components/RuleReasoningBlock'
 
 interface DecisionQueueProps {
   communityId: string
 }
 
 export default function DecisionQueue({ communityId }: DecisionQueueProps) {
-  const [filter, setFilter] = useState<'pending' | 'resolved' | 'all'>('pending')
+  const [searchParams] = useSearchParams()
+  const [filter, setFilter] = useState<'pending' | 'resolved' | 'all'>(
+    () => {
+      const s = searchParams.get('status')
+      return s === 'resolved' || s === 'all' ? s : 'pending'
+    },
+  )
   const [verdictFilter, setVerdictFilter] = useState<string>('')
+  const [ruleFilter, setRuleFilter] = useState<string>(() => searchParams.get('rule_id') ?? '')
+  const [contentTypeFilter, setContentTypeFilter] = useState<'' | 'post' | 'comment'>('')
+  const highlightDecisionId = searchParams.get('decision_id') ?? null
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [suggesting, setSuggesting] = useState(false)
   const [suggestion, setSuggestion] = useState<NewRuleSuggestion | null>(null)
@@ -69,11 +80,13 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
   const isReddit = community?.platform === 'reddit'
 
   const { data: decisions = [], isLoading } = useQuery({
-    queryKey: ['decisions', communityId, filter, verdictFilter],
+    queryKey: ['decisions', communityId, filter, verdictFilter, ruleFilter, contentTypeFilter],
     queryFn: () =>
       listDecisions(communityId, {
         status: filter === 'all' ? undefined : filter,
         verdict: verdictFilter || undefined,
+        rule_id: ruleFilter || undefined,
+        content_type: contentTypeFilter || undefined,
         limit: 50,
       }),
     enabled: !!communityId,
@@ -205,11 +218,34 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             <option value="remove">Remove</option>
             <option value="review">Review</option>
           </select>
+          <span className="text-xs text-gray-500">Content:</span>
+          <select
+            className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none"
+            value={contentTypeFilter}
+            onChange={e => setContentTypeFilter(e.target.value as '' | 'post' | 'comment')}
+            title="Show only posts or only comments"
+          >
+            <option value="">Posts & comments</option>
+            <option value="post">Posts only</option>
+            <option value="comment">Comments only</option>
+          </select>
+          <span className="text-xs text-gray-500">Violated rule:</span>
+          <select
+            className="text-xs border border-gray-300 rounded px-2 py-1.5 bg-white focus:outline-none max-w-[180px]"
+            value={ruleFilter}
+            onChange={e => setRuleFilter(e.target.value)}
+            title="Show only decisions where this rule was violated (agent triggered or moderator linked)"
+          >
+            <option value="">Any rule</option>
+            {rules.filter(r => r.rule_type === 'actionable').map(r => (
+              <option key={r.id} value={r.id}>{r.title}</option>
+            ))}
+          </select>
         </div>
       </div>
 
       {/* Decision cards */}
-      <div className="flex-1 overflow-auto p-6 space-y-4">
+      <div className="flex-1 overflow-auto p-6 space-y-4 max-w-5xl w-full mx-auto">
         {isLoading && (
           <div className="flex items-center justify-center py-12 text-gray-400">
             <Loader2 size={24} className="animate-spin mr-2" />
@@ -231,6 +267,7 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
             decision={decision}
             rulesMap={rulesMap}
             selected={selectedIds.has(decision.id)}
+            highlighted={decision.id === highlightDecisionId}
             onToggleSelect={() => toggleSelect(decision.id)}
             onResolve={(verdict, reasoningCategory, notes, ruleIds, tag) =>
               resolveMutation.mutate({
@@ -461,93 +498,11 @@ function RedditImportModal({
   )
 }
 
-function ItemReasoningTree({
-  itemReasoning,
-  parentId,
-  depth,
-}: {
-  itemReasoning: Record<string, unknown>
-  parentId: string | null
-  depth: number
-}) {
-  const items = Object.entries(itemReasoning).filter(([, itemR]) => {
-    const ir = itemR as Record<string, unknown>
-    return (ir.parent_id ?? null) === parentId
-  })
-
-  if (items.length === 0) return null
-
-  return (
-    <>
-      {items.map(([itemId, itemR]) => {
-        const ir = itemR as Record<string, unknown>
-        return (
-          <div key={itemId} style={{ marginLeft: depth * 12 }}>
-            <div className={`pl-3 border-l-2 ${ir.triggered ? 'border-red-300' : 'border-green-300'}`}>
-              <span className="text-gray-500">{ir.description as string}: </span>
-              <span className={ir.triggered ? 'text-red-700' : 'text-green-700'}>
-                {ir.reasoning as string}
-              </span>
-            </div>
-            <ItemReasoningTree
-              itemReasoning={itemReasoning}
-              parentId={itemId}
-              depth={depth + 1}
-            />
-          </div>
-        )
-      })}
-    </>
-  )
-}
-
-function RuleReasoningBlock({
-  ruleId,
-  ruleTitle,
-  verdict,
-  confidence,
-  itemReasoning,
-  defaultOpen,
-}: {
-  ruleId: string
-  ruleTitle?: string
-  verdict: string
-  confidence?: number
-  itemReasoning?: Record<string, unknown>
-  defaultOpen: boolean
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  return (
-    <div className="rounded border border-gray-200 text-xs overflow-hidden">
-      <button
-        className={`w-full flex items-center gap-2 px-3 py-2 text-left ${open ? 'bg-gray-50' : 'bg-gray-50/50 hover:bg-gray-50'}`}
-        onClick={() => setOpen(!open)}
-      >
-        {open ? <ChevronUp size={12} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={12} className="text-gray-400 flex-shrink-0" />}
-        <span className="font-medium truncate">{ruleTitle || ruleId}</span>
-        <span className={`badge ${verdict === 'approve' ? 'badge-green' : verdict === 'remove' ? 'badge-red' : 'badge-yellow'}`}>
-          {verdict}
-        </span>
-        <span className="text-gray-400 ml-auto flex-shrink-0">{Math.round((confidence || 0) * 100)}%</span>
-      </button>
-      {open && itemReasoning && (
-        <div className="px-3 py-2 space-y-1 border-t border-gray-100">
-          <ItemReasoningTree
-            itemReasoning={itemReasoning}
-            parentId={null}
-            depth={0}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
 function DecisionCard({
   decision,
   rulesMap,
   selected,
+  highlighted,
   onToggleSelect,
   onResolve,
   resolving,
@@ -555,11 +510,18 @@ function DecisionCard({
   decision: Decision
   rulesMap: Record<string, { title: string }>
   selected: boolean
+  highlighted?: boolean
   onToggleSelect: () => void
   onResolve: (verdict: string, reasoningCategory?: string, notes?: string, ruleIds?: string[], tag?: string) => void
   resolving: boolean
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(!!highlighted)
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (highlighted) {
+      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlighted])
   const [selectedVerdict, setSelectedVerdict] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
@@ -611,7 +573,7 @@ function DecisionCard({
   }
 
   return (
-    <div className={`card overflow-hidden ${selected ? 'ring-2 ring-indigo-400' : ''} ${decision.was_override ? 'border-amber-200' : ''}`}>
+    <div ref={cardRef} className={`card overflow-hidden ${selected ? 'ring-2 ring-indigo-400' : ''} ${highlighted ? 'ring-2 ring-yellow-400' : ''} ${decision.was_override ? 'border-amber-200' : ''}`}>
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start gap-3">

@@ -7,6 +7,46 @@ import asyncpraw
 logger = logging.getLogger(__name__)
 
 
+_KNOWN_BOTS = {
+    "automoderator",
+    "remindmebot",
+    "sneakpeekbot",
+    "wikisummarizerbot",
+    "b0trank",
+    "savevideo",
+    "auto-tldr",
+    "gifreversingbot",
+    "sub_doesnt_exist_bot",
+    "imagesofnetwork",
+    "haikubotinc",
+    "of_patrol_bot",
+    "same_subreddit_bot",
+}
+
+
+def _is_bot_username(name: str) -> bool:
+    if not name:
+        return False
+    n = name.lower()
+    if n in _KNOWN_BOTS:
+        return True
+    return n.endswith("bot") or n.endswith("-bot") or n.endswith("_bot")
+
+
+def _is_bot_obj(obj) -> bool:
+    """True if a praw post/comment is from a bot or distinguished moderator."""
+    try:
+        if getattr(obj, "distinguished", None) == "moderator":
+            return True
+    except Exception:
+        pass
+    try:
+        name = obj.author.name if obj.author else ""
+    except Exception:
+        name = ""
+    return _is_bot_username(name)
+
+
 def _safe_author_info(obj) -> tuple[str, int | None, int | None]:
     """Extract author name, account age, and karma safely."""
     try:
@@ -187,6 +227,8 @@ async def crawl_subreddit_comments(
                 body = (comment.body or "").strip()
                 if body in ("[removed]", "[deleted]", ""):
                     continue
+                if _is_bot_obj(comment):
+                    continue
 
                 try:
                     # Load the parent submission for OP context
@@ -245,93 +287,13 @@ async def crawl_subreddit_posts(
                     continue
                 if not post.title.strip():
                     continue
+                if _is_bot_obj(post):
+                    continue
                 posts.append(_map_praw_post(post, subreddit))
         logger.info("Crawled %d %s posts from r/%s", len(posts), sort, subreddit)
         return posts
     except Exception as exc:
         logger.warning("Failed to crawl r/%s: %s", subreddit, exc)
-        return []
-
-
-async def fetch_modlog_actions(
-    subreddit: str,
-    client_id: str,
-    client_secret: str,
-    user_agent: str,
-    username: str = "",
-    password: str = "",
-    limit: int = 50,
-    since_unix: float | None = None,
-) -> list[dict]:
-    """Fetch recent removelink/approvelink actions from the subreddit modlog.
-
-    Returns a list of dicts shaped:
-        {
-            "label": "acceptable" | "unacceptable",
-            "content": <PostContent dict>,
-            "source_metadata": {action_id, mod_username, action, action_at, target_fullname},
-        }
-
-    Items still pending in the modqueue (no action taken) are skipped.
-    Only post (link/selfpost) actions are returned; comment actions are skipped.
-    Requires mod credentials (username/password) for the target subreddit.
-    """
-    if not username or not password:
-        logger.warning("fetch_modlog_actions requires mod credentials")
-        return []
-
-    label_map = {"removelink": "unacceptable", "approvelink": "acceptable"}
-    results: list[dict] = []
-    seen_targets: set[str] = set()
-
-    try:
-        async with asyncpraw.Reddit(
-            client_id=client_id,
-            client_secret=client_secret,
-            user_agent=user_agent,
-            username=username,
-            password=password,
-        ) as reddit:
-            sub = await reddit.subreddit(subreddit)
-            for action_type in ("removelink", "approvelink"):
-                count = 0
-                async for entry in sub.mod.log(action=action_type, limit=limit * 4):
-                    if count >= limit:
-                        break
-                    if since_unix and entry.created_utc < since_unix:
-                        break
-                    target = entry.target_fullname or ""
-                    if not target.startswith("t3_"):
-                        continue
-                    if target in seen_targets:
-                        continue
-                    seen_targets.add(target)
-                    try:
-                        submission = await reddit.submission(id=target[3:])
-                        await submission.load()
-                    except Exception as e:
-                        logger.debug("Skipping modlog entry %s: %s", entry.id, e)
-                        continue
-                    label = label_map[action_type]
-                    content = _map_praw_post(submission, subreddit)
-                    results.append({
-                        "label": label,
-                        "content": content,
-                        "source_metadata": {
-                            "action_id": entry.id,
-                            "mod_username": str(entry.mod) if entry.mod else None,
-                            "action": action_type,
-                            "action_at": datetime.fromtimestamp(
-                                entry.created_utc, tz=timezone.utc
-                            ).isoformat(),
-                            "target_fullname": target,
-                        },
-                    })
-                    count += 1
-        logger.info("Fetched %d modlog actions from r/%s", len(results), subreddit)
-        return results
-    except Exception as exc:
-        logger.warning("Failed to fetch modlog from r/%s: %s", subreddit, exc)
         return []
 
 
@@ -371,6 +333,8 @@ async def sample_subreddit_for_context(
             async for post in sub.hot(limit=25):
                 if post.stickied:
                     continue
+                if _is_bot_obj(post):
+                    continue
                 hot_posts.append(post)
                 result["hot"].append({
                     "title": post.title.strip(),
@@ -384,6 +348,8 @@ async def sample_subreddit_for_context(
             async for post in sub.top(time_filter="month", limit=10):
                 if post.stickied:
                     continue
+                if _is_bot_obj(post):
+                    continue
                 result["top"].append({
                     "title": post.title.strip(),
                     "body": (post.selftext or "")[:300].strip(),
@@ -394,6 +360,10 @@ async def sample_subreddit_for_context(
 
             # Controversial — where norms are contested
             async for post in sub.controversial(time_filter="month", limit=10):
+                if post.stickied:
+                    continue
+                if _is_bot_obj(post):
+                    continue
                 result["controversial"].append({
                     "title": post.title.strip(),
                     "body": (post.selftext or "")[:300].strip(),
@@ -417,6 +387,8 @@ async def sample_subreddit_for_context(
                     if tf == "month" and age_days > 30:
                         break
                     if post.stickied or age_hours < min_age_hours:
+                        continue
+                    if _is_bot_obj(post):
                         continue
                     all_new_posts.append(post)
                 if len(all_new_posts) >= 50:
@@ -467,8 +439,11 @@ async def sample_subreddit_for_context(
                     await post.comments.replace_more(limit=0)
                     for comment in post.comments[:5]:
                         body = (comment.body or "").strip()
-                        if body and body not in ("[removed]", "[deleted]"):
-                            result["comments"].append({
+                        if not body or body in ("[removed]", "[deleted]"):
+                            continue
+                        if _is_bot_obj(comment):
+                            continue
+                        result["comments"].append({
                                 "body": body[:300],
                                 "score": comment.score,
                             })

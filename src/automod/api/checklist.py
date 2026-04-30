@@ -17,7 +17,7 @@ from ..core.tree_evaluator import TreeEvaluator
 from ..db.database import get_db
 from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import ChecklistItemCreate, ChecklistItemRead, ChecklistItemUpdate, SuggestionRead
-from .rules import _apply_diff_operations, _persist_new_examples, _persist_new_items, _re_resolve_checklist_links
+from .rules import _apply_diff_operations, _persist_new_items, _re_resolve_checklist_links
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["checklist"])
@@ -161,10 +161,13 @@ def get_compiler() -> RuleCompiler:
 
 
 async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
-    """Background task: re-evaluate override decisions against updated checklist.
+    """Background task: re-evaluate every resolved decision where this rule was
+    evaluated against the updated checklist.
 
-    Updates Decision.agent_reasoning[rule_id] so health metrics
-    self-correct on the next read. Debounced like _link_uncovered_violations.
+    Updates Decision.agent_reasoning[rule_id] so health metrics self-correct on
+    the next read. Includes agreement decisions (not just overrides) so the
+    health panel doesn't compute FP/FN against stale per-item verdicts after a
+    rule edit. Debounced like _link_uncovered_violations.
     """
     await asyncio.sleep(_REEVAL_DEBOUNCE_SECONDS)
 
@@ -198,7 +201,6 @@ async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
             select(Decision).where(
                 Decision.community_id == rule.community_id,
                 Decision.moderator_verdict != "pending",
-                Decision.was_override == True,  # noqa: E712
             )
         )
         # Snapshot what we need: id + post_content + existing reasoning.
@@ -213,7 +215,7 @@ async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
         ]
 
     if not candidate_decisions:
-        logger.info(f"No override decisions to re-evaluate for rule {rule_id}")
+        logger.info(f"No resolved decisions to re-evaluate for rule {rule_id}")
         return
 
     # ── LLM phase (no session, no lock) ────────────────────────────────
@@ -228,8 +230,7 @@ async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
                 rule=rule,
                 checklist=checklist,
                 post=snap["post_content"],
-                community_name=community_name,
-                examples=[],
+                community_name=community_name
             )
             old_rule = snap["agent_reasoning"].get(rule_id, {})
             updates.append({
@@ -267,7 +268,7 @@ async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
                 updated += 1
 
             await db.commit()
-            logger.info(f"Re-evaluated {updated} override decision(s) for rule {rule_id}")
+            logger.info(f"Re-evaluated {updated} resolved decision(s) for rule {rule_id}")
         except Exception as e:
             logger.error(f"Failed to persist re-evaluations for rule {rule_id}: {e}")
             await db.rollback()
@@ -316,6 +317,9 @@ async def _reevaluate_pending_queue(rule_id: str, generation: int) -> None:
                 Decision.moderator_verdict == "pending",
             )
         )
+        # Evaluate every pending decision against this rule — including ones that
+        # don't yet have an entry for it. This is what lets a freshly-added rule
+        # populate agent_reasoning across the existing pending queue.
         candidate_decisions = [
             {
                 "id": d.id,
@@ -323,7 +327,6 @@ async def _reevaluate_pending_queue(rule_id: str, generation: int) -> None:
                 "agent_reasoning": dict(d.agent_reasoning or {}),
             }
             for d in decisions_result.scalars().all()
-            if rule_id in (d.agent_reasoning or {})
         ]
 
     if not candidate_decisions:
@@ -342,8 +345,7 @@ async def _reevaluate_pending_queue(rule_id: str, generation: int) -> None:
                 rule=rule,
                 checklist=checklist,
                 post=snap["post_content"],
-                community_name=community_name,
-                examples=[],
+                community_name=community_name
             )
 
             reasoning = dict(snap["agent_reasoning"])
@@ -438,6 +440,74 @@ def spawn_pending_queue_reeval(rule_id: str) -> None:
     task.add_done_callback(_detached_reeval_tasks.discard)
 
 
+async def _drop_rule_from_pending_queue(community_id: str, rule_id: str) -> None:
+    """Strip a deactivated rule's contribution from every pending decision in the
+    community and recompute the aggregate verdict / triggered_rules. No LLM calls.
+    """
+    from ..core.actions import resolve_verdict
+    from ..db.database import AsyncSessionLocal, write_session
+
+    async with AsyncSessionLocal() as db:
+        decisions_result = await db.execute(
+            select(Decision).where(
+                Decision.community_id == community_id,
+                Decision.moderator_verdict == "pending",
+            )
+        )
+        affected_ids = [
+            d.id for d in decisions_result.scalars().all()
+            if rule_id in (d.agent_reasoning or {})
+        ]
+
+    if not affected_ids:
+        return
+
+    async with write_session() as db:
+        try:
+            rows = await db.execute(
+                select(Decision).where(Decision.id.in_(affected_ids))
+            )
+            updated = 0
+            for d in rows.scalars().all():
+                reasoning = dict(d.agent_reasoning or {})
+                reasoning.pop(rule_id, None)
+                rule_results = [
+                    {"verdict": v.get("verdict", "approve"), "confidence": v.get("confidence", 0.5)}
+                    for k, v in reasoning.items()
+                    if k != "__community_norms__"
+                ]
+                if rule_results:
+                    agg_verdict, agg_confidence = resolve_verdict(rule_results)
+                else:
+                    agg_verdict, agg_confidence = "approve", 1.0
+                norms = reasoning.get("__community_norms__")
+                if norms and agg_verdict == "approve":
+                    agg_verdict = "review"
+                    agg_confidence = norms.get("confidence", agg_confidence)
+                triggered = [
+                    rid for rid, r in reasoning.items()
+                    if rid != "__community_norms__" and r.get("verdict") in ("remove", "warn")
+                ]
+                d.agent_reasoning = reasoning
+                flag_modified(d, "agent_reasoning")
+                d.agent_verdict = agg_verdict
+                d.agent_confidence = agg_confidence
+                d.triggered_rules = triggered
+                flag_modified(d, "triggered_rules")
+                updated += 1
+            await db.commit()
+            logger.info(f"Dropped rule {rule_id} from {updated} pending decision(s)")
+        except Exception as e:
+            logger.error(f"Failed to drop rule {rule_id} from pending queue: {e}")
+            await db.rollback()
+
+
+def spawn_drop_rule_from_pending_queue(community_id: str, rule_id: str) -> None:
+    task = asyncio.create_task(_drop_rule_from_pending_queue(community_id, rule_id))
+    _detached_reeval_tasks.add(task)
+    task.add_done_callback(_detached_reeval_tasks.discard)
+
+
 def _item_to_read(item: ChecklistItem) -> ChecklistItemRead:
     """Convert ORM item to schema using only scalar columns (no relationship access)."""
     return ChecklistItemRead(
@@ -457,6 +527,7 @@ def _item_to_read(item: ChecklistItem) -> ChecklistItemRead:
         context_pinned=item.context_pinned,
         context_override_note=item.context_override_note,
         pinned_tags=item.pinned_tags,
+        user_edited_logic=item.user_edited_logic,
         updated_at=item.updated_at,
         children=[],
     )
@@ -477,6 +548,19 @@ def _build_tree(items: list[ChecklistItem]) -> list[ChecklistItemRead]:
                 parent.children.append(node)
 
     return roots
+
+
+@router.get("/checklist/structural-fields")
+async def list_structural_fields() -> list[dict[str, str]]:
+    """Return the fixed schema of fields that structural items can check.
+
+    The UI uses this to populate the structural-editor field picker so the
+    moderator can only choose fields the evaluator actually understands. The
+    list is hardcoded in core/structural.py — adding a new field requires
+    extending the field_map there.
+    """
+    from ..core.structural import STRUCTURAL_FIELDS
+    return list(STRUCTURAL_FIELDS)
 
 
 @router.get("/rules/{rule_id}/checklist", response_model=list[ChecklistItemRead])
@@ -538,13 +622,20 @@ async def create_checklist_item(
     siblings = [i for i in existing_items if i.parent_id == body.parent_id]
     next_order = max((s.order for s in siblings), default=-1) + 1
 
-    # Infer item_type and logic via Claude
+    # If the moderator explicitly chose a type in the add form, honor it
+    # and only ask the LLM to fill in the logic for that type. Otherwise
+    # let it classify too. ChecklistItemCreate's default is "subjective"
+    # for back-compat — clients that want full inference should send
+    # item_type=None or omit it. Here we treat any explicit value as
+    # user-chosen.
+    forced_type = body.item_type if body.item_type in ("deterministic", "structural", "subjective") else None
     compiler = get_compiler()
     inferred = await compiler.compile_single_item(
         description=body.description,
         rule=rule,
         community=community,
         existing_items=existing_items,
+        force_item_type=forced_type,
     )
 
     item = ChecklistItem(
@@ -574,11 +665,27 @@ async def update_checklist_item(
     if not item:
         raise HTTPException(status_code=404, detail="Checklist item not found")
 
-    # When the description changes and no explicit logic is provided,
-    # re-infer item_type and logic from the new description so the
-    # evaluation behavior actually updates to match the new wording.
+    # Detect the user's intent for the user_edited_logic flag:
+    #   - explicit False  → "Regenerate" — clear the pin and re-infer fresh.
+    #   - explicit True   → caller wants to pin without sending logic (rare).
+    #   - implicit pin    → any item_type/logic in the body flips the flag to True.
+    explicit_unpin = body.user_edited_logic is False
+    explicit_pin = body.user_edited_logic is True
+    implicit_pin = body.item_type is not None or body.logic is not None
+
     description_changed = body.description is not None and body.description != item.description
-    if description_changed and body.logic is None:
+
+    # Re-infer when: regenerate request, OR description changed on a non-pinned
+    # item with no explicit logic in the body. Pinned items skip re-inference
+    # so a pure description tweak doesn't blow away the moderator's calibration.
+    needs_reinfer = explicit_unpin or (
+        description_changed
+        and body.logic is None
+        and not item.user_edited_logic
+        and not implicit_pin
+    )
+
+    if needs_reinfer:
         rule_result = await db.execute(select(Rule).where(Rule.id == item.rule_id))
         rule = rule_result.scalar_one_or_none()
         community = None
@@ -593,21 +700,26 @@ async def update_checklist_item(
         existing_items = list(existing_result.scalars().all())
 
         compiler = get_compiler()
+        # Re-inference uses the new description if provided, else the current one.
         inferred = await compiler.compile_single_item(
-            description=body.description,
+            description=body.description if body.description is not None else item.description,
             rule=rule,
             community=community,
             existing_items=existing_items,
         )
-        item.description = body.description
+        if body.description is not None:
+            item.description = body.description
         if body.item_type is None:
             item.item_type = inferred["item_type"]
         item.logic = inferred["logic"]
+        item.user_edited_logic = False  # regeneration always unpins
     else:
         if body.description is not None:
             item.description = body.description
         if body.logic is not None:
             item.logic = body.logic
+        if implicit_pin or explicit_pin:
+            item.user_edited_logic = True
 
     if body.rule_text_anchor is not None:
         item.rule_text_anchor = body.rule_text_anchor
@@ -740,18 +852,12 @@ async def recompile_rule(
 
     if not existing_items:
         # No checklist yet (e.g. rule was just re-triaged to actionable) — full compile
-        checklist_items, example_dicts = await compiler.compile_rule(
+        checklist_items = await compiler.compile_rule(
             rule=rule,
             community=community,
             other_rules=other_rules,
         )
         await _persist_new_items(db, checklist_items, rule_id)
-        await db.flush()
-        items_result = await db.execute(
-            select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
-        )
-        item_desc_map = {i.description: i.id for i in items_result.scalars()}
-        await _persist_new_examples(db, example_dicts, rule_id, item_description_map=item_desc_map)
         await db.commit()
         return {"suggestion_id": None, "diff": {"mode": "full_compile"}}
 
@@ -810,7 +916,7 @@ async def accept_recompile(
     )
     existing_by_id = {item.id: item for item in existing_result.scalars().all()}
 
-    await _apply_diff_operations(db, operations, existing_by_id, rule_id)
+    skipped = await _apply_diff_operations(db, operations, existing_by_id, rule_id)
     await db.flush()
     await _re_resolve_checklist_links(db, rule_id)
 
@@ -834,4 +940,8 @@ async def accept_recompile(
     pending_gen = schedule_pending_queue_reeval(rule_id)
     background_tasks.add_task(_reevaluate_pending_queue, rule_id, pending_gen)
 
-    return {"status": "accepted", "operations_applied": len(operations)}
+    return {
+        "status": "accepted",
+        "operations_applied": len(operations) - len(skipped),
+        "skipped_ops": skipped,
+    }

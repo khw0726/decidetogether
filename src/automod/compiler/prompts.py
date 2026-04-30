@@ -26,19 +26,14 @@ def _extract_note_weight(note) -> Optional[float]:
 def _weight_label(w: Optional[float]) -> str:
     """Render a per-note weight as a short, prompt-friendly label.
 
-    Shown in brackets after the note text so the LLM can read the calibration intensity:
-      strong-counter / counter / neutral-leaning / weak-supports / supports / strongly-supports
+    Shown in brackets after the note text so the LLM can read the calibration intensity.
+    Weights are non-negative: 0 entries are filtered out before reaching the prompt, so
+    only positive bands need labels here.
     """
     if w is None:
         return ""
-    if w <= -0.75:
-        return " (STRONG COUNTER-SIGNAL: calibrate AWAY from this)"
-    if w <= -0.25:
-        return " (counter-signal: de-emphasise)"
-    if w < 0.25:
-        return " (weak / neutral influence)"
     if w < 0.75:
-        return " (supports this rule)"
+        return " (informs this rule)"
     return " (STRONGLY informs this rule)"
 
 
@@ -131,11 +126,9 @@ Logic schemas:
   - negate=true: triggered when pattern is NOT found (e.g. required tag missing)
 - structural: {"type": "structural", "checks": [{"field": "account_age_days"|"post_type"|"flair"|"karma", "operator": "<"|">"|"<="|">="|"=="|"!="|"in", "value": ...}], "match_mode": "all"|"any"}
   - triggered when the condition is true (e.g. account_age_days < 7 triggers for new accounts)
-- subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
+- subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7}
 
-Keep trees shallow (3 levels max). Generate one violating example and one borderline example per top-level checklist item. Borderline examples are posts that reasonable moderators might genuinely disagree on — they sit at the gray area of the rule.
-
-For each example, include `related_checklist_item_description`: the exact description string of the checklist item this example is designed to trigger (for violating/borderline examples), or null for compliant examples.
+Keep trees shallow (3 levels max).
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -190,8 +183,7 @@ Output:
         "type": "subjective",
         "prompt_template": "Is this post primarily an advertisement for the author's product, service, or brand rather than a contribution to the community?",
         "rubric": "Score higher when the post centers on something the author sells, includes calls to action ('check out my...'), or offers little value beyond promotion.",
-        "threshold": 0.65,
-        "examples_to_include": 5
+        "threshold": 0.65
       },
       "action": "remove",
       "children": [],
@@ -214,47 +206,6 @@ Output:
       "context_influenced": false,
       "context_note": null
     }
-  ],
-  "examples": [
-    {
-      "label": "violating",
-      "content": {
-        "id": "example-1",
-        "platform": "reddit",
-        "author": {"username": "shopowner123", "account_age_days": 5, "platform_metadata": {}},
-        "content": {"title": "Check out my new online store - 20% off this week!", "body": "Hi everyone! I just launched my store at myshop.com. Use code REDDIT20 for 20% off. Would love your feedback!", "media": [], "links": ["https://myshop.com"]},
-        "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
-        "timestamp": "2026-01-01T00:00:00Z"
-      },
-      "relevance_note": "Clear self-promotion with discount code and external shop link",
-      "related_checklist_item_description": "Does the content contain explicit promotional language or calls to action?"
-    },
-    {
-      "label": "borderline",
-      "content": {
-        "id": "example-2b",
-        "platform": "reddit",
-        "author": {"username": "indie_dev", "account_age_days": 180, "platform_metadata": {}},
-        "content": {"title": "I built a free tool that might help this community", "body": "After struggling with X myself, I spent a month building a small free tool. No monetization, just open source. Would love feedback if anyone finds it useful.", "media": [], "links": ["https://github.com/indie_dev/mytool"]},
-        "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
-        "timestamp": "2026-01-01T00:00:00Z"
-      },
-      "relevance_note": "Shares a personal project but it's free/open-source and frames itself as community contribution — moderators might genuinely disagree on whether this crosses into self-promotion",
-      "related_checklist_item_description": "Is this content primarily self-promotional, even without explicit keywords?"
-    },
-    {
-      "label": "compliant",
-      "content": {
-        "id": "example-2c",
-        "platform": "reddit",
-        "author": {"username": "helpfuluser", "account_age_days": 365, "platform_metadata": {}},
-        "content": {"title": "Tutorial: How I built a REST API in Python", "body": "I spent the weekend learning FastAPI and wanted to share what I learned. Here are the key concepts...", "media": [], "links": []},
-        "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
-        "timestamp": "2026-01-01T00:00:00Z"
-      },
-      "relevance_note": "Genuine knowledge sharing, no commercial intent",
-      "related_checklist_item_description": null
-    }
   ]
 }
 
@@ -271,8 +222,7 @@ Output:
         "type": "subjective",
         "prompt_template": "Does this post or comment push a political/religious agenda or lecture others rather than contribute to the discussion?",
         "rubric": "Score higher when content promotes a political agenda, promotes religious beliefs, or is preachy/lecturing.",
-        "threshold": 0.65,
-        "examples_to_include": 5
+        "threshold": 0.65
       },
       "action": "remove",
       "children": [],
@@ -287,54 +237,12 @@ Output:
         "type": "subjective",
         "prompt_template": "Does this post or comment have anything to do with the Pikmin Bloom game?",
         "rubric": "Score higher when the content does not discuss Pikmin Bloom or any related topic.",
-        "threshold": 0.65,
-        "examples_to_include": 5
+        "threshold": 0.65
       },
       "action": "remove",
       "children": [],
       "context_influenced": false,
       "context_note": null
-    }
-  ],
-  "examples": [
-    {
-      "label": "violating",
-      "content": {
-        "id": "example-3",
-        "platform": "reddit",
-        "author": {"username": "newuser", "account_age_days": 30, "platform_metadata": {}},
-        "content": {"title": "I made a postcard with Pikmins marching for freedom", "body": "<a photo of Pikmin in front of the Capitol> Even Pikmins think the election was rigged!", "media": [], "links": []},
-        "context": {"channel": "r/PikminBloomApp", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
-        "timestamp": "2026-01-01T00:00:00Z"
-      },
-      "relevance_note": "Political post",
-      "related_checklist_item_description": "Does the post or the comment contain political, religious, or soap-boxing content?"
-    },
-    {
-      "label": "borderline",
-      "content": {
-        "id": "example-4b",
-        "platform": "reddit",
-        "author": {"username": "casualplayer", "account_age_days": 90, "platform_metadata": {}},
-        "content": {"title": "Anyone else feel like the new update is ruining the game?", "body": "I know this is just a game but the devs really seem to not care about the community anymore. It's frustrating and kind of insulting honestly.", "media": [], "links": []},
-        "context": {"channel": "r/PikminBloomApp", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
-        "timestamp": "2026-01-01T00:00:00Z"
-      },
-      "relevance_note": "Game-related but venting/negative in tone — could be borderline soap-boxing depending on how strictly the community enforces the 'keep it light' tone",
-      "related_checklist_item_description": "Does the post or the comment contain political, religious, or soap-boxing content?"
-    },
-    {
-      "label": "compliant",
-      "content": {
-        "id": "example-4c",
-        "platform": "reddit",
-        "author": {"username": "regularuser", "account_age_days": 200, "platform_metadata": {}},
-        "content": {"title": " Greetings from the White House ", "body": "<a photo of Pikmin in front of the White House>", "media": [], "links": []},
-        "context": {"channel": "r/PikminBloomApp", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": "Showcase", "platform_metadata": {}},
-        "timestamp": "2026-01-01T00:00:00Z"
-      },
-      "relevance_note": "Although it mentions the White House, the post does not discuss any political agenda.",
-      "related_checklist_item_description": null
     }
   ]
 }
@@ -355,41 +263,12 @@ Output:
         "type": "subjective",
         "prompt_template": "Is the primary written language of this post something other than English?",
         "rubric": "Score high when most of the prose is in a non-English language. Code, proper nouns, brand names, and isolated foreign words inside an otherwise English post do not count.",
-        "threshold": 0.7,
-        "examples_to_include": 5
+        "threshold": 0.7
       },
       "action": "remove",
       "children": [],
       "context_influenced": false,
       "context_note": null
-    }
-  ],
-  "examples": [
-    {
-      "label": "violating",
-      "content": {
-        "id": "example-3a",
-        "platform": "reddit",
-        "author": {"username": "user_es", "account_age_days": 200, "platform_metadata": {}},
-        "content": {"title": "¿Alguien tiene experiencia con esto?", "body": "Estoy buscando recomendaciones sobre el mejor enfoque para resolver este problema. Cualquier consejo sería muy apreciado.", "media": [], "links": []},
-        "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
-        "timestamp": "2026-01-01T00:00:00Z"
-      },
-      "relevance_note": "Entirely in Spanish — clearly violates the English-only rule.",
-      "related_checklist_item_description": "Is the post body written in a non-English language?"
-    },
-    {
-      "label": "compliant",
-      "content": {
-        "id": "example-3c",
-        "platform": "reddit",
-        "author": {"username": "english_user", "account_age_days": 400, "platform_metadata": {}},
-        "content": {"title": "Question about my setup", "body": "I've been running into issues with this configuration. Has anyone seen similar behavior?", "media": [], "links": []},
-        "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
-        "timestamp": "2026-01-01T00:00:00Z"
-      },
-      "relevance_note": "Plain English post — clearly compliant.",
-      "related_checklist_item_description": null
     }
   ]
 }
@@ -403,7 +282,6 @@ def build_compile_prompt(
     platform: str,
     other_rules_summary: str,
     existing_checklist: Optional[list] = None,
-    existing_examples: Optional[list] = None,
     community_context: Optional[dict] = None,
 ) -> str:
     import json
@@ -411,8 +289,6 @@ def build_compile_prompt(
     existing_context = ""
     if existing_checklist:
         existing_context += f"\n\nExisting checklist (preserve user customizations where rule intent unchanged):\n{json.dumps(existing_checklist, indent=2)}"
-    if existing_examples:
-        existing_context += f"\n\nExisting examples:\n{json.dumps(existing_examples, indent=2)}"
 
     context_section = ""
     if community_context:
@@ -442,7 +318,7 @@ Community context (other rules, for background):
 Rule to compile:
 {rule_title}: {rule_text}
 
-Generate a minimal checklist tree — only as many items as the rule genuinely requires, no more. Simple rules need one item; complex rules may need several. Do not pad with redundant or overlapping items. For each item, provide one violating example and one borderline example.
+Generate a minimal checklist tree — only as many items as the rule genuinely requires, no more. Simple rules need one item; complex rules may need several. Do not pad with redundant or overlapping items.
 
 Return JSON in exactly this format:
 {{
@@ -456,21 +332,6 @@ Return JSON in exactly this format:
       "children": [],
       "context_influenced": true | false,
       "context_note": "[situational fact] → [calibration decision], or null"
-    }}
-  ],
-  "examples": [
-    {{
-      "label": "compliant" | "violating" | "borderline",
-      "content": {{
-        "id": "...",
-        "platform": "...",
-        "author": "...",
-        "content": {{"title": "...", "body": "...", "media": [], "links": []}},
-        "context": "...",
-        "timestamp": "..."
-      }},
-      "relevance_note": "Why this example relates to the rule",
-      "related_checklist_item_description": "Exact description of the checklist item this example primarily tests, or null for compliant examples"
     }}
   ]
 }}"""
@@ -524,16 +385,8 @@ def build_subjective_eval_prompt(
     post_content: dict,
     items_with_rubrics: list[dict],
     community_name: str,
-    examples: list[dict],
-    borderline_examples: list[dict] | None = None,
 ) -> str:
     import json
-
-    examples_str = ""
-    if examples:
-        examples_str = f"\n\nClear community examples (compliant/violating — use for calibration):\n{json.dumps(examples[:4], indent=2)}"
-    if borderline_examples:
-        examples_str += f"\n\nBorderline calibration examples (reasonable moderators disagree on these — use to understand edge cases):\n{json.dumps(borderline_examples[:8], indent=2)}"
 
     items_str = json.dumps(items_with_rubrics, indent=2)
 
@@ -551,7 +404,6 @@ def build_subjective_eval_prompt(
 {content_label} to evaluate (TARGET):
 {post_str}
 {thread_context_str}
-{examples_str}
 
 Evaluate the following checklist items. Each item is a yes/no question where YES = violation detected.
 
@@ -594,6 +446,10 @@ Logic schemas:
 
 Note: the `action` field is NOT part of this inference — it is provided separately by the user.
 
+Some existing items may be marked [USER-EDITED] with their full `logic` shown. Treat them as fixed \
+coverage when generating logic for the new item — do NOT reproduce patterns/checks/rubrics that already \
+appear in a user-edited item, even if the description sounds related. Pick a non-overlapping angle.
+
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
 
@@ -602,17 +458,32 @@ def build_infer_item_prompt(
     rule_text: Optional[str] = None,
     community_name: str = "",
     existing_items: Optional[list[dict]] = None,
+    force_item_type: Optional[str] = None,
 ) -> str:
     parts = []
     if community_name:
         parts.append(f"Community: {community_name}")
     if rule_text:
         parts.append(f"Rule this item belongs to:\n{rule_text}")
-    if existing_items:
-        items_str = "\n".join(
-            f"- [{item['item_type']}] {item['description']}"
-            for item in existing_items
+    if force_item_type:
+        parts.append(
+            f"REQUIRED item_type: {force_item_type}. The moderator has chosen this type "
+            f"explicitly — set item_type to {force_item_type!r} and generate a logic JSON "
+            f"matching that type's schema. Do not classify; just produce the logic."
         )
+    if existing_items:
+        import json as _json
+        lines = []
+        for item in existing_items:
+            pinned = bool(item.get("user_edited_logic"))
+            tag = "[USER-EDITED] " if pinned else ""
+            head = f"- {tag}[{item['item_type']}] {item['description']}"
+            if pinned:
+                # Show the actual logic so the model can dodge overlap, not
+                # just dodge the description.
+                head += f"\n    logic: {_json.dumps(item.get('logic') or {})}"
+            lines.append(head)
+        items_str = "\n".join(lines)
         parts.append(f"Existing checklist items for this rule (for context, avoid duplication):\n{items_str}")
     parts.append(f"New item description: {description}")
     parts.append("Classify this item and generate the logic JSON.")
@@ -925,9 +796,9 @@ Tree evaluation semantics:
 Logic schemas:
 - deterministic: {"type": "deterministic", "patterns": [{"regex": "...", "case_sensitive": false}], "match_mode": "any"|"all", "negate": false, "field": "all"|"title"|"body"}
 - structural: {"type": "structural", "checks": [{"field": "...", "operator": "<"|">"|"=="|"!="|"<="|">="|"in", "value": ...}], "match_mode": "all"|"any"}
-- subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7, "examples_to_include": 5}
+- subjective: {"type": "subjective", "prompt_template": "...", "rubric": "...", "threshold": 0.7}
 
-Keep trees shallow (3 levels max). Generate one violating and one borderline example per top-level item.
+Keep trees shallow (3 levels max).
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
@@ -939,15 +810,12 @@ def build_no_context_compile_prompt(
     platform: str,
     other_rules_summary: str,
     existing_checklist: Optional[list] = None,
-    existing_examples: Optional[list] = None,
 ) -> str:
     import json
 
     existing_context = ""
     if existing_checklist:
         existing_context += f"\n\nExisting checklist (preserve user customizations where rule intent unchanged):\n{json.dumps(existing_checklist, indent=2)}"
-    if existing_examples:
-        existing_context += f"\n\nExisting examples:\n{json.dumps(existing_examples, indent=2)}"
 
     return f"""{COMPILE_FEW_SHOT_EXAMPLES}
 
@@ -961,7 +829,7 @@ Community context (other rules, for background):
 Rule to compile:
 {rule_title}: {rule_text}
 
-Generate a minimal checklist tree — only as many items as the rule genuinely requires, no more. For each item, provide one violating example and one borderline example.
+Generate a minimal checklist tree — only as many items as the rule genuinely requires, no more.
 
 Return JSON in exactly this format:
 {{
@@ -975,14 +843,6 @@ Return JSON in exactly this format:
       "children": [],
       "context_influenced": false,
       "context_note": null
-    }}
-  ],
-  "examples": [
-    {{
-      "label": "compliant" | "violating" | "borderline",
-      "content": {{...}},
-      "relevance_note": "...",
-      "related_checklist_item_description": "..."
     }}
   ]
 }}"""
@@ -1006,6 +866,14 @@ You may also emit:
 - "add": Context demands a brand-new check the original rule text did not suggest (e.g., a support community \
 might need a "toxic positivity" check under a civility rule). Set context_influenced=true and \
 context_change_types=["new_item"].
+
+SIBLING-RULE AWARENESS:
+- You will be shown the OTHER RULES in this community. Before emitting an "add", check whether the concern \
+is already covered by a sibling rule. If a sibling rule already addresses the concern (even loosely), DO NOT \
+add a duplicate item here — defer enforcement to that rule. Each concern should live in exactly one rule.
+- Same applies to "update": do not expand an item's scope to cover ground a sibling rule already owns.
+- Only add or expand here if the concern is genuinely unaddressed by any sibling rule, AND falls within \
+THIS rule's natural scope.
 
 DIFF DISCIPLINE:
 - Default to "keep" ONLY when context truly has no bearing on the item. Unlike a text-edit recompile, context \
@@ -1034,6 +902,7 @@ def build_context_adjust_prompt(
     community_context: dict,
     pinned_item_ids: Optional[list[str]] = None,
     custom_context_notes: Optional[list[dict]] = None,
+    other_rules_summary: Optional[str] = None,
 ) -> str:
     import json
 
@@ -1074,12 +943,19 @@ def build_context_adjust_prompt(
             "not be changed):\n" + "\n".join(f"  - {pid}" for pid in pinned_item_ids)
         )
 
+    siblings_section = ""
+    if other_rules_summary and other_rules_summary.strip() and other_rules_summary != "No other rules.":
+        siblings_section = (
+            "\n\nOTHER RULES IN THIS COMMUNITY (do NOT duplicate logic these already cover — "
+            "defer to the owning rule):\n" + other_rules_summary
+        )
+
     return f"""Calibrate this checklist for the "{community_name}" community on {platform}.
 
 Rule: {rule_title}: {rule_text}
 
 Community context:
-{context_section}{custom_notes_section}{pinned_section}
+{context_section}{custom_notes_section}{pinned_section}{siblings_section}
 
 Current checklist (each item has an id — operations must reference these ids exactly):
 {json.dumps(current_checklist, indent=2)}
@@ -1134,6 +1010,13 @@ Do NOT add items to "improve" or "complete" the checklist — strictly reflect t
 - Preserve existing items' ids exactly — do not invent new ids for updated items.
 - Children of kept/updated items are handled inline — include them under "children" as before.
 
+USER-EDITED ITEMS — items whose `user_edited_logic` is true represent moderator-pinned calibration:
+- ALWAYS emit "keep" for them. Never "update" their description/logic/item_type/action, never "delete".
+- Treat them as fixed coverage when deciding whether to "add" new items: their `logic` JSON shows what \
+they actually catch. Do NOT propose new items whose logic duplicates a user-edited item's coverage, even \
+if the descriptions are worded differently. The apply step will silently drop any non-keep op against a \
+user-edited item, so emitting one wastes the diff.
+
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
 
@@ -1146,13 +1029,23 @@ def build_recompile_prompt(
 ) -> str:
     import json
 
+    # Tag pinned items so the system prompt's USER-EDITED rule attaches to a
+    # visible marker. We also keep the full logic JSON so the model can
+    # reason about coverage without needing to re-derive it from the description.
+    annotated = []
+    for it in existing_items:
+        d = dict(it)
+        if d.get("user_edited_logic"):
+            d["__marker__"] = "USER-EDITED — keep-only; do not duplicate coverage"
+        annotated.append(d)
+
     return f"""Update the checklist tree for the "{community_name}" community on {platform} to reflect the updated rule text.
 
 Community context (other rules, for background):
 {other_rules_summary if other_rules_summary else "No other rules yet."}
 
 Existing checklist items (with ids):
-{json.dumps(existing_items, indent=2)}
+{json.dumps(annotated, indent=2)}
 
 Updated rule text:
 {rule_text}
@@ -1164,72 +1057,6 @@ Return JSON in exactly this format:
     {{"op": "update", "existing_id": "...", "description": "...", "rule_text_anchor": "...", "item_type": "...", "logic": {{}}, "action": "...", "children": []}},
     {{"op": "delete", "existing_id": "..."}},
     {{"op": "add", "description": "...", "rule_text_anchor": "...", "item_type": "...", "logic": {{}}, "action": "...", "children": []}}
-  ]
-}}"""
-
-
-# ── Fill Missing Examples ──────────────────────────────────────────────────────
-
-FILL_EXAMPLES_SYSTEM = """You are a content moderation testing specialist. Generate realistic post examples that clearly trigger specific moderation checklist items.
-
-For each checklist item provided, generate exactly one violating example — a post that clearly and unambiguously triggers that specific item --- and one borderline example — a post that is on the edge of triggering the item. Make examples realistic and specific enough to be useful test cases.
-
-Return ONLY valid JSON with no markdown formatting or code blocks."""
-
-
-def build_fill_examples_prompt(
-    rule_text: str,
-    community_name: str,
-    platform: str,
-    items_needing_examples: list[dict],
-    existing_examples: Optional[list[dict]] = None,
-) -> str:
-    import json
-
-    existing_str = ""
-    if existing_examples:
-        existing_str = f"\n\nExisting examples (do not duplicate these):\n{json.dumps(existing_examples, indent=2)}"
-
-    return f"""Generate one violating example for each of the following checklist items from the "{community_name}" community on {platform}.
-
-Rule text:
-{rule_text}
-
-Checklist items that need a violating example:
-{json.dumps(items_needing_examples, indent=2)}
-{existing_str}
-
-Generate exactly one violating post per item. Set related_checklist_item_description to the exact description of the item it triggers.
-
-Return JSON in exactly this format:
-{{
-  "examples": [
-    {{
-      "label": "violating",
-      "content": {{
-        "id": "...",
-        "platform": "...",
-        "author": "...",
-        "content": {{"title": "...", "body": "...", "media": [], "links": []}},
-        "context": "...",
-        "timestamp": "..."
-      }},
-      "relevance_note": "Why this example triggers the checklist item",
-      "related_checklist_item_description": "Exact description of the checklist item this triggers"
-    }},
-    {{
-      "label": "borderline",
-      "content": {{
-        "id": "...",
-        "platform": "...",
-        "author": "...",
-        "content": {{"title": "...", "body": "...", "media": [], "links": []}},
-        "context": "...",
-        "timestamp": "..."
-      }},
-      "relevance_note": "Why this example triggers the checklist item",
-      "related_checklist_item_description": "Exact description of the checklist item this triggers"
-    }}
   ]
 }}"""
 

@@ -3,7 +3,7 @@
 import logging
 from typing import Any
 
-from ..db.models import ChecklistItem, Example, Rule
+from ..db.models import ChecklistItem, Rule
 from .deterministic import evaluate_deterministic
 from .structural import evaluate_structural
 from .actions import VERDICT_PRECEDENCE
@@ -31,7 +31,6 @@ class TreeEvaluator:
         checklist: list[ChecklistItem],
         post: dict[str, Any],
         community_name: str,
-        examples: list[Example],
     ) -> dict[str, Any]:
         """Evaluate all checklist items for a rule, return verdict + reasoning.
 
@@ -60,7 +59,6 @@ class TreeEvaluator:
                 items=subjective_items,
                 post=post,
                 community_name=community_name,
-                examples=examples,
             )
             for result in batch_results:
                 subjective_results[result["item_id"]] = result

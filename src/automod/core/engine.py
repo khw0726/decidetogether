@@ -15,7 +15,7 @@ from ..compiler.prompts import (
     COMMUNITY_NORMS_SYSTEM,
     build_community_norms_prompt,
 )
-from ..db.models import ChecklistItem, Community, Decision, Example, ExampleRuleLink, Rule
+from ..db.models import ChecklistItem, Community, Decision, Rule
 from .actions import resolve_verdict
 from .subjective import SubjectiveEvaluator
 from .tree_evaluator import TreeEvaluator
@@ -87,9 +87,6 @@ class EvaluationEngine:
             )
             checklist = list(items_result.scalars().all())
 
-            # Fetch examples for this rule
-            examples = await self._fetch_rule_examples(rule.id)
-
             if not checklist:
                 # No checklist compiled yet — skip evaluation
                 continue
@@ -99,7 +96,6 @@ class EvaluationEngine:
                 checklist=checklist,
                 post=post,
                 community_name=community.name,
-                examples=examples,
             )
 
             rule_verdict = rule_result["verdict"]
@@ -179,15 +175,6 @@ class EvaluationEngine:
             await self.db.refresh(decision)
 
         return decision
-
-    async def _fetch_rule_examples(self, rule_id: str) -> list[Example]:
-        """Fetch examples linked to a rule."""
-        result = await self.db.execute(
-            select(Example)
-            .join(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
-            .where(ExampleRuleLink.rule_id == rule_id)
-        )
-        return list(result.scalars().all())
 
     def _build_rules_summary(self, rules: list[Rule]) -> str:
         lines = []

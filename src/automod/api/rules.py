@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import get_anthropic_client, settings
 from ..compiler.compiler import RuleCompiler, _filter_context_by_relevant
 from ..db.database import get_db
-from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
+from ..db.models import ChecklistItem, Community, Decision, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..embeddings import embed_text, unpack_vector, cosine
 from ..context_clusters import distinctive_clusters as _distinctive_clusters, shared_clusters as _shared_clusters
 from ..models.schemas import (
@@ -166,7 +166,7 @@ async def _compile_rule_read_and_llm(
         # Two-pass compilation: base compile then context adjustment.
         # Sample posts are not passed here — they shape the community context,
         # which the compiler reads directly.
-        adjusted_items, example_dicts, base_checklist_dicts, adjustment_summary = \
+        adjusted_items, base_checklist_dicts, adjustment_summary = \
             await compiler.compile_rule_two_pass(
                 rule=rule,
                 community=community,
@@ -182,7 +182,6 @@ async def _compile_rule_read_and_llm(
             "rule": rule,
             "community": community,
             "checklist_items": adjusted_items,
-            "example_dicts": example_dicts,
             "base_checklist_json": base_checklist_dicts,
             "context_adjustment_summary": adjustment_summary,
             "matched_relevant_context": matched_relevant_context,
@@ -207,13 +206,7 @@ async def _compile_rule_read_and_llm(
 
 
 async def _compile_rule_persist(result: dict) -> None:
-    """Phase 2: Persist compilation results to DB (must be serialized for SQLite).
-
-    Splits into a write-only stage (items/operations/rule fields, under the
-    global write lock) and a follow-up `_fill_missing_examples` call that runs
-    its own LLM work outside the lock. If the follow-up fails the rule is
-    still committed correctly — examples can be regenerated later.
-    """
+    """Phase 2: Persist compilation results to DB (must be serialized for SQLite)."""
     from ..db.database import write_session
 
     rule_id = result["rule_id"]
@@ -224,15 +217,6 @@ async def _compile_rule_persist(result: dict) -> None:
         try:
             if result["mode"] == "compile":
                 await _persist_new_items(db, result["checklist_items"], rule_id)
-                await db.flush()
-                items_result = await db.execute(
-                    select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
-                )
-                item_desc_map = {i.description: i.id for i in items_result.scalars()}
-                await _persist_new_examples(
-                    db, result["example_dicts"], rule_id,
-                    item_description_map=item_desc_map, community_id=result["community_id"],
-                )
                 await db.flush()
                 # Save two-pass artifacts on the Rule, plus auto-matched relevant_context.
                 base_json = result.get("base_checklist_json")
@@ -277,12 +261,6 @@ async def _compile_rule_persist(result: dict) -> None:
             # silently look like a successful compile.
             raise
 
-    # Lock is released — fill missing examples runs its own LLM call outside it.
-    try:
-        await _fill_missing_examples(rule_id, rule, community)
-    except Exception as e:
-        logger.warning(f"Filling missing examples failed for rule {rule_id}: {e}")
-
 
 async def _compile_rule_background(
     rule_id: str,
@@ -303,9 +281,12 @@ async def _compile_rule_background(
         result = await _compile_rule_read_and_llm(rule_id, community_id)
         if result:
             await _compile_rule_persist(result)
-            if result.get("mode") == "recompile":
-                from .checklist import spawn_pending_queue_reeval
-                spawn_pending_queue_reeval(rule_id)
+            # Re-evaluate the pending queue against the new logic in both modes —
+            # for an initial compile (new rule), so the rule's verdict gets added
+            # to existing pending decisions; for a recompile, so existing entries
+            # reflect the updated logic.
+            from .checklist import spawn_pending_queue_reeval
+            spawn_pending_queue_reeval(rule_id)
         await _set_compile_status(rule_id, "ok", None)
     except Exception as e:
         logger.error(f"Compilation failed for rule {rule_id}: {e}")
@@ -340,154 +321,20 @@ async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
     await db.flush()
 
 
-async def _persist_new_examples(
-    db,
-    example_dicts: list,
-    rule_id: str,
-    item_description_map: dict[str, str] | None = None,
-    community_id: str | None = None,
-) -> None:
-    """Insert generated examples and link them to the rule.
-
-    item_description_map maps checklist item description → item ID, used to
-    create ExampleChecklistItemLink records when the compiler provides
-    related_checklist_item_description on an example.
-    """
-    for ex_dict in example_dicts:
-        label = ex_dict.get("label", "compliant")
-        if label == "borderline":
-            # Route borderline examples through the suggestion pipeline so
-            # moderators must make an explicit compliant/violating decision.
-            db.add(Suggestion(
-                rule_id=rule_id,
-                suggestion_type="example",
-                content={
-                    "label": "borderline",
-                    "content": ex_dict.get("content", {}),
-                    "relevance_note": ex_dict.get("relevance_note", ""),
-                    "related_checklist_item_description": ex_dict.get("related_checklist_item_description"),
-                },
-                status="pending",
-            ))
-            continue
-
-        example = Example(
-            community_id=community_id,
-            content=ex_dict.get("content", {}),
-            label=label,
-            source="generated",
-        )
-        db.add(example)
-        await db.flush()
-        db.add(ExampleRuleLink(
-            example_id=example.id,
-            rule_id=rule_id,
-            relevance_note=ex_dict.get("relevance_note", ""),
-        ))
-        related_desc = ex_dict.get("related_checklist_item_description")
-        if related_desc and item_description_map:
-            item_id = item_description_map.get(related_desc)
-            if item_id:
-                db.add(ExampleChecklistItemLink(
-                    example_id=example.id,
-                    checklist_item_id=item_id,
-                    checklist_item_description=related_desc,
-                ))
-
-
-async def _fill_missing_examples(rule_id: str, rule, community) -> None:
-    """Generate one violating example for each top-level checklist item that doesn't have one.
-
-    Self-contained: opens a short read session to snapshot what's missing, runs
-    the LLM with no session held, then opens a short write session to persist
-    results. This keeps the global write lock free during the LLM call.
-    """
-    from ..db.database import AsyncSessionLocal, write_session
-    compiler = get_compiler()
-
-    # ── Read phase ─────────────────────────────────────────────────────
-    async with AsyncSessionLocal() as db:
-        items_result = await db.execute(
-            select(ChecklistItem).where(
-                ChecklistItem.rule_id == rule_id,
-                ChecklistItem.parent_id == None,  # noqa: E711
-            )
-        )
-        all_items = list(items_result.scalars())
-        if not all_items:
-            return
-
-        covered_result = await db.execute(
-            select(ExampleChecklistItemLink.checklist_item_id)
-            .join(Example, Example.id == ExampleChecklistItemLink.example_id)
-            .where(
-                ExampleChecklistItemLink.checklist_item_id.in_([i.id for i in all_items]),
-                Example.label.in_(["violating", "borderline"]),
-            )
-            .distinct()
-        )
-        covered_ids = {r[0] for r in covered_result}
-
-        items_needing = [i for i in all_items if i.id not in covered_ids]
-        if not items_needing:
-            return
-
-        # Limit to 3 items per rule to avoid overwhelming the calibration step.
-        # Prioritize: subjective > context-influenced > lower thresholds (more ambiguous).
-        if len(items_needing) > 3:
-            def _ambiguity_score(item: ChecklistItem) -> tuple:
-                type_rank = 0 if item.item_type == "subjective" else 1
-                context_rank = 0 if item.context_influenced else 1
-                threshold = (item.logic or {}).get("threshold", 0.7) if item.item_type == "subjective" else 1.0
-                return (type_rank, context_rank, threshold)
-
-            items_needing.sort(key=_ambiguity_score)
-            items_needing = items_needing[:3]
-
-        example_ids_result = await db.execute(
-            select(ExampleRuleLink.example_id).where(ExampleRuleLink.rule_id == rule_id)
-        )
-        example_ids = [r[0] for r in example_ids_result]
-        existing_examples = []
-        if example_ids:
-            examples_result = await db.execute(
-                select(Example).where(Example.id.in_(example_ids))
-            )
-            existing_examples = list(examples_result.scalars())
-
-        item_desc_map = {i.description: i.id for i in all_items}
-
-    # ── LLM phase (no session, no lock) ────────────────────────────────
-    new_examples = await compiler.generate_examples_for_items(
-        rule=rule,
-        community=community,
-        items=items_needing,
-        existing_examples=existing_examples or None,
-    )
-    if not new_examples:
-        return
-
-    # ── Write phase ────────────────────────────────────────────────────
-    async with write_session() as db:
-        try:
-            await _persist_new_examples(
-                db, new_examples, rule_id,
-                item_description_map=item_desc_map, community_id=rule.community_id,
-            )
-            await db.commit()
-            logger.info(f"Filled {len(new_examples)} missing example(s) for rule {rule_id}")
-        except Exception:
-            await db.rollback()
-            raise
-
-
 async def _apply_diff_operations(
     db,
     operations: list[dict],
     existing_by_id: dict,
     rule_id: str,
-) -> None:
-    """Apply keep/update/add/delete operations from recompile_with_diff()."""
+) -> list[dict]:
+    """Apply keep/update/add/delete operations from recompile_with_diff().
+
+    Returns a list of skipped ops — currently used to record non-keep ops
+    against user-edited (pinned) items, so the caller can surface them in
+    the suggestion response. Each entry: {"op": ..., "existing_id": ...,
+    "reason": "user_edited_logic"}.
+    """
+    skipped: list[dict] = []
     for op in operations:
         kind = op.get("op")
 
@@ -499,6 +346,16 @@ async def _apply_diff_operations(
             item = existing_by_id.get(op.get("existing_id"))
             if item is None:
                 logger.warning(f"recompile update: unknown id {op.get('existing_id')!r}")
+                continue
+            if getattr(item, "user_edited_logic", False):
+                # The moderator has hand-calibrated this item; treat the LLM's
+                # update as advisory and drop it. The compiler is told to emit
+                # keep-only for these, so this should be rare.
+                skipped.append({
+                    "op": "update",
+                    "existing_id": item.id,
+                    "reason": "user_edited_logic",
+                })
                 continue
             if "description" in op:
                 item.description = op["description"]
@@ -551,6 +408,13 @@ async def _apply_diff_operations(
             item = existing_by_id.get(op.get("existing_id"))
             if item is None:
                 logger.warning(f"recompile delete: unknown id {op.get('existing_id')!r}")
+                continue
+            if getattr(item, "user_edited_logic", False):
+                skipped.append({
+                    "op": "delete",
+                    "existing_id": item.id,
+                    "reason": "user_edited_logic",
+                })
                 continue
             # Collect child IDs, null out all links before deletion to preserve description
             child_ids_result = await db.execute(
@@ -628,6 +492,8 @@ async def _apply_diff_operations(
 
         else:
             logger.warning(f"recompile: unknown op {kind!r}, skipping")
+
+    return skipped
 
 
 def _community_tag_set(community_context: Optional[dict]) -> set[tuple[str, str]]:
@@ -1183,35 +1049,12 @@ async def commit_recompile(
     await db.commit()
     await db.refresh(rule)
 
-    # Fill any missing examples + re-eval pending queue in the background.
+    # Re-eval the moderation queue against the new logic.
     if rule.rule_type == "actionable":
-        background_tasks.add_task(_fill_examples_and_reeval, rule_id, rule.community_id)
-
-    return RuleRead.model_validate(rule)
-
-
-async def _fill_examples_and_reeval(rule_id: str, community_id: str) -> None:
-    """Background follow-up after a synchronous commit-recompile.
-
-    Generates violating examples for any newly-added items that lack one, then
-    re-evaluates the moderation queue against the new logic.
-    """
-    from ..db.database import AsyncSessionLocal
-    try:
-        async with AsyncSessionLocal() as db:
-            rule = (await db.execute(select(Rule).where(Rule.id == rule_id))).scalar_one_or_none()
-            community = (await db.execute(
-                select(Community).where(Community.id == community_id)
-            )).scalar_one_or_none()
-        if rule and community:
-            await _fill_missing_examples(rule_id, rule, community)
-    except Exception as e:
-        logger.error(f"Background follow-up failed for rule {rule_id}: {e}")
-    try:
         from .checklist import spawn_pending_queue_reeval
         spawn_pending_queue_reeval(rule_id)
-    except Exception as e:
-        logger.error(f"Pending-queue re-eval spawn failed for rule {rule_id}: {e}")
+
+    return RuleRead.model_validate(rule)
 
 
 @router.put("/rules/{rule_id}", response_model=RuleRead)
@@ -1318,6 +1161,7 @@ async def override_rule_type(
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
+    prior_type = rule.rule_type
     rule.rule_type = body.rule_type
     if body.reasoning:
         rule.rule_type_reasoning = body.reasoning
@@ -1332,6 +1176,11 @@ async def override_rule_type(
         )
         if not items_result.scalar_one_or_none():
             background_tasks.add_task(_compile_rule_background, rule.id, rule.community_id)
+    elif prior_type == "actionable":
+        # Going from actionable → non-actionable: strip the rule from pending
+        # decisions so the queue stops attributing verdicts to it.
+        from .checklist import spawn_drop_rule_from_pending_queue
+        spawn_drop_rule_from_pending_queue(rule.community_id, rule.id)
 
     return RuleRead.model_validate(rule)
 
@@ -1346,7 +1195,13 @@ async def deactivate_rule(
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
     rule.is_active = False
+    community_id = rule.community_id
     await db.commit()
+
+    # Strip this rule from every pending decision's agent_reasoning so the
+    # moderation queue's aggregate verdict reflects the updated active-rule set.
+    from .checklist import spawn_drop_rule_from_pending_queue
+    spawn_drop_rule_from_pending_queue(community_id, rule_id)
 
 
 class MatchContextResponse(BaseModel):

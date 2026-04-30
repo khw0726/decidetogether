@@ -86,16 +86,6 @@ class CommunitySamplePostRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class ModqueuePullRequest(BaseModel):
-    limit: int = 25
-    since_days: Optional[int] = None  # only fetch actions newer than N days; null = no limit
-
-
-class SamplePostUpdate(BaseModel):
-    label: Optional[str] = None
-    note: Optional[str] = None
-
-
 # ── Rule ───────────────────────────────────────────────────────────────────────
 
 class RuleContextTag(BaseModel):
@@ -226,6 +216,7 @@ class ChecklistItemRead(BaseModel):
     context_pinned: bool = False
     context_override_note: Optional[str] = None
     pinned_tags: Optional[list[RuleContextTag]] = None
+    user_edited_logic: bool = False
     updated_at: datetime
     children: list["ChecklistItemRead"] = []
 
@@ -248,6 +239,10 @@ class ChecklistItemUpdate(BaseModel):
     logic: Optional[dict[str, Any]] = None
     action: Optional[str] = None
     order: Optional[int] = None
+    # Sending item_type or logic auto-flips this to True. The client may
+    # send user_edited_logic=False explicitly to trigger a fresh re-inference
+    # from the current description (the "Regenerate" button).
+    user_edited_logic: Optional[bool] = None
 
 
 # ── Example ────────────────────────────────────────────────────────────────────

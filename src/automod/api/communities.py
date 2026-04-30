@@ -17,7 +17,6 @@ from ..core.engine import EvaluationEngine
 from ..core.reddit_crawler import (
     crawl_subreddit_comments,
     crawl_subreddit_posts,
-    fetch_modlog_actions,
 )
 from ..db.database import AsyncSessionLocal, get_db
 from ..db.models import (
@@ -40,8 +39,6 @@ from ..models.schemas import (
     CommunitySamplePostCreate,
     CommunitySamplePostRead,
     DecisionRead,
-    ModqueuePullRequest,
-    SamplePostUpdate,
     RedditImportRequest,
     RedditImportResponse,
 )
@@ -285,138 +282,6 @@ async def add_sample_post(
     )
     db.add(post)
     await _mark_context_stale(community)
-    await db.commit()
-    await db.refresh(post)
-    return CommunitySamplePostRead.model_validate(post)
-
-
-class ModqueuePullResponse(BaseModel):
-    pending: list[CommunitySamplePostRead]
-    new_count: int
-    skipped_existing: int
-
-
-@router.post(
-    "/communities/{community_id}/sample-posts/pull-modqueue",
-    response_model=ModqueuePullResponse,
-    status_code=201,
-)
-async def pull_modqueue(
-    community_id: str,
-    body: ModqueuePullRequest,
-    db: AsyncSession = Depends(get_db),
-) -> ModqueuePullResponse:
-    """Fetch recent removelink/approvelink actions from the subreddit modlog and
-    stage them as *pending* sample posts. Mods review them before they are committed."""
-    result = await db.execute(select(Community).where(Community.id == community_id))
-    community = result.scalar_one_or_none()
-    if not community:
-        raise HTTPException(status_code=404, detail="Community not found")
-
-    if community.platform != "reddit":
-        raise HTTPException(status_code=422, detail="Modqueue pull is only available for Reddit communities")
-
-    if not (settings.reddit_client_id and settings.reddit_username and settings.reddit_password):
-        raise HTTPException(status_code=422, detail="Reddit mod credentials (username/password) are required")
-
-    m = re.match(r"^r/(.+)$", community.name.strip(), re.IGNORECASE)
-    if not m:
-        raise HTTPException(status_code=422, detail="Community name must be in r/subreddit format")
-
-    since_unix = None
-    if body.since_days:
-        since_unix = (datetime.now(tz=timezone.utc).timestamp()) - body.since_days * 86400
-
-    actions = await fetch_modlog_actions(
-        subreddit=m.group(1),
-        client_id=settings.reddit_client_id,
-        client_secret=settings.reddit_client_secret,
-        user_agent=settings.reddit_user_agent,
-        username=settings.reddit_username,
-        password=settings.reddit_password,
-        limit=body.limit,
-        since_unix=since_unix,
-    )
-
-    # Dedupe against existing samples (pending OR committed) for this community
-    existing_result = await db.execute(
-        select(CommunitySamplePost.content, CommunitySamplePost.source_metadata).where(
-            CommunitySamplePost.community_id == community_id,
-        )
-    )
-    existing_target_ids: set[str] = set()
-    for content, meta in existing_result.all():
-        if isinstance(content, dict) and content.get("id"):
-            existing_target_ids.add(content["id"])
-        if isinstance(meta, dict) and meta.get("target_fullname"):
-            existing_target_ids.add(meta["target_fullname"])
-
-    new_posts: list[CommunitySamplePostRead] = []
-    skipped = 0
-    for action in actions:
-        target_id = (action.get("source_metadata") or {}).get("target_fullname") or action["content"].get("id")
-        if target_id and target_id in existing_target_ids:
-            skipped += 1
-            continue
-        existing_target_ids.add(target_id)
-        post = CommunitySamplePost(
-            community_id=community_id,
-            content=action["content"],
-            label=action["label"],
-            note=None,
-            status="pending",
-            source="modqueue",
-            source_metadata=action.get("source_metadata"),
-        )
-        db.add(post)
-        await db.flush()
-        await db.refresh(post)
-        new_posts.append(CommunitySamplePostRead.model_validate(post))
-
-    await db.commit()
-    return ModqueuePullResponse(
-        pending=new_posts,
-        new_count=len(new_posts),
-        skipped_existing=skipped,
-    )
-
-
-@router.post(
-    "/communities/{community_id}/sample-posts/{post_id}/approve",
-    response_model=CommunitySamplePostRead,
-)
-async def approve_sample_post(
-    community_id: str,
-    post_id: str,
-    body: SamplePostUpdate | None = None,
-    db: AsyncSession = Depends(get_db),
-) -> CommunitySamplePostRead:
-    """Promote a pending sample to committed, optionally relabeling/annotating."""
-    result = await db.execute(
-        select(CommunitySamplePost).where(
-            CommunitySamplePost.id == post_id,
-            CommunitySamplePost.community_id == community_id,
-        )
-    )
-    post = result.scalar_one_or_none()
-    if not post:
-        raise HTTPException(status_code=404, detail="Sample post not found")
-
-    if body and body.label is not None:
-        if body.label not in ("acceptable", "unacceptable"):
-            raise HTTPException(status_code=422, detail="label must be acceptable|unacceptable")
-        post.label = body.label
-    if body and body.note is not None:
-        post.note = body.note
-
-    if post.status != "committed":
-        post.status = "committed"
-        community = (await db.execute(
-            select(Community).where(Community.id == community_id)
-        )).scalar_one_or_none()
-        if community:
-            await _mark_context_stale(community)
-
     await db.commit()
     await db.refresh(post)
     return CommunitySamplePostRead.model_validate(post)
@@ -944,6 +809,7 @@ async def preview_context_impact(
                 community_context=draft_context,
                 relevant_context=rule.relevant_context,
                 custom_context_notes=rule.custom_context_notes,
+                other_rules=rules,
             )
             if summary:
                 impacts.append(ContextPreviewImpactItem(
@@ -1018,6 +884,7 @@ async def reapply_context(
                 pinned_item_ids=pinned_item_ids,
                 relevant_context=rule.relevant_context,
                 custom_context_notes=rule.custom_context_notes,
+                other_rules=rules,
             )
 
             # Replace existing checklist items. Deletion frees up the existing
