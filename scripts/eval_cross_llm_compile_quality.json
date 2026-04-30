@@ -1,0 +1,794 @@
+{
+  "claude-sonnet_compile": {
+    "config": {
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic",
+      "mode": "compile"
+    },
+    "metrics": {
+      "n_total": 10,
+      "n_errors": 0,
+      "accuracy": 0.8,
+      "approve_precision": 1.0,
+      "approve_recall": 0.6667,
+      "approve_f1": 0.8,
+      "remove_precision": 0.6667,
+      "remove_recall": 1.0,
+      "remove_f1": 0.8,
+      "review_precision": 0,
+      "review_recall": 0,
+      "review_f1": 0,
+      "mean_per_subreddit_accuracy": 0.8
+    },
+    "results": [
+      {
+        "id": "mb-00157",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "remove",
+        "correct": false,
+        "confidence": 0.78,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00377",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "remove",
+        "correct": false,
+        "confidence": 0.75,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00099",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00052",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00213",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00319",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00073",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00388",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00093",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.92,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00234",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      }
+    ],
+    "quality": {
+      "structural": {
+        "anchor_in_rule": 0.8333,
+        "non_leaf_action": 1.0,
+        "regex_compiles": 1.0,
+        "tree_depth_ok": 1.0,
+        "example_count_ok": 0.0,
+        "rubric_nonempty": 1.0
+      },
+      "llm_scores": {
+        "coverage": 3.8333,
+        "logic_specificity": 3.3333,
+        "item_type_fit": 4.3333,
+        "example_quality": 4.1667,
+        "anchor_accuracy": 4.8333,
+        "mean": 4.1
+      }
+    },
+    "quality_per_rule": [
+      {
+        "subreddit": "books",
+        "rule_text_short": "Discussion is the goal  Do not post shallow content. All posts must be directly ",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": true
+        },
+        "llm_scores": {
+          "coverage": 4,
+          "logic_specificity": 4,
+          "item_type_fit": 5,
+          "example_quality": 4,
+          "anchor_accuracy": 5,
+          "notes": "Coverage (4): The single checklist item captures the three stated criteria (book-related, informative, discussion-focused) reasonably well and the rubric enumerates good sub-signals. Minor gap: the rule text says \"informative\" as a standalone criterion, but the rubric somewhat conflates it with discussion-focus. A post could be highly informative (e.g. a detailed publication-date announcement) yet still lack discussion value; the rubric touches on this in point (4) but could be clearer that informativeness alone is insufficient without a discussion angle. No separate item is needed, but the distinction could be sharper.\n\nLogic specificity (4): The rubric is detailed and gives useful positive/negative scoring signals. Threshold of 0.65 is reasonable. Slight risk of over-triggering on posts that are brief but genuinely discussion-inviting (e.g. a short but pointed question about a book), since \"one-liner\" is listed as a violation signal without qualifying whether it poses a substantive question. The rubric's \"Score lower when\u2026\" clause partially mitigates this, but could more explicitly note that length alone is not disqualifying.\n\nExample quality (4): Three examples are provided \u2014 a clear violator, a genuine borderline, and a clear compliant. The borderline is well-chosen and realistic. However, there are only three examples (the prompt template requests 5), so two near-boundary cases are missing. Useful absent examples would include: (a) a purely informational news post (\"Book X won the Booker Prize today\") with no discussion prompt, and (b) a movie-adaptation post that mentions the source book briefly but focuses on the film \u2014 both of which the rubric explicitly flags but which are not illustrated."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Personal conduct  Please use a civil tone and assume good faith when entering a ",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": true
+        },
+        "llm_scores": {
+          "coverage": 4,
+          "logic_specificity": 4,
+          "item_type_fit": 5,
+          "example_quality": 4,
+          "anchor_accuracy": 5,
+          "notes": "Coverage (4): The single checklist item captures both \"civil tone\" and \"assume good faith\" reasonably well, but a second item could more explicitly target bad-faith assumption as a distinct sub-criterion (e.g., assuming malicious intent vs. general incivility). The two prongs of the rule are folded into one item, which works but risks under-weighting the good-faith dimension during scoring.\n\nLogic specificity (4): The rubric is solid and the threshold (0.65) is sensible. However, the rubric could be slightly sharper around what \"contemptuous tone\" looks like versus \"strong disagreement\" \u2014 the boundary cases (like the borderline example) are close enough that more concrete behavioral anchors (e.g., rhetorical questions that imply incompetence) would help reduce inter-rater variance.\n\nExample quality (4): The violating and compliant examples are realistic and well-constructed. The single borderline example is genuinely near the decision boundary, which is good. However, the rule asks for 5 examples to be included (per the rubric field), but only 3 are provided. More borderline cases \u2014 e.g., passive-aggressive sarcasm, venting frustration at a topic that incidentally sounds directed at a person \u2014 would improve discriminative value."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Prohibited  Self-promotion and promotional posts, comments & flairs, memes, imag",
+        "structural": {
+          "anchor_in_rule": false,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": true
+        },
+        "llm_scores": {
+          "coverage": 4,
+          "logic_specificity": 3,
+          "item_type_fit": 3,
+          "example_quality": 5,
+          "anchor_accuracy": 5,
+          "notes": "**logic_specificity (3):** The deterministic regex for self-promotion is over-broad and will trigger false positives on many legitimate posts. Words like \"recommend,\" \"suggest,\" \"my book\" (in context of a book being discussed, not authored), \"buy\" (e.g., \"I just bought this book\"), \"sell\" (e.g., \"the author sells this idea well\"), \"free\" (e.g., \"free time to read\"), and \"visit\" (e.g., \"visit a library\") are extremely common in genuine book discussion. The piracy regex similarly risks false positives \u2014 e.g., \"pdf download\" could appear in a legitimate discussion about ebook formats. The recommendation regex would catch phrases like \"what book club suggestions do people have?\" which is community discussion, not personal requests. These patterns are not specific enough to reliably distinguish violations from edge cases without the downstream subjective check saving them \u2014 but the deterministic layer as standalone is problematic. The dual-layer (det \u2192 subj) architecture partially mitigates this, but the det layer is still too noisy.\n\n**item_type_fit (3):** The meme/image-only check is classified as \"structural\" using `post_type in [\"image\", \"video\"]`, but Reddit posts can be image-type while having substantial text (e.g., a link post with a body that has extensive commentary in the submission text). More importantly, text posts can embed images inline without changing post_type. The structural check may miss memes embedded in self-posts or over-trigger on legitimate image posts. Additionally, the first self-promotion item is classified \"deterministic\" but the patterns are so broad that this classification overstates the reliability of the match \u2014 it functions more like a keyword pre-filter than true deterministic logic, which is borderline misclassification.\n\n**coverage (4):** All six explicitly named prohibitions from the rule text are represented (self-promotion/sales links, memes/image-only/video-only, personal recommendation requests/what's that book/should I read, piracy/plagiarism, spoilers without warning, low-quality lists/sensationalist headlines). Minor gap: \"promotional flairs\" as a standalone signal isn't structurally checked (no `flair` field check) \u2014 it's only folded into the subjective LLM prompt, which may miss flair-only violations where the post body is otherwise clean."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Encouraged  We love original content and self-posts! Thoughts, discussion questi",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": true
+        },
+        "llm_scores": {
+          "coverage": 3,
+          "logic_specificity": 3,
+          "item_type_fit": 4,
+          "example_quality": 3,
+          "anchor_accuracy": 4,
+          "notes": "**Coverage (3):** The rule text is actually an \"Encouraged\" rule \u2014 it describes what the community *welcomes* (original content, self-posts, thoughts, discussion questions, epiphanies, interesting links, flair usage), not a removal policy. The compiled checklist reduces this entirely to a topicality gate (is it related to books?), while completely ignoring two other distinct signals in the rule: (1) the encouragement of *original content and self-posts* (which could inform checks around link-only or low-effort posts), and (2) the mention of a *flair system*, which could prompt a structural check for flair usage. These are not trivial omissions \u2014 the flair system mention in particular maps directly to a deterministic/structural check that is missing.\n\n**Logic Specificity (3):** The single LLM rubric is broadly reasonable but has a notable gap: the threshold of 0.7 and the rubric language are calibrated purely for topicality, with no guidance on distinguishing \"original content / self-post\" quality from link dumps or spam. The rubric's treatment of movie adaptations as a near-violation is slightly over-aggressive \u2014 adaptation discussions are a well-established genre in book communities and the rule itself says \"interesting links about authors and their work,\" which could include adaptation commentary. The rubric could also false-positive on publishing-industry news posts that don't mention a specific book/author.\n\n**Item Type Fit (4):** The single item is correctly classified as subjective. However, the missing flair-related check would naturally be a structural/deterministic item \u2014 its absence contributes to the coverage gap rather than a misclassification of existing items.\n\n**Example Quality (3):** Only three examples are generated (the prompt template requests 5). The violating example is an obvious, clear-cut off-topic case (Netflix shows). The borderline example (Dune film \u2192 book re-read) is genuinely near the decision boundary and well-chosen. The compliant example is solidly on-topic. Missing: a borderline compliant that tests the \"original content vs. low-effort link dump\" distinction; a borderline case around publishing/industry news with no specific book; and any example testing flair usage \u2014 which the rule explicitly mentions.\n\n**Anchor Accuracy (4):** The anchor quote is accurate and drawn directly from the rule text. Minor issue: the anchor omits \"original content and self-posts\" and the flair system mention, which are also substantive parts of the rule. This is a symptom of the coverage gap rather than a fabricated quote, so no major deduction here."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Important  We don't allow personal recommendation posts. You can ask in our Week",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": true
+        },
+        "llm_scores": {
+          "coverage": 4,
+          "logic_specificity": 3,
+          "item_type_fit": 5,
+          "example_quality": 4,
+          "anchor_accuracy": 5,
+          "notes": "**logic_specificity (3):** The rubric does a reasonable job describing the spectrum but has a notable gap: it doesn't distinguish between \"personal\" recommendation requests (tailored to the individual's tastes/history) and \"general community\" recommendation requests (e.g., \"what are the best sci-fi books?\"). The rule text specifically says *personal* recommendation posts are disallowed and explicitly redirects users to r/suggestmeabook \u2014 implying general list/discussion-style solicitations may be permitted. The rubric's third \"score higher\" criterion (\"post would be better suited for r/suggestmeabook\") is circular and doesn't add independent signal. Without a clearer boundary around the word \"personal,\" the rubric risks over-triggering on general community discussion posts like the borderline example. A pattern-level signal (e.g., presence of first-person framing + personal taste references) would sharpen this considerably.\n\n**coverage (4):** The single checklist item captures the core rule. However, the rule text also implies a minor procedural element \u2014 the existence of approved alternatives (Weekly Thread, Suggested Reading page, r/suggestmeabook) \u2014 which could inform the rubric but is not reflected at all. This is a minor gap since the alternatives are redirect instructions rather than additional violation criteria.\n\n**example_quality (4):** The three examples are realistic and well-written. The borderline case is genuinely useful and close to the decision boundary. However, only one borderline example is provided, and the compiled checklist specifies `\"examples_to_include\": 5` \u2014 only 3 were generated. A second borderline case (e.g., a post asking for recs framed as a poll or \"discussion\") and a near-miss compliant post (e.g., someone asking what others thought of a book but subtly fishing for a next-read suggestion) would improve coverage of edge cases."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Spoiler Policy  Any post with a spoiler in the title will be removed. Any commen",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": true
+        },
+        "llm_scores": {
+          "coverage": 4,
+          "logic_specificity": 3,
+          "item_type_fit": 4,
+          "example_quality": 5,
+          "anchor_accuracy": 5,
+          "notes": "logic_specificity issue: The deterministic regex for detecting valid spoiler tags \u2014 `\\[([^\\]]+)\\]\\(#s\\s+\"[^\"]*\"\\)` \u2014 requires at least one whitespace character between `#s` and the opening quote (`\\s+`). However, the rule's canonical example `[Spoilers about XYZ](#s \"Spoiler content here\")` has exactly one space, which is fine, but the regex uses `\\s+` (one or more whitespace) rather than `\\s*` (zero or more). More critically, the match_mode is \"any\" with negate:true, meaning the item triggers when NO valid spoiler tag is found anywhere in the comment. This is logically sound for gating into the subjective child check, but it means ANY comment \u2014 including one with no spoiler content at all \u2014 passes the gate. This is mitigated by the subjective child node, so the two-step structure is appropriate. However, the regex itself could false-negative on valid tags if the user omits the space (e.g. `[Text](#s\"content\")`), which is a real edge case not handled. The regex also doesn't anchor to the full pattern robustly \u2014 a comment with both a valid tag AND additional untagged spoiler content would be treated as compliant (the negate:true would score it as non-violating because it found at least one valid tag). This is a meaningful gap if a comment mixes tagged and untagged spoilers. coverage note: Minor gap \u2014 the rule specifies the exact spoiler tag format in detail, but the checklist doesn't explicitly verify that the tag format includes the label text before `#s` (i.e., `[Label text]`), though this is implicitly captured by the regex. The ban action item is flagged rather than banned \u2014 this is acceptable as a human-review step but worth noting."
+        }
+      }
+    ]
+  },
+  "gemini-pro_compile": {
+    "config": {
+      "model": "gemini-3.1-pro-preview",
+      "provider": "google",
+      "mode": "compile"
+    },
+    "metrics": {
+      "n_total": 10,
+      "n_errors": 0,
+      "accuracy": 0.7,
+      "approve_precision": 1.0,
+      "approve_recall": 0.5,
+      "approve_f1": 0.6667,
+      "remove_precision": 0.5714,
+      "remove_recall": 1.0,
+      "remove_f1": 0.7273,
+      "review_precision": 0,
+      "review_recall": 0,
+      "review_f1": 0,
+      "mean_per_subreddit_accuracy": 0.7
+    },
+    "results": [
+      {
+        "id": "mb-00157",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "remove",
+        "correct": false,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00377",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "remove",
+        "correct": false,
+        "confidence": 0.92,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00099",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00052",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00213",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00319",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00073",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00388",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00093",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00234",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "remove",
+        "correct": false,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      }
+    ],
+    "quality": {
+      "structural": {
+        "anchor_in_rule": 0.8333,
+        "non_leaf_action": 1.0,
+        "regex_compiles": 1.0,
+        "tree_depth_ok": 1.0,
+        "example_count_ok": 0.0,
+        "rubric_nonempty": 0.0
+      },
+      "llm_scores": {
+        "coverage": 2.6667,
+        "logic_specificity": 2.1667,
+        "item_type_fit": 3.3333,
+        "example_quality": 1.5,
+        "anchor_accuracy": 3.6667,
+        "mean": 2.6667
+      }
+    },
+    "quality_per_rule": [
+      {
+        "subreddit": "books",
+        "rule_text_short": "Discussion is the goal  Do not post shallow content. All posts must be directly ",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 3,
+          "logic_specificity": 2,
+          "item_type_fit": 4,
+          "example_quality": 1,
+          "anchor_accuracy": 4,
+          "notes": "Coverage: The rule has three distinct criteria \u2014 (1) book-related, (2) informative, and (3) discussion-focused. The checklist collapses criteria 2 and 3 into a single item (\"shallow, uninformative, or failing to foster meaningful discussion\"), which is workable but merges two independently testable concepts. \"Informative\" and \"discussion-focused\" can fail independently (e.g., a post could be a detailed book fact-dump with no discussion prompt \u2014 informative but not discussion-focused), so separating them would improve precision. Coverage score is 3 because of this merging gap.\n\nLogic specificity: Both items rely purely on LLM judgment with no concrete rubrics, signals, or examples of what counts as \"shallow,\" \"informative,\" or \"discussion-focused.\" The atmosphere note gestures toward a threshold calibration but provides no actionable guidance (e.g., minimum word count signals, presence of a question, personal reflection, or analysis). Without specificity, these checks are highly prone to inconsistent moderation and false positives/negatives. Score 2.\n\nItem type fit: Both items are correctly classified as subjective \u2014 these genuinely require judgment and cannot be resolved by pattern matching alone. Score 4 (minor note: a deterministic helper for obvious off-topic cases, e.g., pure meme images or price-check posts, could complement the subjective checks).\n\nExample quality: The generated examples are entirely empty \u2014 content is an empty object, descriptions are blank strings, and labels carry no substance. This is a complete failure of example generation. Score 1.\n\nAnchor accuracy: \"directly book related\" and \"Do not post shallow content.\" are both verbatim phrases from the rule text, accurately quoted. Score 4 (minor deduction: \"directly book related\" omits the comma and surrounding context but is recognizable)."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Personal conduct  Please use a civil tone and assume good faith when entering a ",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 3,
+          "logic_specificity": 3,
+          "item_type_fit": 4,
+          "example_quality": 1,
+          "anchor_accuracy": 5,
+          "notes": "**Coverage (3):** The two checklist items map cleanly onto the two explicit phrases in the rule (\"civil tone\" and \"assume good faith\"), so the main criteria are covered. However, the \"civil tone\" item only enumerates insults, hostility, and aggressive language, missing subtler incivility such as condescension, sarcasm used as a weapon, or passive-aggressive dismissal. The \"assume good faith\" item covers a few archetypes (trolling, shilling, malicious intent) but misses related bad-faith accusations like calling someone a liar, a bot, or a paid operative \u2014 patterns that could realistically appear and are not enumerated. A note on the distinction between criticising ideas vs. attacking persons would also strengthen coverage. **Logic Specificity (3):** Both items rely entirely on open-ended LLM judgment with no anchoring examples, no illustrative phrases, and no boundary guidance in the rubric. For a rule this vague, the rubric should at least distinguish (a) strong criticism of an idea (compliant) vs. personal attack (violation), and (b) expressions of scepticism about a position (compliant) vs. explicit attribution of malicious motive to a user (violation). Without these guardrails the items risk both over- and under-triggering. **Item Type Fit (4):** Subjective classification is correct for both items given the judgment-heavy nature of tone and intent assessment. Minor deduction because a deterministic pre-screen for obvious slurs/profanity could be added as a child `det` item to the civility node, improving efficiency. **Example Quality (1):** The generated examples are entirely empty \u2014 a single \"compliant\" entry with blank content, relevance note, and checklist reference. This fails the dimension completely. There are no near-boundary cases, no violation examples, and no realistic content at all. Examples should include cases such as: sharp but civil disagreement (compliant), mild sarcasm (borderline), direct insult (violation), expressing doubt about someone's position (compliant), and accusing a user of being a shill (violation). **Anchor Accuracy (5):** Both anchors (\"use a civil tone\" and \"assume good faith\") are verbatim phrases lifted directly from the rule text."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Prohibited  Self-promotion and promotional posts, comments & flairs, memes, imag",
+        "structural": {
+          "anchor_in_rule": false,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 4,
+          "logic_specificity": 2,
+          "item_type_fit": 3,
+          "example_quality": 3,
+          "anchor_accuracy": 4,
+          "notes": "**logic_specificity (2):** Every single checklist item has an empty `logic: {}` object. There are no regex patterns, structural checks, keyword lists, or rubric criteria defined for any item. This means the compiled checklist provides zero actionable signal to distinguish true violations from edge cases \u2014 a moderator reviewing a borderline post gets no guidance beyond the plain-English description. For example, \"promotional material\" needs at least a rubric distinguishing incidental links from overt self-promotion; \"low quality book list\" needs criteria like minimum item count, presence/absence of descriptions, etc.\n\n**item_type_fit (3):** Most items are appropriately classified as `subjective`, but several have clear deterministic or structural signals that are being ignored due to empty logic blocks. \"Sales links\" could have a `det` sub-item with a URL/domain pattern check. \"Spoilers without warning\" could have a `det` check for Reddit spoiler tag syntax (`>!...!<`). \"Meme / image-only / video-only\" could use a `str` check on post flair or media type. Classifying all items purely as `subjective` misses these opportunities and shifts unnecessary burden onto LLM judgment.\n\n**example_quality (3):** All `content` fields are empty objects `{}`, meaning no actual post text, titles, or media descriptions are provided. The examples rely entirely on the `relevance_note` to convey context, which is a significant weakness \u2014 real moderators (or automated systems) cannot practice decision-making on empty content. The borderline examples are conceptually well-chosen (Substack link, \"shelfie\" image, classic literature spoiler, pacing-framed \"should I read?\" question), but they are unusable without actual content.\n\n**anchor_accuracy (4):** Most anchors quote the rule accurately. The last item combines \"low quality book lists\" and \"sensationalist headlines\" into one anchor with an ellipsis (`low quality book lists... sensationalist headlines`), which skips over \"spoilers without warning\" \u2014 this is a minor but real inaccuracy in the quoted excerpt. All other anchors are precise direct quotes."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Encouraged  We love original content and self-posts! Thoughts, discussion questi",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 2,
+          "logic_specificity": 2,
+          "item_type_fit": 3,
+          "example_quality": 2,
+          "anchor_accuracy": 2,
+          "notes": "\n**Coverage (2):** The rule text is an \"Encouraged\" rule listing positive content types: original content, self-posts, thoughts, discussion questions, epiphanies, interesting links about authors/works, and book world developments. The compiler inverted this into a single removal check (\"completely unrelated to books\"), which collapses five or six distinct encouraged content types into one vague criterion. There are no checklist items for the flair system mentioned, no items distinguishing self-posts vs. link posts, and no items about whether content is original vs. reposted. The full spirit of the rule \u2014 what is *encouraged* \u2014 is almost entirely absent.\n\n**Logic Specificity (2):** The single checklist item's logic object is empty `{}`, meaning there are no patterns, keywords, or rubric anchors defined. \"Completely unrelated to books, authors, their works, or developments in the book world\" is an extremely broad and vague test. It sets no threshold for how tangentially related a post must be to pass, and provides no guidance to distinguish edge cases (e.g., movie adaptations, author personal news, publishing industry news, book merchandise). This will produce many false negatives and false positives without any further specification.\n\n**Item Type Fit (3):** Using \"subjective\" is defensible since on-topic relevance requires judgment, but with an empty logic object there are no rubric criteria defined to guide that judgment. A structural check for flair usage (mentioned in the rule) could have been added as a deterministic item. The single item does the minimum but misses opportunities for better-typed checks.\n\n**Example Quality (2):** All three examples have empty `content: {}` objects \u2014 there is no actual post text, title, or body provided in any example. This makes them completely non-functional as examples for training or testing a moderator or model. The borderline example concept (movie adaptation focused on cinematography) is a reasonable idea, but without content it cannot be evaluated. The compliant example's `related_checklist_item_description` is the string `\"null\"` rather than a proper null or a real description, which is a data quality error.\n\n**Anchor Accuracy (2):** The anchor `\"about authors and their work. We also encourage discussion about developments in the book world\"` is a partial and stitched-together quote that omits the beginning of the sentence (\"Thoughts, discussion questions, epiphanies and interesting links\") and joins two non-contiguous fragments with no ellipsis. It does not precisely quote a single continuous passage from the rule text, making it misleading as a citation anchor.\n"
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Important  We don't allow personal recommendation posts. You can ask in our Week",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 2,
+          "logic_specificity": 2,
+          "item_type_fit": 3,
+          "example_quality": 1,
+          "anchor_accuracy": 3,
+          "notes": "\n**Coverage (2):** The single checklist item captures the core prohibition but misses important nuances from the rule: (1) the distinction between \"personal\" recommendations vs. general recommendation posts (the rule says \"personal recommendation posts,\" which implies posts directed at getting tailored picks for the individual poster \u2014 this nuance is not captured); (2) the rule provides three explicit alternative channels (Weekly Recommendation Thread, Suggested Reading/What to Read page, /r/suggestmeabook) \u2014 none of these are referenced in the checklist, even as context for the moderator to redirect the user; (3) there is no item addressing edge cases like posts that are framed as discussions but are functionally recommendation requests.\n\n**Logic Specificity (2):** The `logic` field is completely empty (`{}`). There are no regex patterns, keyword lists, or LLM rubric criteria defined. A rubric should at minimum specify signals like: explicit \"recommend me,\" \"what should I read,\" \"looking for books like X,\" or implicit request framing. Without any logic, this item cannot reliably distinguish a recommendation request from a legitimate discussion post or a review post.\n\n**Item Type Fit (3):** Classifying this as `subjective` is broadly appropriate since intent-detection requires judgment, but without any accompanying rubric or heuristics in the `logic` field, the classification is vacuous. A well-formed subjective item should include LLM-readable criteria. Additionally, some surface-level signals (e.g., \"recommend me,\" \"suggest a book\") could be handled deterministically as a first pass.\n\n**Example Quality (1):** Only one example is provided, it is labeled \"compliant,\" its `content` is an empty object `{}`, and the `relevance_note` is an empty string. There are zero violation examples, zero near-boundary examples, and the single example contains no actual content. This is a complete failure of the examples dimension.\n\n**Anchor Accuracy (3):** The description phrase \"personal book recommendations\" is a mild paraphrase \u2014 the rule says \"personal recommendation posts,\" not \"personal book recommendations.\" While close, it is not an exact quote. The `logic` field is empty so there are no other anchors to evaluate.\n"
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Spoiler Policy  Any post with a spoiler in the title will be removed. Any commen",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 2,
+          "logic_specificity": 2,
+          "item_type_fit": 3,
+          "example_quality": 1,
+          "anchor_accuracy": 4,
+          "notes": "\n**Coverage (2):** The compiled checklist is missing the third distinct rule requirement entirely: \"Any user with an extensive history of spoiling books will be banned.\" This is a user-level ban criterion that is not represented by any checklist item. Additionally, the spoiler tag syntax ([Topic](#s \"content\")) is not captured as a reference/instructional item to help evaluators recognize what a properly formatted spoiler looks like.\n\n**Logic Specificity (2):** Both checklist items are marked subjective with empty `logic: {}` objects, meaning there are no patterns, regex, or structural signals to help identify what constitutes a spoiler in a title or an improperly formatted spoiler code in a comment. At minimum, the spoiler code format `[text](#s \"content\")` is explicitly defined in the rule and should be captured as a deterministic or structural pattern \u2014 e.g., a regex check for the `(#s` markdown pattern. Without this, the rubric cannot distinguish a compliant hidden spoiler from an exposed one programmatically.\n\n**Item Type Fit (3):** The first item (spoiler in the title) is reasonably subjective since detecting a \"spoiler\" requires judgment. However, the second item (comment not using spoiler code) has a deterministic component: the rule explicitly defines the spoiler code syntax `[text](#s \"content\")`. The absence of this code pattern could be checked deterministically, yet the item is classified entirely as subjective. A hybrid or deterministic sub-item for the code format check is missing.\n\n**Example Quality (1):** All three generated examples have completely empty `content: {}` fields. No actual content was generated \u2014 no post titles, no comment text, no near-boundary cases are illustrated. This makes the examples entirely useless for training or calibrating moderation decisions.\n\n**Anchor Accuracy (4):** The two anchors that are present quote the rule text accurately and precisely. Minor deduction because the third rule sentence (\"Any user with an extensive history\u2026\") and the spoiler tag definition are not anchored at all, but the existing anchors themselves are correct.\n"
+        }
+      }
+    ]
+  },
+  "gpt-5.4_compile": {
+    "config": {
+      "model": "gpt-5.4",
+      "provider": "openai",
+      "mode": "compile"
+    },
+    "metrics": {
+      "n_total": 10,
+      "n_errors": 0,
+      "accuracy": 0.7,
+      "approve_precision": 0.8,
+      "approve_recall": 0.6667,
+      "approve_f1": 0.7273,
+      "remove_precision": 0.6,
+      "remove_recall": 0.75,
+      "remove_f1": 0.6667,
+      "review_precision": 0,
+      "review_recall": 0,
+      "review_f1": 0,
+      "mean_per_subreddit_accuracy": 0.7
+    },
+    "results": [
+      {
+        "id": "mb-00157",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "remove",
+        "correct": false,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00377",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "remove",
+        "correct": false,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00099",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "approve",
+        "correct": false,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00052",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00213",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00319",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00073",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.85,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00388",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      },
+      {
+        "id": "mb-00093",
+        "subreddit": "books",
+        "ground_truth": "remove",
+        "predicted": "remove",
+        "correct": true,
+        "confidence": 0.95,
+        "difficulty": "unknown",
+        "source": "removal_log"
+      },
+      {
+        "id": "mb-00234",
+        "subreddit": "books",
+        "ground_truth": "approve",
+        "predicted": "approve",
+        "correct": true,
+        "confidence": 1.0,
+        "difficulty": "unknown",
+        "source": "sqlite3_submission"
+      }
+    ],
+    "quality": {
+      "structural": {
+        "anchor_in_rule": 1.0,
+        "non_leaf_action": 1.0,
+        "regex_compiles": 1.0,
+        "tree_depth_ok": 1.0,
+        "example_count_ok": 0.0,
+        "rubric_nonempty": 0.0
+      },
+      "llm_scores": {
+        "coverage": 3.3333,
+        "logic_specificity": 2.5,
+        "item_type_fit": 3.6667,
+        "example_quality": 2.6667,
+        "anchor_accuracy": 4.6667,
+        "mean": 3.3667
+      }
+    },
+    "quality_per_rule": [
+      {
+        "subreddit": "books",
+        "rule_text_short": "Discussion is the goal  Do not post shallow content. All posts must be directly ",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 3,
+          "logic_specificity": 2,
+          "item_type_fit": 4,
+          "example_quality": 2,
+          "anchor_accuracy": 5,
+          "notes": "**Coverage (3):** The rule has three distinct, conjunctive requirements \u2014 (1) directly book related, (2) informative, and (3) discussion focused \u2014 but the compiled checklist collapses all three into a single OR-logic item (\"not X, not Y, or not Z\"). This means any one failure triggers removal, which may be correct, but the three criteria are meaningfully different and deserve separate checklist items so moderators can reason about each independently. For example, a post could be book-related and discussion-focused but contain no informative content, and a separate item would make that judgment cleaner.\n\n**Logic Specificity (2):** The single subjective item is extremely broad \u2014 essentially restating the rule verbatim as a yes/no question. There are no rubrics, heuristics, or examples of what counts as \"informative\" vs. not, or what \"discussion focused\" means (e.g., does it require an open-ended question? a prompt for replies? a substantive opinion?). Without tighter rubrics, this item is highly prone to inconsistent moderation and false positives/negatives. The compiler should have provided LLM rubrics describing the spectrum for each sub-criterion.\n\n**Item Type Fit (4):** Subjective classification is appropriate for all three underlying criteria, so no issue there. Minor deduction because splitting into three items would still all be subjective, but the single-item collapse is the bigger problem addressed under coverage/specificity.\n\n**Example Quality (2):** Only two examples are generated (both lacking actual post text), and both are described in abstract terms rather than as concrete, realistic post content. The \"violating\" example (\"meme-style prompt\") is fairly obvious, not near the decision boundary. The \"borderline\" example is more useful conceptually, but without actual post text it's impossible to evaluate realism or boundary proximity. There is no clearly non-violating example to anchor the other end of the spectrum, which is a significant gap for training moderators."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Personal conduct  Please use a civil tone and assume good faith when entering a ",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 3,
+          "logic_specificity": 2,
+          "item_type_fit": 4,
+          "example_quality": 2,
+          "anchor_accuracy": 5,
+          "notes": "**Coverage (3):** The rule has two distinct requirements \u2014 (1) use a civil tone, and (2) assume good faith. The single checklist item merges both into one combined question (\"uncivil tone OR accuse others of bad faith\"), which technically covers the surface of the rule but collapses two separable criteria. A violation of civility (e.g., profanity, insults) is distinct from a bad-faith accusation (e.g., \"you're lying,\" \"you're just trolling\"), and they can occur independently. Splitting them into two items would improve precision and coverage. Additionally, the rule says \"when entering a conversation,\" which implies a context-sensitivity (e.g., is this directed at other participants vs. a general rant?) that is not captured at all.\n\n**Logic Specificity (2):** The rubric is extremely vague \u2014 \"uncivil tone or accuse others of bad faith\" gives almost no guidance on how to draw the line. There are no rubric anchors, no examples of what counts as uncivil vs. merely blunt or heated, no distinction between tone directed at other users vs. third parties, and no threshold for what constitutes a bad-faith accusation. This would generate high false-positive and false-negative rates depending on the individual moderator applying it.\n\n**Item Type Fit (4):** Marking this as subjective is appropriate given the judgment required. Minor issue: atmosphere_influenced is marked false with no note, but tone-policing rules often interact with community atmosphere; this could at least be acknowledged.\n\n**Example Quality (2):** The examples lack actual text \u2014 they are only described in meta-terms (\"direct insult,\" \"dismissive phrasing,\" \"disagrees respectfully\"). Without concrete example posts/comments, they cannot be evaluated for realism, diversity, or true boundary-testing. The borderline example is the only one near the decision boundary, but even it is described abstractly. A strong example set would include specific quoted text and cover edge cases like sarcasm, passive-aggressive phrasing, venting without directing it at a user, etc.\n\n**Anchor Accuracy (5):** The anchor quotes the rule text exactly and completely."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Prohibited  Self-promotion and promotional posts, comments & flairs, memes, imag",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 5,
+          "logic_specificity": 3,
+          "item_type_fit": 3,
+          "example_quality": 4,
+          "anchor_accuracy": 5,
+          "notes": "logic_specificity: All checklist items are purely LLM-rubric subjective checks with no structural or deterministic signals layered in. Several items could benefit from tighter guidance. For example, \"low quality book list\" has no rubric criteria distinguishing it from a borderline case (e.g., minimum number of entries with descriptions, presence of any commentary). \"Sensationalist headline\" has no pattern guidance (e.g., excessive punctuation, superlatives, emotional manipulation cues). \"Piracy/plagiarism\" has no structural hints (e.g., external download links, pastebin-style content). Without these tighter rubrics the logic will struggle at the boundary and risk false positives or false negatives. item_type_fit: Most items are reasonably labeled subjective, but \"image-only\" and \"video-only\" posts could be partially deterministic/structural \u2014 a post with only a media embed and no text body is structurally detectable without LLM judgment. Labeling these purely subjective misses an opportunity for a deterministic or structural pre-check. Similarly, sales links (URLs matching e-commerce domains) and piracy links (known piracy domains) could have a deterministic layer. example_quality: Examples are decent and cover all checklist items with one violating and one borderline case each. However, several borderline cases are somewhat predictable and not very close to the decision boundary (e.g., \"reaction meme\" is obvious; the bookshelf image borderline is good). More nuanced borderlines would improve this dimension \u2014 e.g., an author AMA that contains a shop link only in the comments, or a \"what's that book\" disguised as a trivia question."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Encouraged  We love original content and self-posts! Thoughts, discussion questi",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 2,
+          "logic_specificity": 2,
+          "item_type_fit": 3,
+          "example_quality": 2,
+          "anchor_accuracy": 3,
+          "notes": "**Coverage (2):** The rule text is an \"Encouraged\" rule \u2014 it describes what IS welcome (original content, self-posts, thoughts, discussion questions, epiphanies, interesting links about authors/work, book world developments, flair system). The compiled checklist inverts it into a single removal check for off-topic posts. However, the rule says nothing about removing anything explicitly \u2014 it's purely aspirational/encouraging. The compilation fails to cover several distinct elements: (1) the encouragement of *original content and self-posts* specifically, (2) the *flair system* mentioned at the end, and (3) the nuance that this is a positive guidance rule, not a removal rule. The checklist reduces a multi-faceted \"encouraged\" guideline to a single binary removal trigger, which misrepresents the rule's intent.\n\n**Logic Specificity (2):** The single LLM rubric \u2014 \"Is the post unrelated to books, authors, their work, or developments in the book world?\" \u2014 is far too broad and vague to avoid false positives. There is no guidance on edge cases: book-adjacent media (adaptations, author interviews on podcasts, literary awards), self-promotion thresholds, or what counts as a \"development in the book world.\" A rubric this open-ended will produce inconsistent moderation decisions.\n\n**Item Type Fit (3):** Classifying the item as \"subjective\" is defensible since topical relevance requires judgment, but the action \"remove\" is questionable given this is an \"Encouraged\" (not a \"Prohibited\") rule. The item type fit is adequate for the rubric itself but the action assignment is misaligned with the rule's nature.\n\n**Example Quality (2):** Only two examples are provided (minimum diversity), and neither includes the actual post text \u2014 they are described only in the relevance_note with no concrete content. The \"violating\" example (phone hardware upgrade) is extremely obvious and not near any decision boundary. The borderline example (TV adaptation storytelling) is more useful but still lacks the actual text of a post, making it impossible to assess realism. No examples cover encouraged behaviors like original self-posts, flair usage, or book-world news posts.\n\n**Anchor Accuracy (3):** The anchor quotes a real phrase from the rule text, but it omits the opening clause (\"original content and self-posts! Thoughts, discussion questions, epiphanies and interesting links\") which is directly relevant to the checklist item's scope. The truncation slightly misrepresents which aspects of the rule the item is meant to cover."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Important  We don't allow personal recommendation posts. You can ask in our Week",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 3,
+          "logic_specificity": 3,
+          "item_type_fit": 4,
+          "example_quality": 2,
+          "anchor_accuracy": 5,
+          "notes": "**Coverage (3):** The rule mentions three alternative venues (Weekly Recommendation Thread, Suggested Reading/What to Read page, /r/suggestmeabook), but the checklist has no items addressing whether the post was already redirected or whether the redirect alternatives should be noted in the removal reason. More critically, the checklist conflates \"what to read\" with \"what to buy or choose,\" but it does not address edge cases like \"best-of\" lists, gift recommendation requests, or \"what did you think of X\" posts that are technically discussion but could border on personal recommendations. The single checklist item is functionally adequate but leaves no room for nuanced sub-cases.\n\n**Logic Specificity (3):** The single LLM rubric (\"asking others what book(s) the author should read, buy, or choose next\") is fairly broad and does not provide discriminating signals to avoid false positives. For example, it could over-trigger on general \"what are some good books about X topic\" posts vs. a truly personalized \"given my taste/situation, what should I read?\" post. The rubric lacks distinguishing criteria such as: presence of personal context (age, mood, prior reads), direct address to readers for a personal pick, or contrast with general discussion/recommendation list posts.\n\n**Item Type Fit (4):** Classifying this as subjective is appropriate since determining whether a post is a \"personal\" recommendation request requires judgment. Minor issue: some signals (e.g., explicit phrases like \"what should I read next?\", \"recommend me a book\") could be surfaced as deterministic or structural pre-filters before escalating to subjective review, which would improve precision.\n\n**Example Quality (2):** Only two examples are generated \u2014 one clearly violating and one borderline \u2014 and neither includes actual post text or titles. Without concrete post content, the examples are abstract placeholders rather than realistic, near-boundary illustrations. Missing examples include: (a) a general \"best books about WWII\" post (borderline \u2014 not personalized but still a recommendation ask), (b) a \"I loved X, what's similar?\" post (clear violation), (c) a discussion post that incidentally asks for recommendations at the end (borderline), and (d) a non-violating book discussion post for contrast. Diversity and realism are both weak.\n\n**Anchor Accuracy (5):** The anchor \"We don't allow personal recommendation posts.\" is an exact verbatim quote from the rule text."
+        }
+      },
+      {
+        "subreddit": "books",
+        "rule_text_short": "Spoiler Policy  Any post with a spoiler in the title will be removed. Any commen",
+        "structural": {
+          "anchor_in_rule": true,
+          "non_leaf_action": true,
+          "regex_compiles": true,
+          "tree_depth_ok": true,
+          "example_count_ok": false,
+          "rubric_nonempty": false
+        },
+        "llm_scores": {
+          "coverage": 4,
+          "logic_specificity": 3,
+          "item_type_fit": 4,
+          "example_quality": 4,
+          "anchor_accuracy": 5,
+          "notes": "**logic_specificity (3):** The second checklist item (\"Does the comment contain a spoiler that is not formatted using the spoiler code?\") could be substantially strengthened. The rule provides the exact spoiler syntax \u2014 `[Spoilers about XYZ](#s \"Spoiler content here\")` \u2014 but the compiled item makes no reference to checking for the presence/absence of this specific pattern. A deterministic or semi-structural sub-check could flag comments containing narrative book content that lack the `(#s \"...\")` markdown pattern, rather than leaving it entirely to subjective judgment. Without this specificity, moderators may inconsistently apply the formatting check. **coverage (4):** The checklist covers all three enforcement clauses (post title, comment formatting, user ban history). Minor gap: there is no helper item or note clarifying what counts as a correctly formatted spoiler tag (i.e., `[label](#s \"content\")`), which would help moderators evaluate the comment item more reliably. **item_type_fit (4):** The third item's action is listed as `flag` rather than `ban`, which is arguably correct as a process step but slightly inconsistent with the rule's stated consequence (\"will be banned\"). A note or explicit escalation action toward ban would be cleaner."
+        }
+      }
+    ]
+  }
+}

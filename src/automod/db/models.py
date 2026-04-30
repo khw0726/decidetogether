@@ -81,6 +81,12 @@ class Rule(Base):
     # Embedding of the rule title (packed float32 bytes) — populated only for reference
     # rules in the peer-grounding corpus. Used for cosine retrieval at suggestion time.
     title_embedding: Mapped[Optional[bytes]] = mapped_column(LargeBinary, nullable=True)
+    # Background compilation status surfaced in the admin UI so moderators see when
+    # a compile is running, succeeded, or failed (and why). 'idle' = never compiled
+    # or status reset; 'pending' = bg task running; 'ok' = last compile succeeded;
+    # 'failed' = last compile raised — see compile_error for the message.
+    compile_status: Mapped[str] = mapped_column(String, nullable=False, default="idle")
+    compile_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

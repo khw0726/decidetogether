@@ -1,0 +1,1285 @@
+{
+  "purpose": {
+    "peer_support_and_advice": {
+      "description": "Emotional support, personal advice, peer assistance, and help-seeking among community members",
+      "example_tags": [
+        "advice_seeking",
+        "experience_sharing",
+        "practical_advice",
+        "conflict_resolution",
+        "venting_and_catharsis",
+        "relatable_grievances",
+        "low_barrier_help",
+        "narrative_sharing",
+        "interpersonal_disputes",
+        "actionable_advice"
+      ]
+    },
+    "technical_support_and_troubleshooting": {
+      "description": "Technical help, bug reporting, troubleshooting, problem-solving for products or software",
+      "example_tags": [
+        "player_support",
+        "technical_support",
+        "technical_advice",
+        "account_security",
+        "platform_discussion",
+        "problem_solving",
+        "bug_reporting",
+        "feature_feedback",
+        "technical_troubleshooting",
+        "platform_help"
+      ]
+    },
+    "knowledge_and_information_sharing": {
+      "description": "Sharing facts, resources, educational content, and general information with the community",
+      "example_tags": [
+        "knowledge_sharing",
+        "community_resources",
+        "information_aggregation",
+        "community_resource_hub",
+        "information_sharing",
+        "outcome_documentation",
+        "educational_content_sharing",
+        "fact_verification",
+        "knowledge_aggregation",
+        "cultural_content_sharing"
+      ]
+    },
+    "news_and_current_events": {
+      "description": "Aggregating, sharing, and discussing news, current events, and updates",
+      "example_tags": [
+        "news_aggregation",
+        "news_sharing",
+        "news_and_discussion",
+        "event_commentary",
+        "geopolitical_analysis",
+        "esports_coverage",
+        "community_news",
+        "current_events_discussion",
+        "factual_reporting",
+        "political_discussion"
+      ]
+    },
+    "discussion_and_debate": {
+      "description": "General discussion, debate, commentary, and exchange of opinions on any topic",
+      "example_tags": [
+        "open_ended_discussion",
+        "conversational",
+        "behavior_documentation",
+        "discussion_oriented",
+        "cross_platform_commentary",
+        "discussion_based",
+        "general_interest",
+        "moral_arbitration",
+        "accountability_seeking",
+        "casual_discussion"
+      ]
+    },
+    "content_aggregation_and_curation": {
+      "description": "Collecting, curating, and surfacing links, media, or content from elsewhere",
+      "example_tags": [
+        "community_curation",
+        "content_discovery",
+        "novelty_seeking",
+        "content_aggregation",
+        "entertainment_curation",
+        "content_sharing",
+        "multi_format_posts",
+        "media_curation",
+        "media_aggregation",
+        "surprise_discovery"
+      ]
+    },
+    "fan_community_and_franchise": {
+      "description": "Fan communities organized around a specific franchise, IP, show, game, or media property",
+      "example_tags": [
+        "streamer_discussion",
+        "film_discussion",
+        "creator_engagement",
+        "fan_community",
+        "fan_content_sharing",
+        "gacha_pull_celebration",
+        "sports_fandom",
+        "episode_tracking",
+        "fan_discussion",
+        "chapter_tracking"
+      ]
+    },
+    "game_discussion_and_strategy": {
+      "description": "Gameplay discussion, strategy sharing, theorycrafting, build optimization, and game-specific advice",
+      "example_tags": [
+        "game_discussion",
+        "strategy_sharing",
+        "strategy_discussion",
+        "patch_analysis",
+        "competitive_and_casual",
+        "build_guidance",
+        "theory_crafting",
+        "strategy_advice",
+        "game_discovery",
+        "gameplay_strategy"
+      ]
+    },
+    "humor_and_memes": {
+      "description": "Meme creation and sharing, humor-focused content, jokes, and comedic culture",
+      "example_tags": [
+        "social_mockery",
+        "secondhand_embarrassment",
+        "joke_explanation",
+        "meme_culture",
+        "lighthearted_content",
+        "humor_consumption",
+        "absurdity_curation",
+        "humor_discovery",
+        "meme_creation",
+        "schadenfreude_humor"
+      ]
+    },
+    "creative_expression_and_showcase": {
+      "description": "Sharing original creative work, projects, art, writing, photos, or other user-generated content",
+      "example_tags": [
+        "inspiration_sharing",
+        "project_discussion",
+        "user_generated_content",
+        "creative_expression",
+        "content_showcase",
+        "cultural_showcase",
+        "creative_sharing",
+        "oc_only",
+        "project_showcase",
+        "hands_on_work"
+      ]
+    },
+    "question_and_answer": {
+      "description": "Structured Q&A, recommendation-seeking, decision support, and direct question-answering formats",
+      "example_tags": [
+        "crowdsourced_perspectives",
+        "question_answer_format",
+        "question_answering",
+        "low_barrier_inquiry",
+        "voting_based",
+        "crowdsourced_judgment",
+        "narrative_based_voting",
+        "binary_verdict_seeking",
+        "recommendation_seeking",
+        "social_voting"
+      ]
+    },
+    "media_sharing_and_consumption": {
+      "description": "Sharing and passively consuming videos, clips, images, screenshots, and other media",
+      "example_tags": [
+        "visual_content",
+        "reactive_viewing",
+        "visual_sharing",
+        "visual_media_focus",
+        "clip_sharing",
+        "image_sharing",
+        "media_sharing",
+        "video_consumption",
+        "real_emotion_observation",
+        "media_consumption"
+      ]
+    },
+    "skill_development_and_learning": {
+      "description": "Learning, skill-building, peer education, how-to guides, and educational resources",
+      "example_tags": [
+        "peer_education",
+        "educational_resource",
+        "community_education",
+        "guide_creation",
+        "instructional_content",
+        "how_to_sharing",
+        "educational_consumption",
+        "recreational_mathematics",
+        "diy_project_discussion",
+        "practical_guides"
+      ]
+    },
+    "career_and_professional_guidance": {
+      "description": "Career advice, professional development, industry discussion, and workplace guidance",
+      "example_tags": [
+        "labor_advice",
+        "professional_referral_pathway",
+        "professional_discussion",
+        "industry_discourse",
+        "professional_community",
+        "industry_specific_knowledge",
+        "professional_knowledge_sharing",
+        "career_guidance",
+        "career_advice",
+        "professional_advice"
+      ]
+    },
+    "community_coordination_and_events": {
+      "description": "Organizing community events, coordination, scheduling, voting, and community logistics",
+      "example_tags": [
+        "community_coordination",
+        "game_coordination",
+        "cooperative_gameplay_facilitation",
+        "synchronized_discussion",
+        "event_coordination",
+        "player_coordination",
+        "community_events",
+        "indirect_coordination",
+        "community_moderation",
+        "community_organizing"
+      ]
+    },
+    "consumer_and_product_discussion": {
+      "description": "Product reviews, recommendations, purchasing advice, and equipment or gear discussion",
+      "example_tags": [
+        "trade_sharing",
+        "component_selection",
+        "build_validation",
+        "device_discussion",
+        "product_discussion",
+        "purchase_guidance",
+        "equipment_discussion",
+        "trading_marketplace",
+        "purchasing_guidance",
+        "product_information"
+      ]
+    },
+    "social_connection_and_community_building": {
+      "description": "Building relationships, cultural exchange, social bonding, and fostering community identity",
+      "example_tags": [
+        "community_hub",
+        "casual_engagement",
+        "community_celebration",
+        "positivity_sharing",
+        "appreciation_focused",
+        "volunteer_driven",
+        "nostalgia_celebration",
+        "community_sharing",
+        "cultural_sharing",
+        "lifestyle_sharing"
+      ]
+    },
+    "civic_and_local_engagement": {
+      "description": "Civic participation, local community hubs, neighborhood discussion, and public affairs",
+      "example_tags": [
+        "continental_discussion",
+        "regional_coordination",
+        "civic_engagement",
+        "regional_discussion",
+        "local_information_sharing",
+        "local_discussion",
+        "local_community_discussion",
+        "civic_discourse",
+        "policy_discussion",
+        "local_community_hub"
+      ]
+    },
+    "entertainment_and_passive_consumption": {
+      "description": "Entertainment-focused communities primarily for passive enjoyment with low interaction expectations",
+      "example_tags": [
+        "non_actionable_content",
+        "passive_consumption",
+        "entertainment",
+        "passive_engagement",
+        "entertainment_consumption",
+        "passive_learning",
+        "non_actionable_entertainment",
+        "passive_browsing",
+        "voyeuristic_entertainment",
+        "entertainment_focused"
+      ]
+    },
+    "other": {
+      "description": "Tags that do not clearly fit any of the above canonical categories",
+      "example_tags": [
+        "piracy_community",
+        "non_commercial",
+        "non_actionable",
+        "cross_platform",
+        "high_specificity",
+        "low_barrier_posting",
+        "low_barrier_entry",
+        "privacy_focused",
+        "non_actionable_inventory",
+        "chance_based_selection"
+      ]
+    }
+  },
+  "participants": {
+    "mixed_expertise_levels": {
+      "description": "Communities spanning a wide range of knowledge and skill depth, from beginners to experts, with no dominant tier",
+      "example_tags": [
+        "mixed_expertise",
+        "mixed_expertise_levels",
+        "d&d_veterans_and_newcomers",
+        "heterogeneous_expertise",
+        "expertise_agnostic",
+        "minimal_expertise_gap",
+        "casual_to_expert_spectrum",
+        "mixed_skill_levels",
+        "newcomers_present",
+        "beginner_to_expert_spectrum"
+      ]
+    },
+    "expertise_asymmetry": {
+      "description": "Significant imbalance between expert and novice members, creating potential for knowledge gatekeeping or mentorship dynamics",
+      "example_tags": [
+        "knowledge_asymmetry",
+        "knowledge_hierarchy",
+        "expertise_asymmetry",
+        "skill_asymmetry",
+        "verified_hierarchy",
+        "dm_and_player_split",
+        "technical_asymmetry",
+        "skill_gap_high",
+        "gatekeeping_risk",
+        "high_expertise_asymmetry"
+      ]
+    },
+    "casual_to_hardcore_spectrum": {
+      "description": "Participants range from low-investment casual consumers to deeply committed enthusiasts or competitive players",
+      "example_tags": [
+        "casual_to_hardcore_gamers",
+        "casual_browsers",
+        "casual_to_hardcore",
+        "casual_users",
+        "broad_casual_to_hardcore_spectrum",
+        "casual_to_hardcore_spectrum",
+        "casual_to_pro_spectrum",
+        "casual_learners",
+        "casual_to_hardcore_players",
+        "casual_participants"
+      ]
+    },
+    "broad_age_range": {
+      "description": "Community includes members across multiple generational cohorts, from young users to older adults",
+      "example_tags": [
+        "broad_age_demographic",
+        "age_diverse",
+        "mixed_life_experience",
+        "intergenerational_potential",
+        "mixed_age_demographics",
+        "age_diversity_risk",
+        "broad_age_range",
+        "diverse_age_range",
+        "cross_generational",
+        "age_diverse_audience"
+      ]
+    },
+    "youth_presence": {
+      "description": "Meaningful proportion of minors or young demographics, elevating age-related moderation considerations",
+      "example_tags": [
+        "includes_minors",
+        "youth_demographic",
+        "youth_skewed_demographics",
+        "younger_demographic",
+        "youth_skew_likely",
+        "youth_significant",
+        "family_friendly_space",
+        "youth_skewed",
+        "youth_presence",
+        "youth_presence_likely"
+      ]
+    },
+    "adult_focused": {
+      "description": "Community is primarily or explicitly oriented toward adult participants",
+      "example_tags": [
+        "moderate_age_floor",
+        "adult_residents",
+        "adult_skewed_demographic",
+        "adult_audience",
+        "adult_oriented",
+        "crude_humor_exposure",
+        "young_adult_males",
+        "mature_content_exposure",
+        "adult_male_audience",
+        "adult_skewing_audience"
+      ]
+    },
+    "vulnerable_populations": {
+      "description": "Members who may be at elevated risk due to financial, emotional, informational, legal, or developmental factors",
+      "example_tags": [
+        "financial_vulnerability",
+        "socially_anxious_users",
+        "vulnerable_question_askers",
+        "subject_vulnerability",
+        "vulnerable_populations",
+        "relationship_conflict_affected",
+        "accessibility_vulnerability",
+        "relationship_vulnerability",
+        "gaming_addiction_risk",
+        "retail_investors"
+      ]
+    },
+    "misinformation_susceptibility": {
+      "description": "Participants are at heightened risk of encountering or spreading false or misleading information",
+      "example_tags": [
+        "misinformation_vulnerability",
+        "susceptible_to_deception",
+        "vulnerable_to_misinformation",
+        "vulnerable_to_hype",
+        "misinformation_susceptibility",
+        "satire_confusion_risk",
+        "susceptible_to_scams",
+        "mixed_credibility_sources",
+        "susceptible_to_manipulation",
+        "vulnerability_to_scams"
+      ]
+    },
+    "global_audience": {
+      "description": "Membership is geographically distributed across multiple countries or regions, including multilingual and cross-cultural participants",
+      "example_tags": [
+        "global_multilingual_attempt",
+        "global_demographic",
+        "international_playerbase",
+        "global_diverse",
+        "global_audience",
+        "global_community",
+        "global_reach",
+        "broad_geographic_interest",
+        "international_audience",
+        "global_diverse_audience"
+      ]
+    },
+    "general_audience": {
+      "description": "No specific demographic, expertise, or interest prerequisites; open to the broad public",
+      "example_tags": [
+        "broad_demographic",
+        "broad_demographics",
+        "general_audience",
+        "mainstream_reddit",
+        "mainstream_audience",
+        "diverse_demographics",
+        "broad_audience",
+        "general_population",
+        "mainstream_gamers",
+        "mainstream_casual_audience"
+      ]
+    },
+    "low_barrier_to_entry": {
+      "description": "Community requires minimal prior knowledge, skill, or credentials to participate meaningfully",
+      "example_tags": [
+        "low_barrier_entry",
+        "low_expertise_barrier",
+        "low_barrier_to_entry",
+        "minimal_expertise_required",
+        "no_expertise_requirement",
+        "new_player_influx",
+        "inclusive_newcomers",
+        "low_expertise_required",
+        "inclusive_participation",
+        "newcomer_influx"
+      ]
+    },
+    "enthusiast_community": {
+      "description": "Participants share a strong common interest or fandom, ranging from hobbyists to dedicated superfans",
+      "example_tags": [
+        "design_enthusiasts",
+        "gaming_enthusiasts",
+        "tech_enthusiasts",
+        "enthusiast_focused",
+        "humor_enthusiasts",
+        "broad_fandom",
+        "spoiler_sensitive_audience",
+        "sport_enthusiasm_dependent",
+        "high_emotional_investment",
+        "hobbyists_and_makers"
+      ]
+    },
+    "professional_practitioners": {
+      "description": "Community includes or is centered on people with industry credentials, career expertise, or vocational stakes",
+      "example_tags": [
+        "legal_analysts",
+        "industry_participants",
+        "content_creators",
+        "employed_workers",
+        "creative_professionals",
+        "unofficial_employee_presence",
+        "professional_practitioners",
+        "industry_professionals",
+        "content_creators_featured",
+        "mod_developers"
+      ]
+    },
+    "competitive_players": {
+      "description": "Participants engaged in ranked, tournament, or performance-oriented play or competition",
+      "example_tags": [
+        "esports_professionals_present",
+        "competitive_culture_risk",
+        "competitive_players",
+        "competitive_esports_subset",
+        "esports_professionals",
+        "tactical_players",
+        "competitive_subgroups",
+        "esports_participants",
+        "esports_community",
+        "competitive_gamers"
+      ]
+    },
+    "information_seekers": {
+      "description": "Members primarily present to find answers, learn, or receive advice rather than to contribute expertise",
+      "example_tags": [
+        "help_seeking_users",
+        "advice_seekers",
+        "knowledge_seekers",
+        "information_seekers",
+        "help_seeking_newcomers",
+        "help_seeking",
+        "emotion_seeking",
+        "technical_assistance_seekers",
+        "self_directed_learners",
+        "technical_learners"
+      ]
+    },
+    "career_stage_diversity": {
+      "description": "Participants span multiple professional life stages including students, job seekers, career changers, and veterans",
+      "example_tags": [
+        "diverse_life_stages",
+        "career_changers",
+        "junior_to_senior_mix",
+        "student_participation",
+        "college_students",
+        "career_stage_diversity",
+        "job_seekers",
+        "aspiring_to_professional_creators",
+        "students_and_entrants",
+        "career_switchers"
+      ]
+    },
+    "large_scale_community": {
+      "description": "High total membership volume, increasing anonymity, lurker ratios, and moderation complexity",
+      "example_tags": [
+        "massive_diverse_audience",
+        "large_mainstream_audience",
+        "mass_scale",
+        "mass_audience",
+        "high_volume_casual_users",
+        "high_volume_low_curation",
+        "high_subscriber_diversity",
+        "passive_majority_active_minority",
+        "mass_appeal",
+        "large_scale_community"
+      ]
+    },
+    "parasocial_dynamics": {
+      "description": "Relationships between community members and public figures or creators that may affect member behavior and vulnerability",
+      "example_tags": [
+        "streaming_audience",
+        "streamer_fans",
+        "parasocial_investment",
+        "content_creator_presence",
+        "content_creators_present",
+        "parasocial_dynamics",
+        "parasocial_vulnerability",
+        "streamer_influence",
+        "parasocial_dynamic",
+        "streamer_followers"
+      ]
+    },
+    "mentorship_dynamic": {
+      "description": "Structural tendency for more experienced members to guide or advise newer participants",
+      "example_tags": [
+        "mentor_novice_dynamic",
+        "peer_based",
+        "peer_advisors",
+        "mentorship_oriented",
+        "career_mentors",
+        "mentorship_driven",
+        "trainer_trainee_mix",
+        "help_seekers_and_advisors",
+        "peer_mentors",
+        "apprentices_to_experts"
+      ]
+    },
+    "technical_literacy_variance": {
+      "description": "Wide spread in members' ability to understand or engage with technical, digital, or domain-specific content",
+      "example_tags": [
+        "meme_literacy_variance",
+        "technical_skill_variance",
+        "tech_literate_audience",
+        "media_literate_audience",
+        "technical_literacy_variance",
+        "humor_literacy_gap",
+        "technical_literacy_assumed",
+        "technical_depth_variability",
+        "mixed_legal_literacy",
+        "mixed_technical_literacy"
+      ]
+    },
+    "internet_native": {
+      "description": "Participants are culturally fluent in internet norms, memes, and platform behaviors",
+      "example_tags": [
+        "satire_literate",
+        "reddit_native_audience",
+        "tumblr_migrants",
+        "self_aware_gamers",
+        "irony_appreciators",
+        "meme_literate_audience",
+        "internet_native_audience",
+        "humor_fluency_required",
+        "meme_culture_participants",
+        "meme_culture_familiar"
+      ]
+    },
+    "geographically_local": {
+      "description": "Community is anchored to a specific region, city, or locale rather than distributed globally",
+      "example_tags": [
+        "resident_nonresident_split",
+        "canadian_residents",
+        "australian_residents",
+        "german_speakers_primary",
+        "ukrainian_citizens",
+        "uk_residents",
+        "regional_residents",
+        "local_residents",
+        "urban_residents",
+        "urban_bias"
+      ]
+    },
+    "other": {
+      "description": "Tags that do not fit cleanly into any defined canonical category",
+      "example_tags": [
+        "homeowners_and_renters",
+        "anonymous_participation",
+        "peer_interaction",
+        "high_exposure_risk",
+        "minimal_vulnerability",
+        "mixed_empathy_levels",
+        "ally_inclusion",
+        "cultural_representation_focus",
+        "predominantly_male",
+        "low_vulnerability"
+      ]
+    }
+  },
+  "stakes": {
+    "misinformation_risk": {
+      "description": "Potential for false, misleading, or unverified information to spread and cause harm within the community",
+      "example_tags": [
+        "misinformation_at_scale",
+        "misinformation_spread",
+        "mass_audience_reach",
+        "sourcing_verification",
+        "political_agenda_harm",
+        "scale_amplification",
+        "conspiracy_theory_spread",
+        "viral_spread_potential",
+        "scale_of_reach",
+        "misinformation_about_mechanics"
+      ]
+    },
+    "content_permanence": {
+      "description": "Risks arising from content being permanently indexed, searchable, or publicly visible long-term",
+      "example_tags": [
+        "permanence_of_advice",
+        "persistent_high_visibility",
+        "unvetted_advice_permanence",
+        "public_record_permanence",
+        "content_permanence_vulnerability",
+        "permanent_internet_record",
+        "permanent_visibility",
+        "viral_permanence",
+        "permanent_record",
+        "permanent_digital_record"
+      ]
+    },
+    "harassment_risk": {
+      "description": "Potential for targeted harassment, bullying, doxxing, or personal attacks against individuals",
+      "example_tags": [
+        "harassment_and_dogpiling",
+        "creator_harassment_risk",
+        "harassment_amplification",
+        "witch_hunting",
+        "reputational_harm",
+        "streamer_targeting",
+        "harassment_potential",
+        "community_harassment",
+        "public_shaming_risk",
+        "harassment_risk"
+      ]
+    },
+    "chilling_effect": {
+      "description": "Risks that moderation practices, gatekeeping, or community norms suppress legitimate participation or discourse",
+      "example_tags": [
+        "suppression_of_discourse",
+        "chilling_effect_over_moderation",
+        "creative_suppression_risk",
+        "suppression_risk",
+        "discussion_suppression",
+        "suppression_of_legitimate_conflict",
+        "chilling_effect_on_help_seeking",
+        "silencing_nuance",
+        "strategy_debate_suppression",
+        "suppression_of_criticism"
+      ]
+    },
+    "hate_speech_risk": {
+      "description": "Potential for discriminatory, dehumanizing, or bigoted content targeting protected groups",
+      "example_tags": [
+        "bad_faith_dogwhistling",
+        "hate_speech_risk",
+        "incitement_risk",
+        "hate_speech_amplification",
+        "incitement_potential",
+        "hate_speech_proliferation",
+        "vulnerable_group_targeting",
+        "stereotype_amplification",
+        "bigotry_amplification",
+        "marginalized_group_exposure"
+      ]
+    },
+    "financial_harm_risk": {
+      "description": "Potential for scams, fraud, exploitation, or bad financial advice causing real monetary loss",
+      "example_tags": [
+        "financial_loss_risk",
+        "financial_decision_harm",
+        "hype_driven_bubbles",
+        "market_manipulation_concerns",
+        "information_asymmetry_harm",
+        "financial_loss",
+        "financial_harm",
+        "scam_vulnerability",
+        "financial_consequences_fantasy",
+        "financial_fraud_risk"
+      ]
+    },
+    "privacy_violation_risk": {
+      "description": "Potential for exposure of private personal information, including doxxing and unauthorized data sharing",
+      "example_tags": [
+        "personal_information_exposure",
+        "doxxing_risk",
+        "privacy_violation",
+        "doxing_risk",
+        "non_consensual_imagery_risk",
+        "doxxing_exposure",
+        "doxxing_potential",
+        "doxxing_vulnerability",
+        "leak_proliferation",
+        "information_exposure"
+      ]
+    },
+    "spoiler_harm": {
+      "description": "Risk of unwanted exposure to plot or outcome spoilers that degrades the experience for community members",
+      "example_tags": [
+        "spoiler_exposure_harm",
+        "spoiler_management",
+        "spoiler_harm",
+        "spoiler_damage",
+        "narrative_surprise_loss",
+        "spoiler_sensitivity",
+        "spoiler_toxicity",
+        "spoiler_permanence",
+        "story_spoiler_harm",
+        "spoiler_management_critical"
+      ]
+    },
+    "community_fragmentation": {
+      "description": "Risk of community splitting, polarization, echo chambers, or erosion of shared norms",
+      "example_tags": [
+        "coordination_breakdown",
+        "polarization_risk",
+        "political_conflict_risk",
+        "fan_identity_conflict",
+        "fan_tribalism",
+        "territorial_disputes",
+        "competitive_conflict",
+        "political_polarization",
+        "tribal_conflict",
+        "political_polarization_risk"
+      ]
+    },
+    "spam_and_exploitation": {
+      "description": "Vulnerability to spam, commercial exploitation, malware, or low-quality content degrading the community",
+      "example_tags": [
+        "content_spam_risk",
+        "cheat_proliferation",
+        "creator_exploitation",
+        "commercial_exploitation_risk",
+        "exploitation_vulnerability",
+        "spam_proliferation",
+        "exploitation_of_newcomers",
+        "content_flooding",
+        "predatory_monetization",
+        "spam_and_promotion_risk"
+      ]
+    },
+    "health_and_safety_misinformation": {
+      "description": "Potential for medically or physically dangerous misinformation that could cause direct harm to people",
+      "example_tags": [
+        "safety_misinformation",
+        "medical_misinformation_harm",
+        "physical_injury_risk",
+        "actionable_harm_potential",
+        "dangerous_diy_content",
+        "food_safety_risks",
+        "health_misinformation",
+        "safety_critical_content",
+        "suicide_contagion_risk",
+        "self_harm_encouragement"
+      ]
+    },
+    "minor_protection_risk": {
+      "description": "Risk of exposing minors to inappropriate content, exploitation, or unsafe interactions",
+      "example_tags": [
+        "youth_exposure_risk",
+        "inappropriate_exposure",
+        "character_sexualization_concerns",
+        "minor_protection",
+        "nsfw_exposure",
+        "content_appropriateness",
+        "minor_exposure_risk",
+        "minor_exposure_risks",
+        "explicit_content_harm",
+        "sexual_content_moderation"
+      ]
+    },
+    "legal_and_liability_risk": {
+      "description": "Potential for content that creates legal exposure, including piracy, defamation, or regulated speech",
+      "example_tags": [
+        "legal_liability",
+        "incrimination_risk",
+        "ip_protection",
+        "financial_legal_liability_risk",
+        "legal_jeopardy",
+        "academic_dishonesty_risk",
+        "platform_policy_violation",
+        "piracy_risk",
+        "academic_consequences",
+        "copyright_infringement_risk"
+      ]
+    },
+    "content_quality_degradation": {
+      "description": "Risk of declining overall content quality through reposts, low-effort posts, or noise drowning out signal",
+      "example_tags": [
+        "quality_degradation",
+        "content_dilution",
+        "resource_obsolescence",
+        "content_quality_degradation",
+        "repost_fatigue",
+        "advice_quality_variance",
+        "community_purpose_dilution",
+        "sourcing_friction",
+        "reasoning_quality_erosion",
+        "thread_quality_degradation"
+      ]
+    },
+    "psychological_harm_risk": {
+      "description": "Potential for content to cause psychological distress, trauma, or harm to vulnerable users",
+      "example_tags": [
+        "vulnerable_user_exploitation",
+        "relationship_harm_enablement",
+        "graphic_content_risk",
+        "mental_health_mockery",
+        "high_emotional_stakes",
+        "employment_consequences",
+        "body_shaming_harm",
+        "graphic_content_exposure",
+        "vicarious_trauma",
+        "vulnerable_populations_at_risk"
+      ]
+    },
+    "toxicity_risk": {
+      "description": "General risk of hostile, toxic, or unwelcoming community atmosphere that drives away members",
+      "example_tags": [
+        "offensive_content_amplification",
+        "validation_of_abuse",
+        "social_inappropriateness",
+        "crowd_validation_of_toxicity",
+        "toxicity_and_harassment",
+        "toxicity_amplification",
+        "shock_value_escalation",
+        "fandom_toxicity",
+        "toxicity_risk",
+        "community_toxicity"
+      ]
+    },
+    "radicalization_and_normalization_risk": {
+      "description": "Risk of content normalizing extremist views, hate, or gradually shifting community norms toward harmful ideologies",
+      "example_tags": [
+        "hate_speech_normalization",
+        "political_radicalization",
+        "normalization_of_harm",
+        "serious_injury_normalization",
+        "bigotry_normalization",
+        "radicalization_risk",
+        "persistent_harmful_narratives",
+        "propaganda_risk",
+        "normalized_dysfunction",
+        "toxicity_normalization"
+      ]
+    },
+    "technical_harm_risk": {
+      "description": "Potential for bad technical advice or malicious content causing hardware damage, data loss, or security breaches",
+      "example_tags": [
+        "exploit_spread",
+        "technical_failure",
+        "account_security_concerns",
+        "property_damage",
+        "account_compromise_risk",
+        "exploit_promotion_risks",
+        "actionable_advice_quality",
+        "account_security",
+        "operational_harm",
+        "security_risks"
+      ]
+    },
+    "brigading_risk": {
+      "description": "Risk of coordinated off-platform or cross-community attacks manipulating or overwhelming the community",
+      "example_tags": [
+        "brigade_risk",
+        "brigading_potential",
+        "brigading_vulnerability",
+        "bad_faith_infiltration",
+        "brigading_harassment",
+        "political_pile_on",
+        "brigading_risk",
+        "brigade_vulnerability",
+        "harassment_brigading",
+        "cross_platform_coordination"
+      ]
+    },
+    "trust_erosion": {
+      "description": "Risk of declining trust between community members, moderators, or between community and platform",
+      "example_tags": [
+        "removal_inconsistency",
+        "moderation_bias_accusations",
+        "moderation_vacuum",
+        "moderation_bias_perception",
+        "subjective_moderation_drift",
+        "precedent_setting",
+        "trust_erosion",
+        "credibility_erosion",
+        "launch_controversy",
+        "low_moderation_oversight"
+      ]
+    },
+    "censorship_tension": {
+      "description": "Tension between free expression and content removal, where over- or under-moderation risks perceived censorship",
+      "example_tags": [
+        "subjective_moderation_risk",
+        "moderation_friction",
+        "moderation_censorship_tension",
+        "censorship_perception",
+        "censorship_concerns",
+        "political_topic_censorship",
+        "moderation_scope_tension",
+        "moderation_gatekeeping",
+        "permanent_removal_impact",
+        "permanent_removal"
+      ]
+    },
+    "newcomer_discouragement": {
+      "description": "Risk that community norms, gatekeeping, or hostility deter new members from participating",
+      "example_tags": [
+        "low_barrier_to_entry_tension",
+        "new_player_frustration",
+        "contributor_frustration",
+        "gatekeeping_risk",
+        "new_player_gatekeeping",
+        "newcomer_retention",
+        "new_player_retention",
+        "newcomer_gatekeeping",
+        "community_exclusion",
+        "gatekeeping_through_rules"
+      ]
+    },
+    "other": {
+      "description": "Stakes-related risks that do not fit cleanly into any other canonical category",
+      "example_tags": [
+        "scale_enforcement_challenges",
+        "facilitation_prevention",
+        "moderation_difficulty",
+        "gatekeeper_fatigue",
+        "reaction_speed_tradeoff",
+        "high_stakes_decision_making",
+        "protest_sustainability",
+        "controversy_sensitivity",
+        "scale_of_harm",
+        "homework_integrity"
+      ]
+    }
+  },
+  "tone": {
+    "low_conflict": {
+      "description": "Communities with minimal interpersonal conflict, whether by norm, enforcement, or culture (low_conflict, minimal_conflict, low_hostility, low_antagonism, conflict_averse, low_interpersonal_conflict, conflict_minimized, low_conflict_norm, low_conflict_enforced, low_conflict_moderated, low_conflict_expectation, low_conflict_norms, low_conflict_encouraged, low_conflict_enforcement, low_conflict_baseline, conflict_managed, low_to_moderate_conflict)",
+      "example_tags": [
+        "low_conflict",
+        "low_mockery",
+        "low_baseline_conflict",
+        "low_interpersonal_conflict",
+        "low_conflict_baseline",
+        "anti_mockery",
+        "low_conflict_encouraged",
+        "low_to_moderate_conflict",
+        "non_adversarial",
+        "minimal_conflict"
+      ]
+    },
+    "civility_enforced": {
+      "description": "Communities where respectful behavior is actively moderated or explicitly required (civility_enforced, civil_enforcement, civil_enforced, low_toxicity_enforced, rule_enforced, rule_conscious, respectful_required, respectful_enforcement, moderated_civility)",
+      "example_tags": [
+        "civil_by_design",
+        "civility_enforced",
+        "rule_conscious",
+        "toxicity_policed",
+        "moderated_civility",
+        "respectful_moderated",
+        "civil_enforced",
+        "low_tolerance_rudeness",
+        "civil_enforcement",
+        "rule_oriented"
+      ]
+    },
+    "informal_casual": {
+      "description": "Communities with relaxed, everyday conversational register (informal, informal_casual, informal_conversational, casual_informal, casual_friendly, casual_conversational, casual_respectful, informal_friendly, highly_informal, low_formality, conversational, conversational_informal, supportive_informal)",
+      "example_tags": [
+        "casual_and_friendly",
+        "informal_conversational",
+        "casual_language",
+        "informal_friendly",
+        "casual_informal",
+        "informal_language",
+        "informal_casual",
+        "conversational",
+        "casual_conversational",
+        "casual_friendly"
+      ]
+    },
+    "semi_formal": {
+      "description": "Communities balancing accessibility with some degree of structure or professionalism (semi_formal, moderate_formality, moderately_formal, mixed_formality, professional_accessible, accessible_language)",
+      "example_tags": [
+        "accessible_language",
+        "casual_formality_blend",
+        "accessible_casual",
+        "moderate_formality",
+        "mixed_formality",
+        "low_to_moderate_formality",
+        "informal_professional",
+        "professional_accessible",
+        "variable_formality",
+        "structured_accessible"
+      ]
+    },
+    "formal": {
+      "description": "Communities with a high degree of formality, professional tone, or academic register (formal_professional, formal_analytical, formal_academic, formal_register, formal_respectful, respectful_formal, professional_formal, professional_pragmatic, professional_helpful, respectful_formality)",
+      "example_tags": [
+        "formally_structured",
+        "formal_informational",
+        "formal_neutral",
+        "serious_register",
+        "technical_formality",
+        "structured_formal",
+        "formal_informative",
+        "professional_tone",
+        "formal_professional",
+        "cautionary_register"
+      ]
+    },
+    "humor_heavy": {
+      "description": "Communities where humor, memes, or comedy are central to the culture (humor_present, humor_heavy, humor_centric, humor_focused, humor_driven, meme_heavy, meme_culture, meme_friendly, humorous, irreverent, playful_irreverent, playful_tone, casual_irreverent, irreverent_humor, absurdist_humor, entertainment_focused)",
+      "example_tags": [
+        "humor_heavy",
+        "humor_and_memes_present",
+        "humorous_exasperated",
+        "casual_irreverent",
+        "humor_present",
+        "entertainment_focused",
+        "meme_influenced",
+        "humorous",
+        "humorous_lighthearted",
+        "humor_focused"
+      ]
+    },
+    "low_humor": {
+      "description": "Communities where humor is present but peripheral or restrained (low_humor, minimal_humor, light_humor, gentle_humor, low_casual_humor, low_to_moderate_humor, low_humor_tolerance, moderate_humor)",
+      "example_tags": [
+        "humor_present_but_secondary",
+        "low_to_moderate_humor",
+        "minimal_humor",
+        "low_humor_tolerance",
+        "low_humor",
+        "sympathetic_humor",
+        "light_humor",
+        "humor_with_boundaries",
+        "low_memetic_content",
+        "low_humor_presence"
+      ]
+    },
+    "dark_or_edgy_humor": {
+      "description": "Communities featuring dark, self-deprecating, dry, or self-aware comedic styles (dark_humor, dark_humor_present, self_deprecating_humor, self_deprecating, dry_humor, self_aware_humor, self_aware_irony)",
+      "example_tags": [
+        "schadenfreude_driven",
+        "humorous_snark",
+        "self_aware_exasperation",
+        "sarcasm_present",
+        "satirical_informal",
+        "tongue_in_cheek",
+        "self_deprecating",
+        "boundary_bounded_edginess",
+        "dark_humor_present",
+        "dark_comedy"
+      ]
+    },
+    "collaborative_helpful": {
+      "description": "Communities oriented around mutual aid, problem-solving, and cooperative participation (collaborative, helpful_collaborative, collaborative_helpful, supportive_collaborative, collaborative_spirit, helpful_pragmatic, pragmatic_helpful, professional_helpful, helpful_supportive, helpful_tone, solution_oriented, solution_focused)",
+      "example_tags": [
+        "pragmatic_helpful",
+        "collaborative_helpful",
+        "collaborative_friendly",
+        "teaching_focused",
+        "educational_intent",
+        "helpful_and_patient",
+        "helpful_collaborative",
+        "collaborative",
+        "solution_oriented",
+        "helpful_tone"
+      ]
+    },
+    "supportive_encouraging": {
+      "description": "Communities emphasizing emotional support, encouragement, and positive reinforcement (supportive, encouraging, supportive_encouraging, inclusive_welcoming, inclusive, welcoming, friendly_welcoming, non_judgmental, beginner_friendly)",
+      "example_tags": [
+        "encouraging_tone",
+        "patient_supportive",
+        "empathetic_commiseration",
+        "judgment_free",
+        "friendly_welcoming",
+        "non_judgmental",
+        "protective_welcoming",
+        "welcoming",
+        "appreciative",
+        "validating_empathetic"
+      ]
+    },
+    "evidence_analytical": {
+      "description": "Communities that prioritize facts, evidence, data, or rigorous analysis (evidence_focused, evidence_based, fact_focused, formal_analytical, detail_oriented, substantive_focus, technical_focused, quality_focused)",
+      "example_tags": [
+        "substantive_discussion",
+        "fact_focused",
+        "evidence_focused",
+        "neutral_objective",
+        "source_focused",
+        "factually_grounded",
+        "neutral_explanatory",
+        "evidence_based",
+        "analytically_inclined",
+        "analytical_focused"
+      ]
+    },
+    "debate_oriented": {
+      "description": "Communities that engage in structured argumentation, debate, or contested discussion (debate_oriented, constructive_debate, respectful_debate, passionate_debate, respectful_disagreement, constructive_feedback)",
+      "example_tags": [
+        "respectful_disagreement",
+        "opinion_driven",
+        "passionate_debates",
+        "partisan_debate",
+        "passionate_opinionated",
+        "debate_oriented",
+        "debate_present",
+        "adversarial_debate",
+        "discussion_prioritized",
+        "discussion_focused"
+      ]
+    },
+    "technical": {
+      "description": "Communities using specialized or technical language, often with some accessibility accommodation (informal_technical, casual_technical, technical_accessible, technical_pragmatic, technical_but_accessible)",
+      "example_tags": [
+        "technical_register",
+        "technical_precision",
+        "technical_discussion",
+        "pragmatic_technical",
+        "formal_technical_register",
+        "technical_military_discourse",
+        "technical_precision_valued",
+        "technical_discourse",
+        "casual_technical",
+        "technical_detail_oriented"
+      ]
+    },
+    "respectful": {
+      "description": "Communities with a broadly respectful tone not captured by formal enforcement (respectful, respectful_discourse, civil_discourse, civil_respectful, respectful_civil, respectful_baseline, respectful_boundaries)",
+      "example_tags": [
+        "respectful",
+        "respectful_serious",
+        "casual_yet_respectful",
+        "respectful_baseline",
+        "respectful_expectation",
+        "respectful_with_friction_low",
+        "opinion_tolerant",
+        "respectful_supportive",
+        "constructive_and_respectful",
+        "respectful_default"
+      ]
+    },
+    "enthusiastic_passionate": {
+      "description": "Communities characterized by high energy, excitement, or strong emotional investment in a topic (enthusiastic, enthusiastic_positive, enthusiastic_casual, passionate_fandom, passion_driven, celebratory, emotionally_expressive)",
+      "example_tags": [
+        "enthusiastic_engagement",
+        "enthusiastic_tone",
+        "enthusiastic_positive",
+        "passionate_but_civil",
+        "passionate_engaged",
+        "delight_centered",
+        "casual_enthusiastic",
+        "fan_passionate",
+        "enthusiastic",
+        "enthusiasm_present"
+      ]
+    },
+    "pragmatic_direct": {
+      "description": "Communities favoring straightforward, practical, no-nonsense communication (pragmatic, direct_communication, practical_focused, practical_direct, technical_pragmatic)",
+      "example_tags": [
+        "colloquial_directness",
+        "direct_moral_language",
+        "practical_and_direct",
+        "informal_pragmatic",
+        "direct_communication",
+        "pragmatic",
+        "direct_language",
+        "confrontational_directness",
+        "direct_and_candid",
+        "direct_practical"
+      ]
+    },
+    "conflict_present": {
+      "description": "Communities where some level of tension, frustration, or conflict is a normal or accepted feature (occasional_conflict, frustration_present, occasional_frustration, competitive_intensity, competitive_banter, low_to_moderate_conflict)",
+      "example_tags": [
+        "conflict_possible",
+        "mockery_based",
+        "drama_centric",
+        "accusatory_tone",
+        "casual_judgmental",
+        "conflict_normalized",
+        "polarized_discussions",
+        "high_conflict_potential",
+        "competitive_intensity",
+        "high_conflict"
+      ]
+    },
+    "community_vernacular": {
+      "description": "Communities with highly specific in-group language, slang, or cultural norms (gaming_vernacular, profanity_normalized)",
+      "example_tags": [
+        "game_universe_embedded_language",
+        "profanity_normalized",
+        "informal_vernacular",
+        "aave_celebrating",
+        "culturally_specific",
+        "in_jokes_heavy",
+        "competitive_gaming_culture",
+        "insider_references",
+        "gaming_vernacular",
+        "crude_language"
+      ]
+    },
+    "other": {
+      "description": "Tags that do not fit cleanly into any other canonical category",
+      "example_tags": [
+        "aesthetic_focused",
+        "mixed_seriousness",
+        "user_tone_control",
+        "wonder_focused",
+        "mixed_sentiment",
+        "moral_seriousness",
+        "legally_cautious",
+        "crude_to_family_friendly",
+        "serious_somber",
+        "opinion_free"
+      ]
+    }
+  }
+}

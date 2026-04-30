@@ -1,0 +1,1150 @@
+{
+  "books": [
+    {
+      "rule_text": "Discussion is the goal\n\nDo not post shallow content. All posts must be directly book related, informative, and discussion focused.",
+      "checklist": [
+        {
+          "description": "Is the post not directly book related, not informative, or not discussion focused?",
+          "rule_text_anchor": "Do not post shallow content. All posts must be directly book related, informative, and discussion focused.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A low-effort opinion prompt about books that does not provide informative context or invite meaningful discussion.",
+          "related_checklist_item_description": "Is the post not directly book related, not informative, or not discussion focused?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A simple recommendation request is book-related, but moderators could disagree on whether it is informative and discussion-focused enough.",
+          "related_checklist_item_description": "Is the post not directly book related, not informative, or not discussion focused?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Personal conduct\n\nPlease use a civil tone and assume good faith when entering a conversation.",
+      "checklist": [
+        {
+          "description": "Does the post or comment use an uncivil tone or attack another person instead of discussing books in good faith?",
+          "rule_text_anchor": "Please use a civil tone and assume good faith when entering a conversation.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Direct insult and bad-faith accusation toward another user clearly violates the civility and assume-good-faith requirement.",
+          "related_checklist_item_description": "Does the post or comment use an uncivil tone or attack another person instead of discussing books in good faith?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Sharply dismissive language may be read as rude or as merely blunt disagreement, making this a genuine gray area for moderators.",
+          "related_checklist_item_description": "Does the post or comment use an uncivil tone or attack another person instead of discussing books in good faith?"
+        },
+        {
+          "label": "compliant",
+          "relevance_note": "Disagrees with another user\u2019s reading respectfully and interprets their view in good faith.",
+          "related_checklist_item_description": null
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Prohibited\n\nSelf-promotion and promotional posts, comments & flairs, memes, image-only, video-only, personal recommendation requests, 'what's that book' and 'should I read?' requests, sales links, piracy, plagiarism, low quality book lists, spoilers without warning, sensationalist headlines. Please see extended rules for appropriate subreddits or use the multireddit buttons.",
+      "checklist": [
+        {
+          "description": "Does the content promote the poster's own work, product, service, or brand, including via promotional flair or calls to action?",
+          "rule_text_anchor": "Self-promotion and promotional posts, comments & flairs",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Is the submission a prohibited low-substance format such as a meme, image-only post, or video-only post?",
+          "rule_text_anchor": "memes, image-only, video-only",
+          "item_type": "structural",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Is the content a prohibited request type: a personal recommendation request, 'what's that book' request, or 'should I read?' request?",
+          "rule_text_anchor": "personal recommendation requests, 'what's that book' and 'should I read?' requests",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the content include sales links, piracy, or plagiarism?",
+          "rule_text_anchor": "sales links, piracy, plagiarism",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Is the content a low quality book list, an unwarned spoiler, or does it use a sensationalist headline?",
+          "rule_text_anchor": "low quality book lists, spoilers without warning, sensationalist headlines",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly promotes the author's own book with a purchase link and call to buy.",
+          "related_checklist_item_description": "Does the content promote the poster's own work, product, service, or brand, including via promotional flair or calls to action?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The author shares their newly released book while framing it as discussion; moderators could disagree on whether it is mainly promotional.",
+          "related_checklist_item_description": "Does the content promote the poster's own work, product, service, or brand, including via promotional flair or calls to action?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "A reaction image macro about reading with no substantive discussion is a prohibited meme/image-only submission.",
+          "related_checklist_item_description": "Is the submission a prohibited low-substance format such as a meme, image-only post, or video-only post?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "An image of a bookshelf with a short caption invites some discussion, but moderators could disagree on whether it is still effectively image-only.",
+          "related_checklist_item_description": "Is the submission a prohibited low-substance format such as a meme, image-only post, or video-only post?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "Asks for a personalized recommendation based on the poster's tastes, which the rule explicitly prohibits.",
+          "related_checklist_item_description": "Is the content a prohibited request type: a personal recommendation request, 'what's that book' request, or 'should I read?' request?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Asks whether to read a specific book and includes some context; moderators might disagree whether it is a discussion starter or a prohibited request.",
+          "related_checklist_item_description": "Is the content a prohibited request type: a personal recommendation request, 'what's that book' request, or 'should I read?' request?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "Links to a free unauthorized download of a copyrighted book, which is piracy.",
+          "related_checklist_item_description": "Does the content include sales links, piracy, or plagiarism?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Mentions a discount retailer link while discussing a book edition; moderators could disagree whether the link is merely informational or a prohibited sales link.",
+          "related_checklist_item_description": "Does the content include sales links, piracy, or plagiarism?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "Uses a clickbait headline and reveals a major ending without warning.",
+          "related_checklist_item_description": "Is the content a low quality book list, an unwarned spoiler, or does it use a sensationalist headline?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A ranked list with brief explanations and a dramatic title may or may not be considered low quality or sensationalist depending on moderator judgment.",
+          "related_checklist_item_description": "Is the content a low quality book list, an unwarned spoiler, or does it use a sensationalist headline?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Encouraged\n\nWe love original content and self-posts! Thoughts, discussion questions, epiphanies and interesting links about authors and their work. We also encourage discussion about developments in the book world and we have a flair system.",
+      "checklist": [
+        {
+          "description": "Is the post unrelated to books, authors, their work, or developments in the book world?",
+          "rule_text_anchor": "Thoughts, discussion questions, epiphanies and interesting links about authors and their work. We also encourage discussion about developments in the book world",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "An off-topic post about movies rather than books or authors would conflict with the encouraged scope described by the rule.",
+          "related_checklist_item_description": "Is the post unrelated to books, authors, their work, or developments in the book world?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A post about a film adaptation of a novel sits near the edge of book relevance and moderators could reasonably disagree on whether it is sufficiently about the author's work.",
+          "related_checklist_item_description": "Is the post unrelated to books, authors, their work, or developments in the book world?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Important\n\nWe don't allow personal recommendation posts. You can ask in our Weekly Recommendation Thread, consult our Suggested Reading or What to Read page, or post in /r/suggestmeabook.",
+      "checklist": [
+        {
+          "description": "Is this a personal recommendation request posted outside the Weekly Recommendation Thread or /r/suggestmeabook?",
+          "rule_text_anchor": "We don't allow personal recommendation posts.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Direct request for book recommendations tailored to the poster's tastes, which the rule disallows as a standalone post.",
+          "related_checklist_item_description": "Is this a personal recommendation request posted outside the Weekly Recommendation Thread or /r/suggestmeabook?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Asks for books in a broad category but still centers on what the poster should personally read, so moderators could disagree on whether it is a discussion post or a recommendation request.",
+          "related_checklist_item_description": "Is this a personal recommendation request posted outside the Weekly Recommendation Thread or /r/suggestmeabook?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Spoiler Policy\n\nAny post with a spoiler in the title will be removed. Any comment with a spoiler that doesn't use the spoiler code will be removed. Any user with an extensive history of spoiling books will be banned. Spoiler tags are: #s for example: Spoilers about XYZ is done with: [Spoilers about XYZ](#s \"Spoiler content here\").",
+      "checklist": [
+        {
+          "description": "Does the post title contain a spoiler about a book's plot, ending, death, identity, twist, or other major reveal?",
+          "rule_text_anchor": "Any post with a spoiler in the title will be removed.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the comment contain a spoiler that is not formatted using the spoiler code?",
+          "rule_text_anchor": "Any comment with a spoiler that doesn't use the spoiler code will be removed.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the user have an extensive history of spoiling books?",
+          "rule_text_anchor": "Any user with an extensive history of spoiling books will be banned.",
+          "item_type": "subjective",
+          "action": "flag",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Reveals a major ending directly in the title.",
+          "related_checklist_item_description": "Does the post title contain a spoiler about a book's plot, ending, death, identity, twist, or other major reveal?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Mentions a character outcome in the title that some readers may already know, but moderators could still view it as a spoiler.",
+          "related_checklist_item_description": "Does the post title contain a spoiler about a book's plot, ending, death, identity, twist, or other major reveal?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "A comment gives away a major plot twist without using spoiler formatting.",
+          "related_checklist_item_description": "Does the comment contain a spoiler that is not formatted using the spoiler code?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The comment hints strongly at an ending without stating it outright and uses no spoiler formatting, making it debatable.",
+          "related_checklist_item_description": "Does the comment contain a spoiler that is not formatted using the spoiler code?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "The author has repeatedly posted untagged spoilers across multiple threads, matching an extensive history of spoiling books.",
+          "related_checklist_item_description": "Does the user have an extensive history of spoiling books?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The author has a few prior spoiler removals, but it is unclear whether that counts as an extensive history.",
+          "related_checklist_item_description": "Does the user have an extensive history of spoiling books?"
+        }
+      ],
+      "subreddit": "books"
+    }
+  ],
+  "relationships": [
+    {
+      "rule_text": "This sub is about helping people in need\n\nf you are not providing such help (i.e. abuse, jokes, meta arguments, fighting with other posters, pointless tangents), your comments may be removed. Please report comments that you feel are in violation of these guidelines to keep discussions constructive.",
+      "checklist": [
+        {
+          "description": "Is the comment not meaningfully trying to help the person in need, such as by being abusive, joking, meta-arguing, fighting, or going off on a pointless tangent?",
+          "rule_text_anchor": "f you are not providing such help (i.e. abuse, jokes, meta arguments, fighting with other posters, pointless tangents), your comments may be removed.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly insults the poster instead of offering any help.",
+          "related_checklist_item_description": "Is the comment not meaningfully trying to help the person in need, such as by being abusive, joking, meta-arguing, fighting, or going off on a pointless tangent?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Contains some potentially useful sentiment, but is mostly snarky and dismissive, so moderators could disagree on whether it is still constructive.",
+          "related_checklist_item_description": "Is the comment not meaningfully trying to help the person in need, such as by being abusive, joking, meta-arguing, fighting, or going off on a pointless tangent?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "At any time mods may remove or refer posts to other subs as we deem appropriate, and our decisions are final.",
+      "checklist": [
+        {
+          "description": "Has a moderator explicitly deemed this post removable or better suited for referral to another subreddit?",
+          "rule_text_anchor": "At any time mods may remove or refer posts to other subs as we deem appropriate, and our decisions are final.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Tests the rule's broad moderator-discretion standard by representing a post a moderator has decided to remove or redirect.",
+          "related_checklist_item_description": "Has a moderator explicitly deemed this post removable or better suited for referral to another subreddit?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Tests a gray-area case where a moderator might reasonably think the post belongs in a more specialized relationship subreddit rather than this one.",
+          "related_checklist_item_description": "Has a moderator explicitly deemed this post removable or better suited for referral to another subreddit?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Ages, genders and relationship length required!",
+      "checklist": [
+        {
+          "description": "Does the post omit ages, genders, or relationship length for the people in the relationship being discussed?",
+          "rule_text_anchor": "Ages, genders and relationship length required!",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "The post asks for relationship advice but does not provide ages, genders, or relationship length.",
+          "related_checklist_item_description": "Does the post omit ages, genders, or relationship length for the people in the relationship being discussed?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The post includes ages and genders in shorthand but gives only a vague relationship duration, which moderators might disagree about satisfying the requirement.",
+          "related_checklist_item_description": "Does the post omit ages, genders, or relationship length for the people in the relationship being discussed?"
+        },
+        {
+          "label": "compliant",
+          "relevance_note": "The post clearly includes ages, genders, and how long the relationship has lasted.",
+          "related_checklist_item_description": null
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Spelling, grammar, and readability count!",
+      "checklist": [
+        {
+          "description": "Is the post so poorly written that spelling, grammar, or readability problems make it meaningfully hard to understand?",
+          "rule_text_anchor": "Spelling, grammar, and readability count!",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Clear case where severe spelling/grammar issues make the relationship question difficult to parse and understand.",
+          "related_checklist_item_description": "Is the post so poorly written that spelling, grammar, or readability problems make it meaningfully hard to understand?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Understandable overall, but has enough errors and poor structure that moderators could reasonably disagree about whether readability is insufficient.",
+          "related_checklist_item_description": "Is the post so poorly written that spelling, grammar, or readability problems make it meaningfully hard to understand?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Include a TL;DR\n\na brief summary at the end of your post. No \"See title\"",
+      "checklist": [
+        {
+          "description": "Does the post lack a brief TL;DR summary at the end, or use \"See title\" instead of a real TL;DR?",
+          "rule_text_anchor": "a brief summary at the end of your post. No \"See title\"",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Post has no TL;DR section and therefore violates the requirement to include a brief summary at the end.",
+          "related_checklist_item_description": "Does the post lack a brief TL;DR summary at the end, or use \"See title\" instead of a real TL;DR?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Post includes a very minimal ending summary that some moderators might accept as a TL;DR while others might find too vague to count.",
+          "related_checklist_item_description": "Does the post lack a brief TL;DR summary at the end, or use \"See title\" instead of a real TL;DR?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "First Person Posts Only",
+      "checklist": [
+        {
+          "description": "Is the post written about someone else's relationship situation rather than the poster's own first-person experience?",
+          "rule_text_anchor": "First Person Posts Only",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A third-person post asking for advice about a friend's relationship instead of the author's own situation.",
+          "related_checklist_item_description": "Is the post written about someone else's relationship situation rather than the poster's own first-person experience?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The author uses some first-person framing but the core issue is still mostly about another person's relationship, making moderator judgment plausible.",
+          "related_checklist_item_description": "Is the post written about someone else's relationship situation rather than the poster's own first-person experience?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "No Gift or Activity Questions",
+      "checklist": [
+        {
+          "description": "Is the post asking for gift ideas or activity/date ideas for a relationship situation?",
+          "rule_text_anchor": "No Gift or Activity Questions",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly asks the community for gift suggestions for a partner, which the rule forbids.",
+          "related_checklist_item_description": "Is the post asking for gift ideas or activity/date ideas for a relationship situation?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Asks what couples do for anniversaries, which may be interpreted as seeking activity ideas even though it is framed as discussion.",
+          "related_checklist_item_description": "Is the post asking for gift ideas or activity/date ideas for a relationship situation?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "No General/Meta Questions",
+      "checklist": [
+        {
+          "description": "Is the post a general or meta question about relationships in general rather than a specific personal relationship situation needing advice?",
+          "rule_text_anchor": "No General/Meta Questions",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Asks a broad, generic question about relationships rather than seeking advice about a specific personal situation.",
+          "related_checklist_item_description": "Is the post a general or meta question about relationships in general rather than a specific personal relationship situation needing advice?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Mentions the poster's own uncertainty, but the question is still framed broadly enough that moderators could disagree on whether it is too general.",
+          "related_checklist_item_description": "Is the post a general or meta question about relationships in general rather than a specific personal relationship situation needing advice?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "No polling questions or \"opinion gathering\"",
+      "checklist": [
+        {
+          "description": "Does the post ask the community to vote, choose sides, or broadly collect opinions rather than seek specific relationship advice?",
+          "rule_text_anchor": "No polling questions or \"opinion gathering\"",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly asks readers to vote on who is right, which is opinion gathering rather than a request for advice.",
+          "related_checklist_item_description": "Does the post ask the community to vote, choose sides, or broadly collect opinions rather than seek specific relationship advice?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Asks what others would do in the same situation, which may be interpreted either as advice-seeking or as general opinion gathering.",
+          "related_checklist_item_description": "Does the post ask the community to vote, choose sides, or broadly collect opinions rather than seek specific relationship advice?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "No questions directed at a single gender. ",
+      "checklist": [
+        {
+          "description": "Does the post ask a question addressed to only one gender rather than people generally?",
+          "rule_text_anchor": "No questions directed at a single gender.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Clearly asks only women for answers, which is a question directed at a single gender.",
+          "related_checklist_item_description": "Does the post ask a question addressed to only one gender rather than people generally?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Targets 'guys' in a casual way that could mean men specifically or the community generally, making it a gray-area case.",
+          "related_checklist_item_description": "Does the post ask a question addressed to only one gender rather than people generally?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "No photos, links, or videos",
+      "checklist": [
+        {
+          "description": "Does the post contain any photo, video, or external link?",
+          "rule_text_anchor": "No photos, links, or videos",
+          "item_type": "deterministic",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Includes an external URL, which the rule explicitly prohibits.",
+          "related_checklist_item_description": "Does the post contain any photo, video, or external link?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Mentions a URL in plain text without hyperlink formatting; moderators might disagree on whether this still counts as a prohibited link.",
+          "related_checklist_item_description": "Does the post contain any photo, video, or external link?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Please don't feed the trolls or request proof. Use the report button instead!\n\nAvoid engaging with trolls or asking for proof; use the report button instead.",
+      "checklist": [
+        {
+          "description": "Does the post or comment engage with a suspected troll or ask another user for proof of their story/claim?",
+          "rule_text_anchor": "Please don't feed the trolls or request proof. Use the report button instead!",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly asks OP to prove their relationship story instead of reporting suspected trolling.",
+          "related_checklist_item_description": "Does the post or comment engage with a suspected troll or ask another user for proof of their story/claim?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Questions plausibility and lightly asks for more evidence, which some moderators may see as ordinary clarification and others as requesting proof.",
+          "related_checklist_item_description": "Does the post or comment engage with a suspected troll or ask another user for proof of their story/claim?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Do not repost removed material",
+      "checklist": [
+        {
+          "description": "Does the post appear to repost content that was previously removed in this community?",
+          "rule_text_anchor": "Do not repost removed material",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "User explicitly states they are reposting an update after moderators removed the same story earlier, which directly violates the rule.",
+          "related_checklist_item_description": "Does the post appear to repost content that was previously removed in this community?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "This could be a repost of previously removed material, but it may also be a substantially revised repost with new context, so moderators could reasonably disagree without checking history.",
+          "related_checklist_item_description": "Does the post appear to repost content that was previously removed in this community?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Posts that are removed by the AutoModerator that are missing information submitted for approval will not be considered unless you use the link explaining what was wrong with the post. The only exceptions are posts that were removed by actual humans for missing information.",
+      "checklist": [
+        {
+          "description": "Is this a repost submitted for approval after an AutoModerator removal for missing information, without using the link explaining what was wrong with the post?",
+          "rule_text_anchor": "Posts that are removed by the AutoModerator that are missing information submitted for approval will not be considered unless you use the link explaining what was wrong with the post.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "The user reposted after an AutoModerator removal for missing information and ignored the required correction link, so the resubmission should not be considered.",
+          "related_checklist_item_description": "Is this a repost submitted for approval after an AutoModerator removal for missing information, without using the link explaining what was wrong with the post?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The user says they followed the instructions from the removal message, but the moderator cannot easily tell from the post metadata whether they actually used the required link or simply reposted manually.",
+          "related_checklist_item_description": "Is this a repost submitted for approval after an AutoModerator removal for missing information, without using the link explaining what was wrong with the post?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Do not request personal info, including pics.",
+      "checklist": [
+        {
+          "description": "Does the post or comment request personal information or pictures from another person?",
+          "rule_text_anchor": "Do not request personal info, including pics.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly asks another user to share identifying details and a photo, which the rule forbids.",
+          "related_checklist_item_description": "Does the post or comment request personal information or pictures from another person?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Asks for a selfie to judge attractiveness without asking for overtly identifying details; moderators could still see this as requesting pics.",
+          "related_checklist_item_description": "Does the post or comment request personal information or pictures from another person?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "No Agendas",
+      "checklist": [
+        {
+          "description": "Does the post or comment push a broader ideological, political, gender-war, or social agenda instead of seeking or giving relationship-focused advice in good faith?",
+          "rule_text_anchor": "No Agendas",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Clear agenda-posting: it uses a relationship scenario mainly to promote a generalized ideological stance rather than discuss the specific relationship issue.",
+          "related_checklist_item_description": "Does the post or comment push a broader ideological, political, gender-war, or social agenda instead of seeking or giving relationship-focused advice in good faith?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Could be read either as sincere advice grounded in repeated experience or as advancing a generalized gender-based agenda.",
+          "related_checklist_item_description": "Does the post or comment push a broader ideological, political, gender-war, or social agenda instead of seeking or giving relationship-focused advice in good faith?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Crossposting to other subreddits will result in an instaban.",
+      "checklist": [
+        {
+          "description": "Is this submission a crosspost to another subreddit?",
+          "rule_text_anchor": "Crossposting to other subreddits will result in an instaban.",
+          "item_type": "structural",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A native Reddit crosspost from another subreddit clearly violates the no-crossposting rule.",
+          "related_checklist_item_description": "Is this submission a crosspost to another subreddit?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A manually recreated post that mentions it was also posted elsewhere may prompt moderator disagreement because it references another subreddit without using Reddit's crosspost mechanism.",
+          "related_checklist_item_description": "Is this submission a crosspost to another subreddit?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "No Politics",
+      "checklist": [
+        {
+          "description": "Does the post or comment contain political content or primarily discuss political issues, figures, parties, campaigns, elections, legislation, or government debates?",
+          "rule_text_anchor": "No Politics",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Clear political discussion about voting and a public official, which violates the no-politics rule.",
+          "related_checklist_item_description": "Does the post or comment contain political content or primarily discuss political issues, figures, parties, campaigns, elections, legislation, or government debates?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The relationship problem arises from a politically charged disagreement, so moderators could disagree on whether this is mainly a relationship post or still too political for the community.",
+          "related_checklist_item_description": "Does the post or comment contain political content or primarily discuss political issues, figures, parties, campaigns, elections, legislation, or government debates?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Do not encourage violence or criminal behavior, even as a joke.",
+      "checklist": [
+        {
+          "description": "Does the post or comment encourage violence or criminal behavior, including when framed as a joke?",
+          "rule_text_anchor": "Do not encourage violence or criminal behavior, even as a joke.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly tells someone to commit a violent act and a crime, with joking language that does not negate the encouragement.",
+          "related_checklist_item_description": "Does the post or comment encourage violence or criminal behavior, including when framed as a joke?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Uses hyperbolic joking language about damaging property after relationship conflict; some moderators may see it as dark humor while others may treat it as encouragement of criminal behavior.",
+          "related_checklist_item_description": "Does the post or comment encourage violence or criminal behavior, including when framed as a joke?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Do not mention upvotes or downvotes. We do not allow vote manipulation.",
+      "checklist": [
+        {
+          "description": "Does the post or comment mention upvotes or downvotes, or ask for voting behavior?",
+          "rule_text_anchor": "Do not mention upvotes or downvotes. We do not allow vote manipulation.",
+          "item_type": "deterministic",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Explicitly asks readers to upvote the post, which mentions votes and attempts vote manipulation.",
+          "related_checklist_item_description": "Does the post or comment mention upvotes or downvotes, or ask for voting behavior?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Mentions being downvoted without directly asking for votes; still touches on vote discussion and may be treated as a violation under the rule.",
+          "related_checklist_item_description": "Does the post or comment mention upvotes or downvotes, or ask for voting behavior?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Be respectful at all times.",
+      "checklist": [
+        {
+          "description": "Does the post or comment contain disrespectful, insulting, or demeaning language toward a person or group?",
+          "rule_text_anchor": "Be respectful at all times.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly insults the other person rather than discussing the relationship issue respectfully.",
+          "related_checklist_item_description": "Does the post or comment contain disrespectful, insulting, or demeaning language toward a person or group?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Harsh and contemptuous phrasing may be seen as disrespectful, but some moderators might read it as blunt advice rather than a personal attack.",
+          "related_checklist_item_description": "Does the post or comment contain disrespectful, insulting, or demeaning language toward a person or group?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "It's nice if you tell people that are giving you advice, \"thank you.\"",
+      "checklist": [
+        {
+          "description": "Does the reply to advice omit a polite acknowledgment or thanks?",
+          "rule_text_anchor": "It's nice if you tell people that are giving you advice, \"thank you.\"",
+          "item_type": "subjective",
+          "action": "flag",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A blunt follow-up after receiving advice with no acknowledgment or thanks; this tests failure to thank advice-givers.",
+          "related_checklist_item_description": "Does the reply to advice omit a polite acknowledgment or thanks?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The poster gives a short neutral update after receiving advice but does not explicitly say thanks; moderators could disagree on whether implicit appreciation is enough.",
+          "related_checklist_item_description": "Does the reply to advice omit a polite acknowledgment or thanks?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Creative writing projects and trolls are not welcome. ",
+      "checklist": [
+        {
+          "description": "Does the post appear to be fabricated as a creative writing exercise or deliberately posted to troll rather than seek genuine relationship advice or discussion?",
+          "rule_text_anchor": "Creative writing projects and trolls are not welcome.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Obvious bait and implausible escalation suggest the post was written to provoke reactions rather than discuss a real relationship issue.",
+          "related_checklist_item_description": "Does the post appear to be fabricated as a creative writing exercise or deliberately posted to troll rather than seek genuine relationship advice or discussion?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The story sounds dramatic and somewhat implausible, but it could still be genuine; moderators might disagree on whether it is trolling or just an unusually written real post.",
+          "related_checklist_item_description": "Does the post appear to be fabricated as a creative writing exercise or deliberately posted to troll rather than seek genuine relationship advice or discussion?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Most importantly, abuse, bigotry, misogyny, misandry, racism, homophobia, gendered slurs, agendas and encouraging violence are not tolerated in our community and will result in a ban. Don't be rude.",
+      "checklist": [
+        {
+          "description": "Does the post or comment contain abuse, bigotry, misogyny, misandry, racism, homophobia, gendered slurs, agenda-pushing, encouragement of violence, or rude/personal attacks toward a person or group?",
+          "rule_text_anchor": "Most importantly, abuse, bigotry, misogyny, misandry, racism, homophobia, gendered slurs, agendas and encouraging violence are not tolerated in our community and will result in a ban. Don't be rude.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly insults and dehumanizes a gender group while using a gendered slur and endorsing harm.",
+          "related_checklist_item_description": "Does the post or comment contain abuse, bigotry, misogyny, misandry, racism, homophobia, gendered slurs, agenda-pushing, encouragement of violence, or rude/personal attacks toward a person or group?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Harsh generalization about a gender group and dismissive tone could be seen as misandry/misogyny or merely venting, so moderators might disagree.",
+          "related_checklist_item_description": "Does the post or comment contain abuse, bigotry, misogyny, misandry, racism, homophobia, gendered slurs, agenda-pushing, encouragement of violence, or rude/personal attacks toward a person or group?"
+        }
+      ],
+      "subreddit": "relationships"
+    },
+    {
+      "rule_text": "Assign Proper Flair\n\nRelationships -issues in ongoing romantic relationships\n Infidelity -issues of actual cheating\n Breakups -immediate issues surrounding a break up.\nDating -new people in your life, crushes, unclear relationships, or things shorter than 1 month\nUpdates -\"UPDATE\" needs to be in the title. Link to the previous post, which cannot be deleted or removed. Original post cannot be on the front page or within 48 hours. The update needs to be about the solution. One update only.\nPersonal issues -internal problems and behaviors that cause you problems in relationships\nNon-Romantic -issues with family or friends.",
+      "checklist": [
+        {
+          "description": "Is the post missing a flair that matches the relationship category described in the post?",
+          "rule_text_anchor": "Assign Proper Flair",
+          "item_type": "subjective",
+          "action": "continue",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Is an Updates-flaired post missing one or more required update conditions?",
+          "rule_text_anchor": "Updates -\"UPDATE\" needs to be in the title. Link to the previous post, which cannot be deleted or removed. Original post cannot be on the front page or within 48 hours. The update needs to be about the solution. One update only.",
+          "item_type": "subjective",
+          "action": "flag",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A breakup post is flaired as Relationships, so the assigned flair does not match the post's category.",
+          "related_checklist_item_description": "Is the post missing a flair that matches the relationship category described in the post?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The post concerns a two-week situationship that is becoming exclusive; moderators could disagree between Dating and Relationships flair.",
+          "related_checklist_item_description": "Is the post missing a flair that matches the relationship category described in the post?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "An Updates post lacks UPDATE in the title and does not link the previous post, clearly missing required conditions.",
+          "related_checklist_item_description": "Is an Updates-flaired post missing one or more required update conditions?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The post includes UPDATE in the title and links a prior thread, but it is posted about 36 hours later and only partially discusses a solution, so moderators could disagree on whether it satisfies the update requirements.",
+          "related_checklist_item_description": "Is an Updates-flaired post missing one or more required update conditions?"
+        }
+      ],
+      "subreddit": "relationships"
+    }
+  ],
+  "asoiaf": [
+    {
+      "rule_text": "Be Respectful to Each Other\n\nDon't attack other posters, be rude, condescending, or insulting. Don't use spoilers, quotes, or rhetorical questions as weapons.",
+      "checklist": [
+        {
+          "description": "Does the post or comment attack another poster or use rude, condescending, insulting, or weaponized language against them?",
+          "rule_text_anchor": "Don't attack other posters, be rude, condescending, or insulting. Don't use spoilers, quotes, or rhetorical questions as weapons.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Direct personal attack and condescending insult aimed at another user.",
+          "related_checklist_item_description": "Does the post or comment attack another poster or use rude, condescending, insulting, or weaponized language against them?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Sharply dismissive rhetorical phrasing directed at another user could be read as rude or merely heated disagreement.",
+          "related_checklist_item_description": "Does the post or comment attack another poster or use rude, condescending, insulting, or weaponized language against them?"
+        }
+      ],
+      "subreddit": "asoiaf"
+    },
+    {
+      "rule_text": "Use the Spoiler Code\n\nIf your comment goes beyond a given thread's spoiler scope, cover the spoilers with the spoiler code: [Spoilers Extended](/s \"Like this\")",
+      "checklist": [
+        {
+          "description": "Does the comment reveal spoilers beyond the thread's stated spoiler scope without using spoiler code?",
+          "rule_text_anchor": "If your comment goes beyond a given thread's spoiler scope, cover the spoilers with the spoiler code",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Unhidden discussion of a later-book/event reveal in a thread with a narrower spoiler scope.",
+          "related_checklist_item_description": "Does the comment reveal spoilers beyond the thread's stated spoiler scope without using spoiler code?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Hints at a later development without stating it directly; moderators could disagree on whether this is a spoiler requiring code.",
+          "related_checklist_item_description": "Does the comment reveal spoilers beyond the thread's stated spoiler scope without using spoiler code?"
+        }
+      ],
+      "subreddit": "asoiaf"
+    },
+    {
+      "rule_text": "Titles Should Not Contain Spoilers\n\nTopics with spoilers in titles will be removed. Use the appropriate spoiler tag.",
+      "checklist": [
+        {
+          "description": "Does the post title contain plot information that would reasonably reveal a spoiler?",
+          "rule_text_anchor": "Topics with spoilers in titles will be removed.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly reveals a major plot outcome in the title, which the rule prohibits.",
+          "related_checklist_item_description": "Does the post title contain plot information that would reasonably reveal a spoiler?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Hints at a significant story event in a vague way; moderators might disagree on whether it is specific enough to count as a spoiler in the title.",
+          "related_checklist_item_description": "Does the post title contain plot information that would reasonably reveal a spoiler?"
+        }
+      ],
+      "subreddit": "asoiaf"
+    },
+    {
+      "rule_text": "Stay on Topic\n\nNew Topics must have a concrete focus on ASOIAF/GoT. Meta topics are not allowed. We host monthly discussion hubs after the turn of each month for talking about the subreddit.",
+      "checklist": [
+        {
+          "description": "Is the post not concretely focused on ASOIAF/GoT, or is it a meta topic about the subreddit rather than the works?",
+          "rule_text_anchor": "New Topics must have a concrete focus on ASOIAF/GoT. Meta topics are not allowed.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Direct subreddit meta discussion, which the rule explicitly disallows outside monthly hubs.",
+          "related_checklist_item_description": "Is the post not concretely focused on ASOIAF/GoT, or is it a meta topic about the subreddit rather than the works?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Discusses the adaptation and franchise context, but only loosely connects to ASOIAF/GoT; moderators could disagree on whether the focus is concrete enough.",
+          "related_checklist_item_description": "Is the post not concretely focused on ASOIAF/GoT, or is it a meta topic about the subreddit rather than the works?"
+        }
+      ],
+      "subreddit": "asoiaf"
+    },
+    {
+      "rule_text": "No Memes, Silly Content, FanArt Topics\n\nNo silly posts, external funny links, memes, as new topics. /r/aSongOfMemesAndRage is best for these. Constructive parodies, theories, are allowed to an extent, at the moderators' discretion. Fan Art should be posted in our weekly Friday Fan Art threads.",
+      "checklist": [
+        {
+          "description": "Is this a new-topic post whose primary purpose is a meme, silly/funny content, or an external funny link rather than substantive ASOIAF discussion?",
+          "rule_text_anchor": "No silly posts, external funny links, memes, as new topics.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Is this a new-topic post centered on fan art instead of being posted in the weekly Friday Fan Art thread?",
+          "rule_text_anchor": "Fan Art should be posted in our weekly Friday Fan Art threads.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Image macro joke post with no substantive discussion; clearly a meme as a standalone topic.",
+          "related_checklist_item_description": "Is this a new-topic post whose primary purpose is a meme, silly/funny content, or an external funny link rather than substantive ASOIAF discussion?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A parody-style theory post that uses humor but may still be constructive, fitting the rule's moderator-discretion carveout.",
+          "related_checklist_item_description": "Is this a new-topic post whose primary purpose is a meme, silly/funny content, or an external funny link rather than substantive ASOIAF discussion?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "Standalone fan art submission posted as its own topic instead of in the Friday fan art thread.",
+          "related_checklist_item_description": "Is this a new-topic post centered on fan art instead of being posted in the weekly Friday Fan Art thread?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A post analyzing heraldry choices while including the author's own sketch; moderators might disagree whether it is primarily fan art or substantive discussion.",
+          "related_checklist_item_description": "Is this a new-topic post centered on fan art instead of being posted in the weekly Friday Fan Art thread?"
+        }
+      ],
+      "subreddit": "asoiaf"
+    },
+    {
+      "rule_text": "Piracy is Prohibited.",
+      "checklist": [
+        {
+          "description": "Does the post or comment request, provide, or facilitate access to pirated ASOIAF-related content?",
+          "rule_text_anchor": "Piracy is Prohibited.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Directly asks for an unauthorized copy of the books and offers to share one, which is piracy facilitation.",
+          "related_checklist_item_description": "Does the post or comment request, provide, or facilitate access to pirated ASOIAF-related content?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Mentions getting the books for free from an unofficial source without clearly asking for or sharing links, making it a gray-area piracy signal.",
+          "related_checklist_item_description": "Does the post or comment request, provide, or facilitate access to pirated ASOIAF-related content?"
+        }
+      ],
+      "subreddit": "asoiaf"
+    },
+    {
+      "rule_text": "Don't be Sketchy.",
+      "checklist": [
+        {
+          "description": "Is the post or comment suspicious, deceptive, evasive, or likely to facilitate wrongdoing?",
+          "rule_text_anchor": "Don't be Sketchy.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Attempts to arrange a suspicious off-platform transaction using evasive language and burner contact info.",
+          "related_checklist_item_description": "Is the post or comment suspicious, deceptive, evasive, or likely to facilitate wrongdoing?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Uses vague, secretive phrasing that could be harmless joking or could indicate sketchy intent, so moderators might disagree.",
+          "related_checklist_item_description": "Is the post or comment suspicious, deceptive, evasive, or likely to facilitate wrongdoing?"
+        }
+      ],
+      "subreddit": "asoiaf"
+    }
+  ]
+}

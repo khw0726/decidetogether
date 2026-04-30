@@ -385,6 +385,22 @@ async def _migrate_sample_post_modqueue_fields(conn) -> None:
         ))
 
 
+async def _migrate_rule_compile_status(conn) -> None:
+    """Add compile_status and compile_error columns to rules if missing."""
+    cols = await conn.execute(text("PRAGMA table_info(rules)"))
+    col_names = {r[1] for r in cols.fetchall()}
+    if not col_names:
+        return
+    if "compile_status" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN compile_status VARCHAR NOT NULL DEFAULT 'idle'"
+        ))
+    if "compile_error" not in col_names:
+        await conn.execute(text(
+            "ALTER TABLE rules ADD COLUMN compile_error TEXT DEFAULT NULL"
+        ))
+
+
 async def init_db() -> None:
     """Create all database tables."""
     async with engine.begin() as conn:
@@ -408,6 +424,7 @@ async def init_db() -> None:
         await _migrate_reference_corpus_fields(conn)
         await _migrate_flag_to_warn(conn)
         await _migrate_sample_post_modqueue_fields(conn)
+        await _migrate_rule_compile_status(conn)
         await conn.run_sync(Base.metadata.create_all)
 
 

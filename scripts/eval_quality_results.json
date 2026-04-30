@@ -1,0 +1,122 @@
+{
+  "per_rule": [
+    {
+      "subreddit": "books",
+      "rule_text_short": "Discussion is the goal  Do not post shallow content. All posts must be directly ",
+      "structural": {
+        "anchor_in_rule": true,
+        "non_leaf_action": true,
+        "regex_compiles": true,
+        "tree_depth_ok": true,
+        "example_count_ok": false,
+        "rubric_nonempty": true
+      },
+      "llm_scores": {
+        "coverage": 2,
+        "logic_specificity": 3,
+        "item_type_fit": 4,
+        "example_quality": 4,
+        "anchor_accuracy": 4,
+        "notes": "**Coverage (2):** The rule has three distinct requirements: (1) not shallow, (2) directly book-related, and (3) discussion-focused/informative. The compiled checklist tree only contains two checklist items \u2014 and both are *exact duplicates* of each other, both addressing only the \"directly book related\" criterion. The \"shallow content\" prohibition and the \"informative and discussion-focused\" requirement are never addressed as separate checklist items, even though they are the primary thrust of the rule (\"Do not post shallow content\" is literally the first sentence). This is a major gap.\n\n**Logic specificity (3):** The single implemented rubric (book-relatedness) is reasonably well-specified, with good examples of both sides of the boundary and an appropriate threshold (0.7). However, the missing items for \"shallow/low-effort content\" and \"discussion-focused\" would need their own rubrics, which are entirely absent. Without those, the compiled rule cannot catch shallow but book-adjacent posts (e.g., a photo of a bookshelf with no caption) or posts that are book-related but not discussion-focused (e.g., \"Here's my reading list for 2024\" with no invitation to discuss).\n\n**Item type fit (4):** The subjective classification is appropriate for the book-relatedness check \u2014 it genuinely requires judgment. The missing items (shallowness, discussion focus) would also likely be subjective, so no misclassification, but absence is still a problem.\n\n**Example quality (4):** The five examples are realistic and well-chosen. The borderlines (b1: short McCarthy post; b2: film-to-book bridge post) are genuinely near the decision boundary. The compliant example (Dostoevsky doubles analysis) is a strong anchor. Minor issue: example v1 (\"Just finished a book and it made me cry\") is mapped to a checklist item (\"Is the post shallow\u2026\") that doesn't actually exist in the compiled tree \u2014 a consistency error between examples and checklist.\n\n**Anchor accuracy (4):** The anchor \"All posts must be directly book related\" is a precise quote from the rule. Minor issue: both duplicate items use the same anchor, and neither references the \"shallow content\" or \"discussion focused\" anchors that exist verbatim in the rule text (\"Do not post shallow content,\" \"discussion focused\")."
+      }
+    },
+    {
+      "subreddit": "books",
+      "rule_text_short": "Personal conduct  Please use a civil tone and assume good faith when entering a ",
+      "structural": {
+        "anchor_in_rule": true,
+        "non_leaf_action": true,
+        "regex_compiles": true,
+        "tree_depth_ok": true,
+        "example_count_ok": false,
+        "rubric_nonempty": true
+      },
+      "llm_scores": {
+        "coverage": 4,
+        "logic_specificity": 4,
+        "item_type_fit": 5,
+        "example_quality": 4,
+        "anchor_accuracy": 5,
+        "notes": "Coverage (4): The single checklist item captures both \"civil tone\" and \"assume good faith\" dimensions well, and the rubric addresses both. However, the rule has two distinct obligations (tone civility AND good faith assumption) that could benefit from being split into separate checklist items for cleaner enforcement. Currently they're bundled, which is adequate but slightly imprecise \u2014 e.g., a post can be polite in tone but still implicitly assume bad faith, and the combined rubric may underweight that scenario. Logic specificity (4): The rubric is reasonably specific with four scoring criteria and a clear lower-bound carve-out (frustration at a book vs. a person). However, the threshold of 0.65 is asserted without grounding, and the rubric does not clarify edge cases like sarcasm or passive-aggressive language, which sit near the decision boundary. Example quality (4): The three examples are well-written and realistic. The borderline case is genuinely ambiguous and near the decision boundary. However, only one borderline example is generated (the rubric specifies 5 examples_to_include but only 3 are present), and there is no example of frustration directed at a book/idea (the explicitly called-out compliant edge case in the rubric), nor a passive-aggressive or sarcastic tone example."
+      }
+    },
+    {
+      "subreddit": "books",
+      "rule_text_short": "Prohibited  Self-promotion and promotional posts, comments & flairs, memes, imag",
+      "structural": {
+        "anchor_in_rule": true,
+        "non_leaf_action": true,
+        "regex_compiles": true,
+        "tree_depth_ok": true,
+        "example_count_ok": false,
+        "rubric_nonempty": true
+      },
+      "llm_scores": {
+        "coverage": 1,
+        "logic_specificity": 2,
+        "item_type_fit": 3,
+        "example_quality": 4,
+        "anchor_accuracy": 5,
+        "notes": "CRITICAL ISSUES:\n\n**Coverage (1/5):** The compiled checklist tree is catastrophically incomplete. The rule prohibits 13 distinct categories: self-promotion, promotional posts/comments/flairs, memes, image-only, video-only, personal recommendation requests, 'what's that book' requests, 'should I read?' requests, sales links, piracy, plagiarism, low quality book lists, and spoilers without warning. The compiled checklist contains ONLY 7 identical duplicates of a single checklist item \u2014 the \"sensationalist headlines\" check. Every other prohibited category (self-promotion, memes, image-only, video-only, recommendation requests, 'what's that book', 'should I read?', sales links, piracy, plagiarism, low-quality book lists, spoilers without warning) is completely missing from the checklist tree. This is a near-total compilation failure.\n\n**Logic Specificity (2/5):** The one item that was compiled (sensationalist headlines) has a reasonable rubric with decent specificity. However, the item is duplicated 7 times identically \u2014 this suggests a severe compiler loop/bug rather than intentional multi-signal logic. The rubric itself is adequate but the 0.7 threshold is applied without explanation of scale, and the duplicate entries would cause redundant 7x evaluation of the same signal.\n\n**Item Type Fit (3/5):** The sensationalist headlines item is correctly classified as subjective, which is appropriate. However, many missing items (e.g., sales links with URL patterns, image-only posts via post_type metadata, plagiarism via text matching) would warrant deterministic or structural classifications \u2014 these can't be evaluated because the items are absent.\n\n**Example Quality (4/5):** Despite the checklist failure, the generated examples are actually strong. They cover 7 different rule categories, include realistic violating and borderline cases for each, and the borderline cases are genuinely near the decision boundary (e.g., blog-linked analysis, veiled recommendation requests, informal spoiler labels). The compliant example is also well-chosen. Minor deduction: examples reference checklist item descriptions that don't exist in the actual compiled tree (e.g., self-promotion, meme, piracy checklist items).\n\n**Anchor Accuracy (5/5):** The one anchor used (\"sensationalist headlines\") is an exact verbatim quote from the rule text."
+      }
+    },
+    {
+      "subreddit": "books",
+      "rule_text_short": "Important  We don't allow personal recommendation posts. You can ask in our Week",
+      "structural": {
+        "anchor_in_rule": true,
+        "non_leaf_action": true,
+        "regex_compiles": true,
+        "tree_depth_ok": true,
+        "example_count_ok": false,
+        "rubric_nonempty": true
+      },
+      "llm_scores": {
+        "coverage": 3,
+        "logic_specificity": 3,
+        "item_type_fit": 4,
+        "example_quality": 3,
+        "anchor_accuracy": 5,
+        "notes": "**Coverage (3):** The rule text contains two distinct elements: (1) a prohibition on personal recommendation posts, and (2) a redirect to three specific alternatives (Weekly Recommendation Thread, Suggested Reading/What to Read page, r/suggestmeabook). The compiled checklist only addresses the first element \u2014 detecting the prohibited post type \u2014 with no checklist item covering whether the post should be redirected or whether the removal message includes the required alternative resources. While enforcement of the redirect is arguably outside the scope of a detection checklist, the alternatives also implicitly define the boundary of what *is* allowed (e.g., is a post that frames itself as a \"Weekly Thread\"-style prompt compliant?). This nuance is absent. A second item distinguishing \"general community recommendation prompts\" from \"personal requests\" would sharpen coverage.\n\n**Logic Specificity (3):** The single LLM rubric is reasonable but too coarse for a decision boundary that moderators genuinely struggle with. The rubric conflates two distinct axes \u2014 (a) is the post soliciting suggestions at all, and (b) is the solicitation *personal* vs. community-oriented \u2014 without giving the model clear guidance on how to weight them independently. For example, \"What are the best books of the decade?\" is collective but still a recommendation request; \"I'm reading X, what else fits my taste?\" is clearly personal. The threshold of 0.65 is stated but there is no guidance on what constitutes a \"high\" vs. \"low\" score in this 0\u20131 space, and no fallback deterministic signal (e.g., regex for \"recommend me,\" \"what should I read,\" \"looking for books like\") to anchor the LLM's judgment. False positives on general discussion posts (\"best books about X topic\") are a real risk.\n\n**Item Type Fit (4):** Classifying the single item as `subjective` is appropriate \u2014 the distinction between a personal recommendation request and a general discussion prompt genuinely requires judgment. A minor improvement would be to split off a lightweight `deterministic` pre-filter (regex on common recommendation-seeking phrases) before escalating to the LLM, which would reduce cost and improve consistency.\n\n**Example Quality (3):** Only three examples are provided (one violating, one borderline, one compliant), despite the logic specifying `examples_to_include: 5`. The two missing examples leave important decision-boundary cases untested. Key missing near-boundary cases include: (a) a post asking for recommendations framed as a poll or list (\"What's everyone's favorite X book?\"), (b) a post that explicitly mentions the Weekly Thread or r/suggestmeabook but still makes a personal ask in the body, and (c) a \"looking for books like X\" post that adds substantive discussion of why X resonated (blending discussion and recommendation). The existing borderline example is good, but the compliant example is far from the boundary (an analytical literary discussion is an easy non-violation).\n\n**Anchor Accuracy (5):** The single anchor, \"We don't allow personal recommendation posts,\" is a verbatim quote from the rule text. No issues."
+      }
+    },
+    {
+      "subreddit": "books",
+      "rule_text_short": "Spoiler Policy  Any post with a spoiler in the title will be removed. Any commen",
+      "structural": {
+        "anchor_in_rule": true,
+        "non_leaf_action": true,
+        "regex_compiles": true,
+        "tree_depth_ok": true,
+        "example_count_ok": false,
+        "rubric_nonempty": true
+      },
+      "llm_scores": {
+        "coverage": 2,
+        "logic_specificity": 1,
+        "item_type_fit": 2,
+        "example_quality": 4,
+        "anchor_accuracy": 4,
+        "notes": "\nCOVERAGE (2): The rule has three distinct requirements \u2014 (1) posts with spoilers in the title must be removed, (2) comments with spoilers not using spoiler code must be removed, and (3) users with an extensive history of spoiling will be banned. The compiled checklist contains ONLY the third requirement (user ban history), duplicated three times identically. Requirements 1 and 2 are entirely missing from the checklist tree.\n\nLOGIC_SPECIFICITY (1): The sole check used is `karma < -10`, which is a poor and unsupported proxy for \"extensive history of spoiling books.\" General karma score does not specifically measure spoiler violations \u2014 a user could have negative karma for entirely unrelated reasons (e.g., controversial opinions, downvotes on arguments), or a chronic spoiler-poster might have net-positive karma. There is no check on spoiler-specific moderation history, prior warnings, or removal counts. Additionally, the same item is copy-pasted three times with no differentiation, adding no additional logic coverage. The threshold of -10 is arbitrary and unexplained.\n\nITEM_TYPE_FIT (2): The check for \"extensive history of spoiling books\" is classified as `structural` using a karma field check, but this is a poor fit. An extensive spoiler history is inherently a `subjective` judgment requiring moderator review of past posts/comments, not a simple karma threshold. Even if a structural check were used, it should reference a more relevant field (e.g., prior removal count, mod notes) rather than general karma.\n\nEXAMPLE_QUALITY (4): Examples are realistic, diverse, and well-chosen. The borderline cases (vague title allusion, classic novel implication) are genuinely near the decision boundary. The compliant example correctly uses the spoiler tag format. Minor issue: no example is provided for the user-ban scenario (extensive spoiler history), which would have been relevant given that's the only compiled checklist item.\n\nANCHOR_ACCURACY (4): The anchor quote \"Any user with an extensive history of spoiling books will be banned.\" is a precise, verbatim quote from the rule text. No issues there. Score is not 5 only because the two missing checklist items (title spoilers, untagged comment spoilers) also have verbatim-quotable anchors in the rule that were never used.\n"
+      }
+    }
+  ],
+  "aggregate": {
+    "structural": {
+      "anchor_in_rule": 1.0,
+      "non_leaf_action": 1.0,
+      "regex_compiles": 1.0,
+      "tree_depth_ok": 1.0,
+      "example_count_ok": 0.0,
+      "rubric_nonempty": 1.0
+    },
+    "llm_scores": {
+      "coverage": 2.4,
+      "logic_specificity": 2.6,
+      "item_type_fit": 3.6,
+      "example_quality": 3.8,
+      "anchor_accuracy": 4.6,
+      "mean": 3.4
+    }
+  }
+}

@@ -1,0 +1,912 @@
+{
+  "AskReddit": [
+    {
+      "title": "You must post a clear and direct question in the title.",
+      "description": "The title may contain two, short, necessary context sentences. No text is allowed in the textbox. If you wish to tag your post NSFW, either put only the letters 'NSFW' before or after the post, or use the tagger button. Introductory statements or claims, 'baiting' devices like 'Possibly NSFW', or non question-related information such as 'I'll start...' are a violation of this rule, and will result in the post being removed. You need to have a question mark in your question.\nQuestions may ask for results other than an obvious response. for example you may ask, \"Other than flowers, what do you get your mom for mother's day?\"\nSpelling errors that change the meaning of the question will be removed.\nAny answers or examples to the question, including your own, should go in the comments as a reply to your own post. This is to allow for users to distinguish between the question being asked, and its answers, when voting."
+    },
+    {
+      "title": " Any post asking for advice should be generic and not specific to your situation alone.",
+      "description": "In AskReddit, your title should always be about the question itself. If the question is focused on your personal story or is only relevant to your experience, it is not suitable for AskReddit. Crowdsourcing naming decisions, purchases, etc, is not appropriate. If you wish to receive advice on a specific topic, there are several options listed in the sidebar."
+    },
+    {
+      "title": "Askreddit is for open-ended discussion questions.",
+      "description": "Questions with definite answers, that can be researched elsewhere, provide a limited scope for discussion (yes/no, DAE, polls and surveys, etc.), or limit discussion are not appropriate.\nWe are not a replacement for google. We are here to engage in constructive and entertaining discussion. Posts that do not promote such qualities may be removed. Either/or, \"would you rather\", or A/B posts also constitute as polls. Also prohibited are posts seeking to compile NSFW-links (as top-level comments). Such posts are not conducive to active discussion, and there are other subreddits where they would be more appreciated.\nThreads which require answers be based on usernames are not allowed. These threads are generally non conducive to discussion. The same applies to threads which add a length requirement (either over X number of characters/words/etc. or under) because they hinder discussion and limit answers.\nThreads in which many of the responses are the same (AKA Tom Cruise threads) discourage discussion and will be removed.\nThreads in which the first commenter is required to give one answer and the second commenter needs to add on in some way, or argue the opposite point are not allowed, because they tend to limit discussion by requiring what child comments can say."
+    },
+    {
+      "title": "Posting, or seeking, any identifying personal information, real or fake, will result in a ban without a prior warning.",
+      "description": "This includes for yourself or other people, and refers to, but is not limited to, names, phone numbers, email addresses, facebook or other social media accounts.\nRegardless of intent, posting any information under the premise of being personally identifiable information is prohibited, and the person posting the information will be banned from the subreddit. This is a protective measure, because we cannot verify the accuracy of what is posted, nor defend against any unsavory intentions other users might have.\nFor clarity: AskReddit's moderators are not in a position to check the validity of any information posted. As such posting ANY phone numbers, email addresses, facebook or other social media accounts, etc, real or fake, personal or corporate, will result in a ban without warning.\nPlease note: Rule 4 also applies to posting a user's history. It's permissible to link to a relevant comment from another thread or even another sub, but against the rules to post a link to something, even in the same thread, if it encourages going into that user's history. \"Here's a relevant comment\" comments fine but \"Look at what I found in this user's history! See what else you can find\" comments are not. "
+    },
+    {
+      "title": "AskReddit is not your soapbox, personal army, or advertising platform.",
+      "description": "Posts attempting to promote a specific agenda of yours or anyone else, to gain publicity, promote a cause or charity drive, or to publicly shame a person or entity will be removed. Rhetorical and loaded questions will also be removed. Posts asking users to shame or call out specific people or groups of people will be removed because they lead to witchhunting rather than discussion.\nThis isn't a place to recruit members for a cause, highlight an individual or entity for positive or negative publicity, or toot your own horn. Also, do not make posts or edits asking for upvotes or downvotes. Attempting to gain support for a movement, rig a contest, or form a vote brigade on reddit will result in immediate post removal. We're not here to do your bidding."
+    },
+    {
+      "title": "Questions seeking professional advice are inappropriate for this subreddit and will be removed.",
+      "description": "This includes but is not limited to medical, legal, mental health and financial advice. If you think that you need professional support, please contact a professional in your area as the qualifications of anyone giving advice on reddit can not be verified.\nIf it's serious enough for you to ask Reddit, it's serious enough for you to see a professional about it. "
+    },
+    {
+      "title": "Soliciting money, goods, services, or favours are not allowed. They will be removed.",
+      "description": "This ties back in with rules 2, 3, 4, and 5. Gaining publicity for a charity drive, assistance with a homework or work assignment, or asking other redditors to provide you with a good or service, including upvotes or reddit gold, is not conducive to discussion. There are other subreddits, many listed in our Offers & Assistance Multi-reddit, for just such a thing. Doing this, even as a joke, can result in a ban."
+    },
+    {
+      "title": "Mods reserve the right to remove content or restrict users' posting privileges as necessary if it is deemed detrimental to the subreddit or to the experience of others. ",
+      "description": "    All users are expected to be respectful to other users at all times. Personal attacks or comments that insult or demean a specific user or group of users will be removed and regular or egregious violations will result in bans.\nSlur use is not allowed in AskReddit. Exceptions may be made when they are part of a quote, but this is a friendly subreddit and using slurs when talking to others will not be tolerated.\nDo not make bigoted jokes. You are allowed to post your opinions to AskReddit, but please do so in a respectful manner. We expect most users will use common sense to determine what goes too far, but mods have ultimate discretion to remove comments and ban users for breaking this rule. Blatant statements of bigotry, with no added context, will be removed - e.g. \"I hate gays\" or \"Black people suck\".Please be aware that this is a site on the internet that hosts anonymous users. Thick skin is required. That said, don't be abusive or harass other users. If it is deemed that your conduct is detrimental to the experience of other users, your posting privileges will be revoked. Comments and posts mentioning subreddits and websites deemed to be harmful, because of demeaning content, spam, etc., will be filtered. Unmarked NSFW links, unmarked spoilers, misleading links, spam, and the likes will also be removed. Editing comments and posts to mislead and/or advertise will result in removal of the post/comment.\nShotgunning is defined as making low effort replies to top-level comments in high frequency, in a way that piggybacks on popular comments in an effort to grab easy karma. Karma farming is the practice of making low effort comments in a similar manner, but it applies to all comments. Frequently making top-level comments that are extremely low-effort ​is considered karma farming, and those comments may be removed. Mod actions in response to karma farming are generally reserved for users taking low effort comments to an extreme. Users with a majority of low effort comments that add little to the conversation (usually meaning jokes) may be banned but final judgement is up to the mods. Users who appear to make a genuine effort to add to discussions will likely be treated more leniently than people who are more clearly shotgunning intentionally.\nPosts which are considered to bait users into breaking rules (such as asking for racist jokes or controversial opinions) will be removed.\nBans may be issued to users who disregard this rule. "
+    },
+    {
+      "title": "Comment replies consisting solely of images will be removed.",
+      "description": "ASCII images over one line are also not allowed. You may post single line emoticons (ಠ◡ಠ, ʘ‿ʘ, ¯\\_(ツ)_/¯ , etc.), but large ASCII images and vertical text do not add value to discussion and will be treated as spam.\nChild comments (comment replies to other comments), that consist only of a link to an image/video will be removed. Links as part of a larger sentence giving context will still be permitted. For example, [random sentence made a link](http://www.reaction.gif) or http://www.imgur.com/jpg will be removed, but a comment like this: Here is an example of a comment containing a [link](http://www.imgur.com/jpg). will still be permitted. This is to prevent long chains of pictures, videos, or gifs that derail and detract from the conversation more than they contribute or progress it. Askreddit is a self-post only community focusing on discussion, and such comment replies only serve to derail the conversation, and are often 'spam' in nature."
+    }
+  ],
+  "science": [
+    {
+      "title": "Directly link to published peer-reviewed research articles or a brief media summary.",
+      "description": ""
+    },
+    {
+      "title": "No summaries of summaries, reviews or popular reposts (over 100 upvotes).",
+      "description": ""
+    },
+    {
+      "title": "Research must be less than 6 months old.",
+      "description": ""
+    },
+    {
+      "title": "No sensationalized titles, all titles must include the model where applicable.",
+      "description": ""
+    },
+    {
+      "title": "No blogspam, images, videos, infographics.",
+      "description": ""
+    },
+    {
+      "title": "All submissions must be flaired and contain a link to the published article, either in the submission link or as a standalone comment.",
+      "description": ""
+    },
+    {
+      "title": "On-topic. No memes/jokes/etc.",
+      "description": ""
+    },
+    {
+      "title": "No abusive/offensive/spam comments.",
+      "description": ""
+    },
+    {
+      "title": "Non-professional personal anecdotes may be removed.",
+      "description": ""
+    },
+    {
+      "title": "Arguments dismissing established scientific theories must contain substantial, peer-reviewed evidence.",
+      "description": ""
+    },
+    {
+      "title": "No medical advice!",
+      "description": ""
+    },
+    {
+      "title": "Repeat or flagrant offenders may be banned.",
+      "description": ""
+    }
+  ],
+  "AskHistorians": [
+    {
+      "title": "Civility",
+      "description": "All users are expected to behave with courtesy and politeness at all times. We will not tolerate racism, sexism, or any other forms of bigotry. This includes Holocaust denialism. Nor will we accept personal insults of any kind."
+    },
+    {
+      "title": "Scope",
+      "description": "Submissions to /r/AskHistorians must be either:\n* A question about the human past\n* A meta post about the state of the subreddit. Anyone may start a meta post, but please check with the moderators if you aren't sure you're using the label correctly. Short questions (e.g. clarification of moderation policy) that don't require discussion are better sent to the mods directly.\n* An AMA (\"Ask Me Anything\") with a historical expert or panel of experts. These should be arranged with the moderators beforehand – please message us if you're interested."
+    },
+    {
+      "title": "No current events",
+      "description": "To discourage off-topic discussions of current events, questions, answers and all other comments must be confined to events that happened 20 years ago or more, inclusively (e.g. 1997 and older). Further explanation on this topic can be found in Rules Roundtable."
+    },
+    {
+      "title": "Questions",
+      "description": "People asking questions should make every effort to ensure that their questions are clear, specific, and novel.\nQuestions should be about an event or person or culture in history. They can be direct questions such as \"What events led up to the War of 1812?\", or they can be indirect questions such as \"How historically accurate is Assassin’s Creed?\". Please put your question in the post title; if you put something like \"A question for you all (details inside)\", you may not attract the interest of the historians you want. Make sure your main question gives a clear idea what you're asking about. You can then expand on the question using the text box. For more information on the best way to format a question, check out our handy guide!\nQuestions may also be about historical method (e.g. “How should we deal with the biases in primary sources?”) or the “world of history” more generally (e.g. “What are the major collections, archives and museums in your field of research?”).\nPlease note that there is no such thing as a stupid question. As long as it falls within the guidelines here, feel free to ask it, even if you think it's obvious. And, if you see a question which looks stupid or obvious, remember that everyone comes to learning at their own time; we're not all born experts.\nPosts that ask for reading recommendations are allowed. You may also wish to check the book list.\nCheck your ego at the door; a large part of asking questions is accepting the possibility of being told things you didn't know."
+    },
+    {
+      "title": "Is this the right place for your question?",
+      "description": "While we welcome questions about mysterious objects you may have found, you should also try asking about them in r/WhatIsThisThing. They have a much better track record!\nQuestions about current events and politics may be more appropriate for r/AskSocialScience. Their political scientists, lawyers, economists, sociologists, and more, would be glad to receive your question.\nWhile there is a great deal of overlap, questions about early human history (beyond the written record), or proto-human history may be better suited to /r/AskAnthropology, and users should consider X-posting such questions there."
+    },
+    {
+      "title": "Homework",
+      "description": "Our users aren't here to do your homework for you, but they might be willing to help. Remember: AskHistorians helps those who help themselves. Don't just give us your essay/assignment topic and ask us for ideas. Do some research of your own, then come to us with questions about what you've learned. For further discussion and explication of the rules on homework questions, check out this Roundtable Discussion."
+    },
+    {
+      "title": "Popular Questions",
+      "description": "History may not repeat itself, but questions about history sure do! We maintain a list of frequently asked questions and the most useful answers to them on the popular questions wiki page. Please check this before you post your question: you may find the answer you want without having to wait. However, you are still welcome to ask your question if it has been asked before: you may get new answers from different people.\nIf you spot a question that gets asked often but isn't in the popular questions, please do message the moderators so we can add it to the list."
+    },
+    {
+      "title": "NSFW content",
+      "description": "If your question contains (or is likely to contain) adult topics or language, please try to keep title as SFW (\"safe for work\") as possible and make use of reddit's NSFW tag. You can tag a question as NSFW after you post it by browsing to your post and clicking the \"nsfw\" link below the title. Questions with NSFW titles will be deleted and we will ask you to repost it with a different title.\nThis is to help anyone browsing the subreddit for whom NSFW text may be a problem, and to allow people to know that a question contains NSFW content before they view it. Only the title of the thread is relevant; the body of the question and comments in reply to it are free to contain NSFW content."
+    },
+    {
+      "title": "No \"poll\"-type questions",
+      "description": "\"Poll\"-type questions aren't appropriate here: \"Who was the most influential person in history?\" or \"Who was the worst general in your period?\" or \"Who are your Top 10 favourite people in history?\" If your question includes the words \"most\" or \"least\", or \"best\" or \"worst\" (or can be reworded to include these words), it's probably a \"poll\"-type question. These questions do not lend themselves to answers with a firm foundation in sources and research, and the resulting threads usually turn into monsters with enormous speculation and little focussed discussion - and, as such, are banned here."
+    },
+    {
+      "title": "No \"Example Seeking\" Questions",
+      "description": "One of our key principles regarding questions is that they should be as precise as possible. We do not want threads that will attract only bad answers or are so generalized that they cannot be answered to the standards we ask for here. We therefore remove questions that are seeking examples rather than informed answers.\nOur guiding principle is that if a thread can be summarized as \"tell me random stuff about X\" then it falls into this category. Questions likely to be removed are those asking about all history and all places at once or an extraordinary range. If a question isn't reasonably limited to a specific time and/or place, it likely will be removed. If your question includes the phrase \"In your area of expertise\", \"examples of [X] throughout history\", or \"What are some facts about [X]\", strongly reconsider posting it, or else spend some time to narrow the scope of what you are asking. Your question may be a good one, but given the limits of Reddit and our ability to moderate it, we cannot allow this category of questioning because of the stress it adds to the mod-team.\nIn the case of a question looking for trivia or an extremely general topic, you might consider asking it our weekly META threads; the Friday-Free-for-All thread in particular is well suited to many of these questions, as is the Tuesday Trivia thread, for which we are always open to topic suggestions. Many general questions have been well explored in the past, and you might find lots of interesting information in the archives of both Tuesday Trivia and Friday Free-for-All threads."
+    },
+    {
+      "title": "No \"Soapboxing\" or Loaded Questions.",
+      "description": "This subreddit is called AskHistorians, not LectureHistorians or DebateHistorians. While we appreciate your enthusiasm for the history of issues that play a role in your life, we are here to answer your questions about issues, not provide a sounding board for your theories or a podium for your lectures. All questions must allow a back-and-forth dialogue based on the desire to gain further information, and not be predicated on a false and loaded premise in order to push an agenda.\nExample:\nGood Question: \"People say that Nixon is the worst President of all time. Why is this so?\"\nBad Question: \"Nixon was the worst President of all time. Why isn't Obama considered the worst?\"\nThe bad question is a fishing expedition to try to start a debate about Obama's presidency. Most of these questions will break our 20-year rule, or try to set up a debate about an issue using a long wall of text in the main post.\nAdditionally when posting, we prefer that any posts that you make are well-sourced and directly address the asker's question. Do not take the opportunity to make claims that are politically or religiously motivated. All comments are expected to be sourced, answer the asker's question, and relevant."
+    },
+    {
+      "title": "No \"What If\" Questions",
+      "description": "Questions should be about what did happen, not what could have happened. If your question calls for the crafting of a counterfactual scenario to answer it, you should either look to rework it to remove that element, or else send it over to r/HistoryWhatIf. "
+    },
+    {
+      "title": "Privacy",
+      "description": "Certain questions can lead to privacy concerns, and with this in mind, there are specific inquiries that we prohibit where, in our estimation, possible privacy concerns override the historical value of the question. As such, we do not allow questions which pose possible privacy issues for living, or recently deceased, persons who are not in the public eye. The cut-off for \"recent\" is 100 years, but even if a question does not meet the exact criteria above, we may remove at moderator discretion if we believe there nevertheless remains certain privacy concerns.\nIn the case of questions seeking military records, as well as seeking to identify service information from uniforms or photographs, try referring to our guide on Military Records and Identification. This thread provides more information and guidance on the rule. Additionally, /r/Genealogy provides an excellent resource on this site for researching family history."
+    },
+    {
+      "title": "Limitations on Questions Concerning Historical Artifacts and Items",
+      "description": "The goal of /r/AskHistorians is to provide an educational forum for people who have questions for experts. Often, those questions include inquiries about items or artifacts which have come into their possession. It is our policy to disallow posts asking for further information on artifacts where there is a likelihood that the acquisition or possession of the item might be illegal, unethical, and/or run contrary to sound, historical practices. This includes, but is not limited to, items possibly taken from archaeological sites, or requests for appraisal in preparation for sale. It should not be taken as a ban on questions about any items, such as family heirlooms, or common collectibles such as books, stamps, or firearms."
+    },
+    {
+      "title": "If at first, you don't succeed...",
+      "description": "... ask again. You are allowed to ask your question again if a reasonable time has passed without receiving a useful answer. We recommend waiting at least 24 hours, to give everyone around the world a full day to see your question. On the other hand, please don't ask the same question every day. Use some judgement."
+    },
+    {
+      "title": "Answers",
+      "description": "Answers in this subreddit are expected to be of a level that historians would provide: comprehensive and informative. As such, all answers will be assessed against the standards of Historiography and Historical Method. You should cite or quote sources where possible. A good answer will go further than a simple short sentence. As described here, \"good answers aren't good just because they are right – they are good because they explain. In your answers, you should seek not just to be right, but to explain.\""
+    },
+    {
+      "title": "Sources",
+      "description": "Sources are highly encouraged in all answers given in r/AskHistorians. A good answer will be supported by relevant and reliable sources. Primary sources are good. Secondary sources are also acceptable.\nHowever, tertiary sources such as Wikipedia are not as good. They are often useful for checking dates and facts, but not as good for interpretation and analysis. Furthermore, Wikipedia articles are open to random vandalism and can contain factual errors; therefore, please double-check anything you cite from Wikipedia. As outlined here, Wikipedia, or any other single tertiary resource, used by itself not a suitable basis for a comment in this subreddit.\nIt is also important to point out that you are not a source.\nEven though sources are not mandatory, if someone asks you to provide sources in good faith, please provide them willingly and happily. If you are not prepared to substantiate your claims when asked, please think twice before answering in the first place. Please keep in mind that all posters who fail to substantiate their posts when asked in good faith run the risk of having their posts removed.If you would like to provide a link to a book, please use WorldCat, OpenLibrary or any other non-commercial source for linking. The reddit spam filter is overly aggressive on bookseller links (especially Amazon!) and your good sourced comment may be auto-removed by the spam filter until a mod is able to approve it. Referral links (for Amazon or other referral sites) are firmly against the rules.\nHere is a helpful guide[1] to providing in-line citations using tooltips."
+    },
+    {
+      "title": "Write an in-depth answer",
+      "description": "An in-depth answer gives context to the events being discussed so that someone who is unfamiliar with the area can understand. An in-depth answer is usually more than a sentence or two. Use a balanced mix of context and explanation and sources and quotations in your answer. Being able to use Google to find an article that seems related to the question does not magically make you an expert. If you can contribute nothing more than your skills at using Google to find an article, please don't post.\nAsk yourself these questions:\n* Do I have the expertise needed to answer this question?\n* Have I done research on this question?\n* Can I cite my sources?\n* Can I answer follow-up questions?\nIf you answer \"Yes\" to all of these questions, then proceed. If you answer \"No\" to one or more of these questions, seriously reconsider what you're posting."
+    },
+    {
+      "title": "No personal anecdotes",
+      "description": "Personal anecdotes are not acceptable answers in this subreddit. They are unreliable, unverifiable and of very little real interest."
+    },
+    {
+      "title": "No speculation",
+      "description": "Suppositions and personal opinions are not a suitable basis for an answer in r/AskHistorians. Warning phrases for speculation include:\n* \"I guess...\" or \"My guess is...\"\n *\"I believe...\"\n *\"I think...\"\n *\"... to my understanding.\"\n *\"It makes sense to me that...\"\n * \"It's only common sense.\"\nIf your answer includes any of these phrases, it is likely that you are merely sharing your opinion or speculating, and not posting a proper answer."
+    },
+    {
+      "title": "No partial answers or \"placeholders\"",
+      "description": "An answer should be full and complete in and of itself.\nDo not post partial answers with the intention of prompting further discussion. You do not need to post a part-answer to prompt historians to answer the question; they will answer it if they can, regardless. The question is already the \"starting point\" for discussion; there's no need for anything more.\nIf you see a question without answers, do not provide a part-answer merely for the sake of putting something in the thread. If you can not answer the question fully, wait for someone who can.\nDo not provide a part-answer as a \"placeholder\" to come back to expand on later. Wait and provide the good answer when you can.\nThis is not a race for karma: a good answer late is better than a bad answer early. Good answers take time, and that's okay."
+    },
+    {
+      "title": "No political agendas or moralising",
+      "description": "This subreddit is a place for learning and open-minded discussion. As such, answers should not be written in the interests of advancing a personal agenda, but should represent a sincere effort to make an argument from the historical record. They should be constructed in keeping with the principles of the historical method - that is to say, your evidence should not be chosen selectively to support an argument that you feel is right; your argument should instead demonstrably flow from your critical engagement with an appropriate range of evidence. This is not to say that answers can not or should not delve into controversial topics, or deal with political hot-button issues when necessary, but rather that we would expect the answerer to approach the issue earnestly and in good faith. History often is controversial, and we aren't shying away from that, but rather asking that users will show proper respect for the historical method in constructing their response and avoid approaches which might be viewed as polemical."
+    },
+    {
+      "title": "Do not just post links or quotations",
+      "description": "Do not just post links to other sites as an answer. This is not helpful. Please take some time to put the links in context for the person asking the question. Avoid only recommending a source – whether that's another site, a book, or large slabs of copy-pasted text. If you want to recommend a source, please provide at least a small summary of what the source says. (This does not apply to questions that are only created to request sources.) Linking to past /r/AskHistorians questions is allowable.\nRegardless of the quality of the source you are citing, an answer should not consist only (or primarily) of copy-pasted sections of text from that source. The intention in providing an answer in r/AskHistorians is to answer as a historian: making a statement of your own, while using sources to support that statement.\nA good answer will be a balanced mix of context and explanation and sources and quotations. Only links or only quotations is not a good answer."
+    },
+    {
+      "title": "No plagiarism",
+      "description": "We have a zero-tolerance policy on blatant plagiarism, such as directly copying and pasting another person's words and trying to pass them off as your own. This will result in an instant ban."
+    },
+    {
+      "title": "Beware of historiographical fallacies",
+      "description": "Historiographical fallacies include: Presentism, The Historian's Fallacy,Chronological Snobbery"
+    },
+    {
+      "title": "Jokes and humour",
+      "description": "A post should not consist only of a joke, a humorous remark, or a flippant comment. You can certainly include humour as part of a full and comprehensive post, but your post should not be made solely for the purpose of being funny."
+    },
+    {
+      "title": "Digression",
+      "description": "All comments should be related to the topic as outlined in the OP. Substantial digressions will be redirected towards a new thread."
+    },
+    {
+      "title": "Follow-up questions",
+      "description": "If you have a follow-up question to the original question, please feel free to ask it.\nIf you have heard or read something which might be related to the question, and you want to check it, then make sure you ask it as a question. Do not post \"I'm not sure if this is true...\" or \"Someone will correct me if I'm wrong.\" If you're not actually answering the question, then make sure your comment looks like a question."
+    },
+    {
+      "title": "Pictures, videos and memes",
+      "description": "Any comment which consists only or mainly of an image or a video or a meme will be deleted. Photos and documentaries which support an answer are encouraged, but generic images, gifs, and internet memes are not welcome here."
+    },
+    {
+      "title": "Bots, usernames, and novelty accounts",
+      "description": "We are not interested in bots and they will be banned on sight. If you operate a bot, please consider blacklisting /r/AskHistorians to save us the trouble.\nIf your user account's name is something that would be unacceptable on a post - bigoted or hateful slurs, references to sexual violence, and so on - that user account will be banned on sight. We recommend you use an account with an innocuous name when posting on /r/AskHistorians.\nWe are also not interested in \"novelty\" accounts. Users may post from novelty accounts provided they do not do so \"in character\"."
+    }
+  ],
+  "explainlikeimfive": [
+    {
+      "title": "Read the Rules",
+      "description": "Make sure to read the rules."
+    },
+    {
+      "title": "Objective Explanations Only",
+      "description": "This subreddit is for asking for objective explanations. It is not a repository for any question you may have."
+    },
+    {
+      "title": "Explain, Don't Just Answer",
+      "description": "E is for Explain - merely answering a question is not enough."
+    },
+    {
+      "title": "Friendly and Simplified Explanations",
+      "description": "LI5 means friendly, simplified and layman-accessible explanations - not responses aimed at literal five-year-olds."
+    },
+    {
+      "title": "Search Before Posting",
+      "description": "Perform a keyword search, you may find good explanations in past threads. You should also consider looking for your question in the FAQ."
+    },
+    {
+      "title": "No Arguments",
+      "description": "Don't post to argue a point of view."
+    },
+    {
+      "title": "Flair Your Question",
+      "description": "Flair your question after you've submitted it."
+    }
+  ],
+  "relationships": [
+    {
+      "title": "This sub is about helping people in need",
+      "description": "f you are not providing such help (i.e. abuse, jokes, meta arguments, fighting with other posters, pointless tangents), your comments may be removed. Please report comments that you feel are in violation of these guidelines to keep discussions constructive."
+    },
+    {
+      "title": "At any time mods may remove or refer posts to other subs as we deem appropriate, and our decisions are final.",
+      "description": ""
+    },
+    {
+      "title": "Ages, genders and relationship length required!",
+      "description": ""
+    },
+    {
+      "title": "Spelling, grammar, and readability count!",
+      "description": ""
+    },
+    {
+      "title": "Include a TL;DR",
+      "description": "a brief summary at the end of your post. No \"See title\""
+    },
+    {
+      "title": "First Person Posts Only",
+      "description": ""
+    },
+    {
+      "title": "No Gift or Activity Questions",
+      "description": ""
+    },
+    {
+      "title": "No General/Meta Questions",
+      "description": ""
+    },
+    {
+      "title": "No polling questions or \"opinion gathering\"",
+      "description": ""
+    },
+    {
+      "title": "No questions directed at a single gender. ",
+      "description": ""
+    },
+    {
+      "title": "No photos, links, or videos",
+      "description": ""
+    },
+    {
+      "title": "Please don't feed the trolls or request proof. Use the report button instead!",
+      "description": "Avoid engaging with trolls or asking for proof; use the report button instead."
+    },
+    {
+      "title": "Do not repost removed material",
+      "description": ""
+    },
+    {
+      "title": "Posts that are removed by the AutoModerator that are missing information submitted for approval will not be considered unless you use the link explaining what was wrong with the post. The only exceptions are posts that were removed by actual humans for missing information.",
+      "description": ""
+    },
+    {
+      "title": "Do not request personal info, including pics.",
+      "description": ""
+    },
+    {
+      "title": "No Agendas",
+      "description": ""
+    },
+    {
+      "title": "Crossposting to other subreddits will result in an instaban.",
+      "description": ""
+    },
+    {
+      "title": "No Politics",
+      "description": ""
+    },
+    {
+      "title": "Do not encourage violence or criminal behavior, even as a joke.",
+      "description": ""
+    },
+    {
+      "title": "Do not mention upvotes or downvotes. We do not allow vote manipulation.",
+      "description": ""
+    },
+    {
+      "title": "Be respectful at all times.",
+      "description": ""
+    },
+    {
+      "title": "It's nice if you tell people that are giving you advice, \"thank you.\"",
+      "description": ""
+    },
+    {
+      "title": "Creative writing projects and trolls are not welcome. ",
+      "description": ""
+    },
+    {
+      "title": "Most importantly, abuse, bigotry, misogyny, misandry, racism, homophobia, gendered slurs, agendas and encouraging violence are not tolerated in our community and will result in a ban. Don't be rude.",
+      "description": ""
+    },
+    {
+      "title": "Assign Proper Flair",
+      "description": "Relationships -issues in ongoing romantic relationships\n Infidelity -issues of actual cheating\n Breakups -immediate issues surrounding a break up.\nDating -new people in your life, crushes, unclear relationships, or things shorter than 1 month\nUpdates -\"UPDATE\" needs to be in the title. Link to the previous post, which cannot be deleted or removed. Original post cannot be on the front page or within 48 hours. The update needs to be about the solution. One update only.\nPersonal issues -internal problems and behaviors that cause you problems in relationships\nNon-Romantic -issues with family or friends."
+    }
+  ],
+  "legaladvice": [
+    {
+      "title": "Use Responses as Guidelines",
+      "description": "Please only use responses as guidelines to better prepare yourself for when you meet with a lawyer."
+    },
+    {
+      "title": "Consultation Offerings",
+      "description": "Lawyers everywhere usually offer low-or-no cost consultations."
+    },
+    {
+      "title": "No Personal Information",
+      "description": "Posting personally identifiable information will get you banned."
+    },
+    {
+      "title": "Don't Delete Posts",
+      "description": "Please do not delete your post after you've received help. If you're worried about your identity, create a throwaway."
+    },
+    {
+      "title": "Link Previous Posts",
+      "description": "If you've posted about the same or a related issue before in this subreddit, please provide a link to your previous post."
+    },
+    {
+      "title": "Add Flair to Posts",
+      "description": "After you submit your post, please click the 'flair' button below it and choose the best option."
+    },
+    {
+      "title": "Recognized Users",
+      "description": "Users with stars have been recognized for consistently strong contributions. Read about them and the guidelines for requesting one here. "
+    },
+    {
+      "title": "Joking Allowed, Advice Required",
+      "description": "It's ok to joke around a bit, but it's not ok to ONLY joke around here. Please offer legal information if you have it, and if you don't, keep your comments to yourself. "
+    },
+    {
+      "title": "No Negative Comments",
+      "description": "Posts containing primarily negative comments, and lacking in advice, will be summarily removed without warning. Users who are consistent problems will be banned. Post to help, not to flame. "
+    },
+    {
+      "title": "No Advertising or Promotions",
+      "description": "Posts should not advertise, offer or promote any service, legal or otherwise. "
+    },
+    {
+      "title": "No Encouragement of Media Contact",
+      "description": "Posts or comments encouraging others to contact the media or to post on social media will be removed. "
+    },
+    {
+      "title": "Direct Legal Questions Required",
+      "description": "Posts should contain a summary of the issue and a direct legal question. Posts containing videos and asking us to analyze will be summarily removed."
+    },
+    {
+      "title": "Use NP Links",
+      "description": "If you're linking to a reddit post, use NP links (http://np.reddit.com/...)"
+    },
+    {
+      "title": "No Private Messaging",
+      "description": "Please do not request to be contacted or offer to contact over PM."
+    },
+    {
+      "title": "No Video Links",
+      "description": "Please do not post links to videos, including YouTube, in either posts or comments."
+    },
+    {
+      "title": "No Attorney Recommendations",
+      "description": "Please do not offer or request a recommendation for a specific attorney or law firm."
+    },
+    {
+      "title": "Moderation Discretion",
+      "description": "The mods have discretion to remove any post or comment they believe to be disruptive, unhelpful, or otherwise detrimental."
+    },
+    {
+      "title": "Include Location",
+      "description": "Always include your location in the title or body of your post. If in the US, include your state; if in Canada, include your province; else, give your country. Laws change dramatically as you cross borders."
+    },
+    {
+      "title": "Update Posts",
+      "description": "If your post is an update to a previous post, please use [Update] in the subject line, and include a link to your previous post. Discussion on update posts may take place in our sister subs, /r/legaladviceofftopic or /r/bestoflegaladvice. If you want your update post unlocked because you have further questions, please message the mods."
+    },
+    {
+      "title": "Hypothetical and Political Posts",
+      "description": "Hypothetical posts, political posts, law discussions should be posted on /r/legaladviceofftopic. Questions and comments that are substantially political in nature are outside the scope of the sub, and are subject to removal without warning."
+    },
+    {
+      "title": "Consider Regional Subreddits",
+      "description": "Please consider posting to /r/LegalAdviceUK with questions from the UK or /r/AusLegal for questions from Australia. You will have a greater chance at someone being familiar with the laws of your area."
+    },
+    {
+      "title": "Spam Filter Issues",
+      "description": "The spam filter occasionally eats good posts. Message the mods with a link to your post if you would like for us to save it and we might. Forget the link and we won't."
+    }
+  ],
+  "personalfinance": [
+    {
+      "title": "Submission guidelines",
+      "description": "Please treat others with respect, stay on-topic, and avoid self-promotion. Posts must be a question or discussion about personal finance with a descriptive title and may not be:\n* Non-English\n* Generic, open-ended, or hypothetical questions\n* Surveys and polls\n* Success stories with limited information/advice\n* Meta posts\n*IAMA/AMA requests or posts\n* News/information without a discussion or quote/summary"
+    },
+    {
+      "title": "Self-promotional advertising or soliciting",
+      "description": "We don't allow:\n* Advertisements, petitions, announcements, or promotion of companies, products, sites, blogs, videos, apps, etc.\n* Usernames referring to a business\n* Promotion of anything owned by you or someone affiliated with you, even if not monetized\n* Referral, affiliate, invite, and discount links/codes\n* PM requests or seeking private information\n* Repeatedly/prominently stating finance-related credentials\n Okay if pre-approved: open source tools, Google Docs, customer service replies"
+    },
+    {
+      "title": "Unhelpful or disrespectful",
+      "description": "We don't allow:\n* Circlejerking or karmawhoring\n* Posting purely for upvotes or humor\n* Insincerity or dishonesty\n* Trolling, loaded questions, loaded language, or provoking unproductive conversation\n* Memes and low-effort pictures/videos\n* Clickbait titles\n* Excessive large, bold, or spaced-out text\n* Bots and bot summoning\n* Novelty accounts that post \"in character\"\n* Insubstantive or ephemeral posts\n* Asking for upvotes or downvotes (or fewer upvotes or downvotes)\n* Excessive profanity"
+    },
+    {
+      "title": "Asking for handouts",
+      "description": "We don't allow asking for handouts. That includes:\n* Asking (even indirectly) for gifts, loans, donations for yourself or on behalf of any organization or person(s)\n* Any mention of a fundraising campaign even without a link\n* Requesting a job or attempting to recruit prospective employees\n* Asking for loan cosigners or soliciting for investors"
+    },
+    {
+      "title": "Legal discussion",
+      "description": "We don't allow:\n* Discussions that are predominantly legal issues\n* Content that would be better suited for /r/legaladvice"
+    },
+    {
+      "title": "Politicizing",
+      "description": "We don't allow:\n* Moralizing issues\n* Political discussions\n* Political baiting\n* Soapboxing"
+    },
+    {
+      "title": "Lawbreaking information",
+      "description": "We don't allow:\n* Suggesting another user perform illegal activity (or an activity that is illegal in most jurisdictions)\n* Linking to illegal content or lawbreaking information\n* Asking for advice on how to commit fraud, evade taxes, etc.\n* Suggesting the use of piracy, warez, software cracks"
+    },
+    {
+      "title": "Personal attack on redditors or groups",
+      "description": "We don't allow:\n* Personal attacks: Raw criticism without any constructive feedback\n* Name-calling, flaming, shaming, or otherwise harassing another\n  poster\n* Instructing a user to harm themselves or others in any way\n* Abusive language\n* Racist, sexist, homophobic, or otherwise bigoted remarks\n* Suggesting sex work or\n  exchanging sex acts for money or support\n* Retaliating in response to an attack or perceived affront"
+    },
+    {
+      "title": "Relationship or personal advice discussion",
+      "description": "We don't allow relationship or personal advice discussions, especially with limited personal finance context. That includes:\n* Content that would be better suited for /r/relationships\n* Recommending a poster end their current relationship or start a new relationship\n* Posts about suicide or violence\n* Posts asking for advice on how to convince someone else to change their behaviour\n* Relationship drama not essential to a question or discussion"
+    },
+    {
+      "title": "Other bad behavior",
+      "description": "\n* Doxing \u2014 Posting personal information, dox attempts, dox threats\n* Harshness \u2014 Being intentionally rude\n* Flooding \u2014 Making excessively frequent posts\n* Duplicates \u2014 Reposting news and information\n* Rabble rousing \u2014 We are not your personal army.\n* Plagiarism \u2014 Not giving credit or quoting properly\n* Missing \u2014 Disappearing after posting a discussion, posting for someone else with insufficient information\n[Content policy violations](/w/contentpolicy)\n[Poor reddiquette](/w/reddiquette)"
+    }
+  ],
+  "changemyview": [
+    {
+      "title": "Explain Your View",
+      "description": "Explain the reasoning behind your view, not just what that view is (500+ characters required). If your view is about a 'double standard', please see the guidelines."
+    },
+    {
+      "title": "Personal View Requirement",
+      "description": "You must personally hold the view and be open to it changing. A post cannot be neutral; made on behalf of others; for playing devil's advocate; or to 'soapbox'. Posts by throwaway accounts must be approved through modmail."
+    },
+    {
+      "title": "Submission Title Format",
+      "description": "Submission titles must adequately sum up your view and include 'CMV:' at the beginning. Posts with misleading/overly-simplistic titles may be removed."
+    },
+    {
+      "title": "No Meta Posts",
+      "description": "No 'meta posts'. Please post to /r/ideasforcmv instead. Feasible suggestions that gain traction there may be implemented or posted to CMV for further discussion by the mods."
+    },
+    {
+      "title": "Engagement Requirement",
+      "description": "Only post if you are willing to have a conversation with those who reply to you, and are available to start doing so within 3 hours of posting. If you haven't replied during this time, your post will be removed."
+    },
+    {
+      "title": "Challenge the View",
+      "description": "Direct responses to a CMV post must challenge at least one aspect of OP\u2019s stated view (however minor), or ask a clarifying question. Arguments in favor of the view must be restricted to replies to other comments."
+    },
+    {
+      "title": "No Rudeness or Hostility",
+      "description": "Don't be rude or hostile to other users. Your comment will be removed even if the rest of it is solid. 'They started it' is not an excuse. You should report, not retaliate."
+    },
+    {
+      "title": "Avoid Accusations",
+      "description": "If you are unsure whether someone is genuine, ask clarifying questions (see: socratic method). If you think they are still exhibiting poor behaviour, please message us."
+    },
+    {
+      "title": "Award Deltas Properly",
+      "description": "Award a delta if you've acknowledged a change in your view. You must include an explanation of the change along with the delta so we know it's genuine. Delta abuse includes sarcastic deltas, joke deltas, super-upvote deltas, etc. "
+    },
+    {
+      "title": "No Low Effort Comments",
+      "description": "No low effort comments. Comments that are only jokes or \"written upvotes\", for example. Humor and affirmations of agreement can be contained within more substantial comments."
+    }
+  ],
+  "news": [
+    {
+      "title": "Not news",
+      "description": "A story that is over a week old, does not properly report a story, or is not noteworthy. Self posts and meta posts without moderator approval (live update threads, major breaking news, and megathreads are usually exempt) should go to /r/InTheNews."
+    },
+    {
+      "title": "Opinion/analysis or advocacy piece",
+      "description": "Opinion and analysis should go in /r/InTheNews or another relevant subreddit. This includes articles with editorial opinion, personal conjecture, or otherwise. Press releases with an editorial slant, and analysis of news events (rather than reporting on the event itself) are not allowed. Both articles and domains regarding advocacy for a certain point of view or ideology rather than objective reporting should be reviewed under this rule."
+    },
+    {
+      "title": "Politics",
+      "description": "News concerning politics should be posted in /r/Politics or another appropriate subreddit. Politics in this case primarily means rhetoric pieces, so notable substantial events within political institutions (eg. supreme court decisions in the US, denouncement of actions by a government body, etc.) are reviewed on a case-by-case basis."
+    },
+    {
+      "title": "Title not from article/editorialized title",
+      "description": "Editorialized titles, written by the posting user or the domain, are not allowed. Titles should be unbiased and strictly factual. When the article itself is titled appropriately, the submission title should be directly sourced from the title or lead paragraph of the linked article. Don't plug other subreddits in the title; adding cross-post references is not suitable for /r/news."
+    },
+    {
+      "title": "Paywall or is blogspam/steals content",
+      "description": "Domains which require the user to purchase a subscription or register an account in order to read the full article are not allowed in /r/news. All users should be able to access the article. Domains which are stealing or reposting content from other news sites, or simply rehash another article without adding substance, are not allowed, and users are encouraged to post the original source instead."
+    },
+    {
+      "title": "Covers an already-submitted story",
+      "description": "This rule is in relation to already submitted stories which are being rehashed on multiple domains. If a popular story is being submitted while the same event is covered in another post on the front page, or one with sufficient upvotes at an earlier date, it may be subject to removal. If a story was already submitted but did not become popular, then the rule is not applicable. Spamming a story until it reaches the front page is in violation of reddit's sitewide rules and is not allowed."
+    },
+    {
+      "title": "Racist, sexist, vitriolic, or overly crude",
+      "description": "Comments containing racist, sexist or bigoted slurs are subject to removal. Comments which promote racism, sexism or bigotry (including a viewpoint in relation to those) are subject to removal, and users whom engage in posting such comments may be banned at the mods' discretion. Overly crude comments which add nothing to discussion are also subject to removal. These include inappropriate or inflammatory comments, personal attacks, etc."
+    },
+    {
+      "title": "Unnecessarily rude or provocative",
+      "description": "In conjunction with vitriolic and crude comments, a comment that is unnecessarily rude (inflammatory comments, personal attacks) or purposefully provocative (baiting) are subject to removal."
+    },
+    {
+      "title": "Cheap or distracting joke or meme",
+      "description": "Jokes, memes, puns, and overall low quality comments are subject to removal, especially in the top-level comments."
+    },
+    {
+      "title": "Breaks sitewide rules, witchhunting",
+      "description": "Any thread which violates reddit's site-wide rules or invokes a witch-hunt is not allowed in /r/news. Contact information publicly advertised by the person or organization in question is allowed so long as it is not being used to incite personal harassment, and doesn't contain personal contact information (home phone number, information of non-public family members, etc.) To ensure that such comments aren't removed, provide a link to the official page where this information is contained."
+    }
+  ],
+  "depression": [
+    {
+      "title": "Text Posts only",
+      "description": "Articles (including personal blogs) and media must be linked in a text submission and accompanied by a full account of your personal experience with them and how they affected your depression.\nIf your resource is of primarily scientific or socio-political interest, please post it elsewhere, e.g. /r/psychology, /r/science, /r/mentalhealth.\nThis also means no fundraising or activism, please.\nAny surveys or research related posts must be pre-approved by the mod team.\nDo not debate or sensationalise current events or hot-button topics because they happen to have a \"depression angle\". "
+    },
+    {
+      "title": "Do not post or respond with",
+      "description": "* \"Tough love\" of any description.\n* General uplifting or \"it gets better\" messages. Encouragement is not helpful unless it integrates real, personal understanding of the OP's feelings and situation.\n* Anything explicit or inciting related to suicide or self harm.\n* Claims about the efficacy of any treatment or self-help strategy including religion."
+    },
+    {
+      "title": "Please don't diagnose others or advocate for or against specific treatments or self-help strategies.",
+      "description": "It's fine to describe how something worked (or didn't) for you, but it's absolutely not okay to prescribe for anybody else.Our focus is on support rather than \"fixes\". If you are looking for a more solution-oriented community, check out /r/getting_over_it/ or /r/GetMotivated. "
+    },
+    {
+      "title": "Don't say that you're here to help, show it by responding supportively to our OPs.",
+      "description": "Empathy, support, and feedback are usually more helpful than advice.\nDon't advertise yourself as a helper, authority or role model. This includes inviting PMs as a first resort.\nIf you struggle with knowing how best to empathize and connect with others, this brief video from Brené Brown and the RSA may help.\nYou don't need special knowledge or expertise to help, you just need to be non-judgmental and interested in understanding the other person's experience."
+    }
+  ],
+  "books": [
+    {
+      "title": "Discussion is the goal",
+      "description": "Do not post shallow content. All posts must be directly book related, informative, and discussion focused."
+    },
+    {
+      "title": "Personal conduct",
+      "description": "Please use a civil tone and assume good faith when entering a conversation."
+    },
+    {
+      "title": "Prohibited",
+      "description": "Self-promotion and promotional posts, comments & flairs, memes, image-only, video-only, personal recommendation requests, 'what's that book' and 'should I read?' requests, sales links, piracy, plagiarism, low quality book lists, spoilers without warning, sensationalist headlines. Please see extended rules for appropriate subreddits or use the multireddit buttons."
+    },
+    {
+      "title": "Encouraged",
+      "description": "We love original content and self-posts! Thoughts, discussion questions, epiphanies and interesting links about authors and their work. We also encourage discussion about developments in the book world and we have a flair system."
+    },
+    {
+      "title": "Important",
+      "description": "We don't allow personal recommendation posts. You can ask in our Weekly Recommendation Thread, consult our Suggested Reading or What to Read page, or post in /r/suggestmeabook."
+    },
+    {
+      "title": "Spoiler Policy",
+      "description": "Any post with a spoiler in the title will be removed. Any comment with a spoiler that doesn't use the spoiler code will be removed. Any user with an extensive history of spoiling books will be banned. Spoiler tags are: #s for example: Spoilers about XYZ is done with: [Spoilers about XYZ](#s \"Spoiler content here\")."
+    }
+  ],
+  "hiphopheads": [
+    {
+      "title": "Be Civil",
+      "description": "Overly-aggressive and obvious flamewars will be removed in extreme circumstances at our discretion. Use some common sense."
+    },
+    {
+      "title": "Remove Lyric/Pun Chains",
+      "description": "Lyric/pun chains and overused memes will be removed at our discretion."
+    },
+    {
+      "title": "No Emojis",
+      "description": "Don't use emojis."
+    },
+    {
+      "title": "Comment Length in Official Discussions",
+      "description": "In discussion threads top level comments should be at least 140 characters long. This only applies to Official Discussions like First Reaction Threads and the various Album Discussion Threads."
+    },
+    {
+      "title": "Posting guidelines",
+      "description": "Please read our rules and the rules of Reddit carefully prior to posting. We have a zero tolerance policy for individuals that break the rules of reddit. This includes blog spam, vote manipulation through outside sites and the posting of links to illegal downloads. Blog spam is defined as a user whose posts are >10% to a personal website or particular site. We use the same definition, including consistently posting non-exclusive blog links. If the link can be found on a Reddit-embed-able site, (YouTube, SoundCloud, etc.) post that link instead."
+    },
+    {
+      "title": "Song Posting Requirements",
+      "description": "All song posts must contain at least the ARTIST'S NAME and TITLE of the album/song."
+    },
+    {
+      "title": "No Opinion in Link Titles",
+      "description": "Don't inject opinion or hyperbole into link titles."
+    },
+    {
+      "title": "Post Tag Usage",
+      "description": "Use one of the approved tags if relevant; misusing a tag or using one not on the list will get your post removed. [FRESH] new songs/albums released in the past week. [HYPE] upcoming artists. [ORIGINAL] Redditor-created music. [LEAK] leaked songs/albums. [MIXTAPE] for mixtapes. [DISCUSSION] post starting a discussion on a topic you present. [SHOTS FIRED] legitimate beef. [WAVY WEDNESDAY] wavy tracks, Wednesdays only. [THROWBACK THURSDAY] classic tracks not on the Favorites list or posted in the last year, Thursdays only. [OFFICIAL DISCUSSION] moderator-designated threads - all related posts go in that thread"
+    },
+    {
+      "title": "NP Links Only",
+      "description": "All links to other subreddits must be np links. We have the automoderator set to remove links that are non-np links."
+    },
+    {
+      "title": "Guide Approval Required",
+      "description": "Guides must be submitted to the mods for approval."
+    },
+    {
+      "title": "Fresh Fridays Rule",
+      "description": "Fridays are \"Fresh Fridays\". On these days the only songs that are allowed to be posted must either have a [Fresh], [Hype] or [Original] tag or it will be removed."
+    },
+    {
+      "title": "Interviews Title Guidelines",
+      "description": "Interviews with editorialized titles will be removed. Say \"Kanye West Interview with XXL, Discusses X & Y\" not \"Kanye likes Young Thug\"."
+    },
+    {
+      "title": "Do Not Post Featured Thread Content",
+      "description": "If your post belongs in one of the recurring threads, post there instead of making a new post. Monthly Feedback Thread: posted on the 1st of each month for subreddit feedback and announcements. Album of the Week: posted Tuesdays, in-depth discussion of one album. Essential Album of the Week: posted Wednesdays, going chronologically through the HHH Essentials list. Daily Discussion Thread: posted daily for general hip-hop discussion, ranking questions, recommendations, hypotheticals, and meta posts. Moronic Monday: for objective questions or ones you are too embarrassed to ask elsewhere. RIYL: weekly Saturday thread for recommendations based on what you listen to. What Have You Been Listening To?: weekly thread to share your listening from the previous week."
+    },
+    {
+      "title": "No Songs from Favorites List",
+      "description": "No songs from Favorites List: Check out hiphop101 if you're into this stuff."
+    },
+    {
+      "title": "No Frequent/Reposted Content",
+      "description": "No posts that have been made frequently or recently. Check the Done to Death section of the FAQ and USE THE SEARCH BAR!!! For songs the rule is if the song was on the front page within the last year it is a repost."
+    },
+    {
+      "title": "No Images and Vines Without Exceptions",
+      "description": "No images and Vines. Check out hiphopimages if you're into this stuff (EXCEPTIONS: newly-announced album covers/tracklistings and tour info)."
+    },
+    {
+      "title": "No Bashing Threads",
+      "description": "No threads that are specifically designed to bash an artist/fanbase should be avoided."
+    },
+    {
+      "title": "Tabloid News Removal",
+      "description": "Tabloid news and rumors will be removed at moderator discretion."
+    },
+    {
+      "title": "No Social Media Requests for Upvotes",
+      "description": "Posts linked by a Social Media post asking for upvotes will be deleted and the offending user may be banned."
+    },
+    {
+      "title": "No Social Media Comments (Except Announcements)",
+      "description": "Social Media comments (EXCEPTIONS: official announcements and back-and-forth beefs that have been broken down by the OP). All tweets, even official announcements must be self posts."
+    },
+    {
+      "title": "AMA Approval Required",
+      "description": "AMA requests or updates without explicit moderator approval will be removed. If you are setting up an AMA, please notify the moderators before making any posts on the topic."
+    },
+    {
+      "title": "No Playlists",
+      "description": "Playlists are not allowed."
+    },
+    {
+      "title": "No Birthday Threads",
+      "description": "Birthday Threads are not allowed."
+    },
+    {
+      "title": "Concert Review Standards",
+      "description": "Example. If it doesn't look like this one or at least like this one it's getting removed."
+    },
+    {
+      "title": "No \"I Met A Rapper!\" Threads",
+      "description": "These threads should go in the Daily Discussion thread or /r/hiphopimages."
+    },
+    {
+      "title": "Official Streams Only",
+      "description": "Only Official Streams are allowed, this serves as a tool to prevent spam and shady websites getting cash instead of the artists"
+    },
+    {
+      "title": "No Timed Posts",
+      "description": "Don't make those damn timed posts. \"When this post is X hours old....\"."
+    },
+    {
+      "title": "No Snippets",
+      "description": "Snippets are not allowed. You can discuss them in DD or a relevant thread with a larger scope, but we don't need multiple posts only containing awful audio quality/fakes (they've happened in the past)/incomplete songs."
+    },
+    {
+      "title": "No Political Endorsements",
+      "description": "Interviews are fine, but someone just saying they like 'x' politician should be avoided."
+    },
+    {
+      "title": "No Vague Announcements",
+      "description": "A picture of 2 rappers together is not an announcement of an upcoming collaboration."
+    },
+    {
+      "title": "No Illegal Downloads",
+      "description": "Please do not request or distribute links to retail projects."
+    },
+    {
+      "title": "No Petitions",
+      "description": "Please don't post petitions (change.org or similar). These can go in the Daily Discussion thread."
+    },
+    {
+      "title": "No Ticket Sales",
+      "description": "Please do not post requests to buy or sell tickets."
+    },
+    {
+      "title": "No Ranking Questions",
+      "description": "Questions like \"What's your favorite __?\" should be taken to the Daily Discussion Thread."
+    }
+  ],
+  "asoiaf": [
+    {
+      "title": "Be Respectful to Each Other",
+      "description": "Don't attack other posters, be rude, condescending, or insulting. Don't use spoilers, quotes, or rhetorical questions as weapons."
+    },
+    {
+      "title": "Use the Spoiler Code",
+      "description": "If your comment goes beyond a given thread's spoiler scope, cover the spoilers with the spoiler code: [Spoilers Extended](/s \"Like this\")"
+    },
+    {
+      "title": "Titles Should Not Contain Spoilers",
+      "description": "Topics with spoilers in titles will be removed. Use the appropriate spoiler tag."
+    },
+    {
+      "title": "Stay on Topic",
+      "description": "New Topics must have a concrete focus on ASOIAF/GoT. Meta topics are not allowed. We host monthly discussion hubs after the turn of each month for talking about the subreddit."
+    },
+    {
+      "title": "No Memes, Silly Content, FanArt Topics",
+      "description": "No silly posts, external funny links, memes, as new topics. /r/aSongOfMemesAndRage is best for these. Constructive parodies, theories, are allowed to an extent, at the moderators' discretion. Fan Art should be posted in our weekly Friday Fan Art threads."
+    },
+    {
+      "title": "Piracy is Prohibited.",
+      "description": ""
+    },
+    {
+      "title": "Don't be Sketchy.",
+      "description": ""
+    }
+  ],
+  "anime": [
+    {
+      "title": "Anime Specific Content",
+      "description": "Everything posted here must be anime specific."
+    },
+    {
+      "title": "Spoilers",
+      "description": "Do not post untagged spoilers."
+    },
+    {
+      "title": "No Memes or Low-Effort Content",
+      "description": "No memes, image macros, reaction images, \"fixed\" posts or rage comics."
+    },
+    {
+      "title": "No Unofficial Links",
+      "description": "Do not link to/lead people towards torrents, proxies, or unofficial streams/downloads."
+    },
+    {
+      "title": "Self-Promotion Ratio",
+      "description": "To self promote you must maintain a ratio of 10 other posts for each self promotive one."
+    },
+    {
+      "title": "No Link Shorteners",
+      "description": "Do not use link shortening services."
+    },
+    {
+      "title": "No Referral Scams",
+      "description": "No referral scams."
+    },
+    {
+      "title": "No Crowdfunds",
+      "description": "Do not link crowdfunds here."
+    },
+    {
+      "title": "No Selling",
+      "description": "Do not try to sell things here. Links to sales or products that you do not profit from are OK. It is not OK to try to sell your own stuff here."
+    },
+    {
+      "title": "No Hentai",
+      "description": "Do not post Hentai here. Lightly NSFW things are okay, use your judgement."
+    },
+    {
+      "title": "Meta Posts",
+      "description": "Post Meta concerns in the monthly meta threads."
+    },
+    {
+      "title": "No Low-Effort Images",
+      "description": "Do not post screenshots, jokes, comics or single images of cosplay, wallpapers, or other low-effort content. Albums of 5 or more images (3 or more images for cosplay albums) are exempt from this rule so long as all the images are collected to make a point or illustrate an idea. Full song link posts are considered low-effort unless they are official music videos. Posts asking for identification of a screenshot's source anime are allowed."
+    },
+    {
+      "title": "Fanart Posts",
+      "description": "All fanart posts must be text posts and include [Fanart] in their subject. If you are posting fanart drawn by yourself, please also use the [OC] tag. Cosplay posts must also include [Cosplay], but do not have to be text posts."
+    },
+    {
+      "title": "Watch This! Posts",
+      "description": "All Watch This! posts must be text posts, over 1500 characters, and include [WT!] in the subject."
+    }
+  ],
+  "space": [
+    {
+      "title": "Allowed Submissions",
+      "description": "Top-level source news and articles about outer space | Directly linked, quality images with a strong connection to Space/Astronomy/Cosmology (must use the original source of image) | Informative and thought provoking self-posts | Discussions about outer space"
+    },
+    {
+      "title": "No Off-Topic Submissions",
+      "description": "Submissions with no direct connection to Space/Astronomy/Cosmology. This includes \"circlejerky\" submissions or space-related art, with the exception of art from space agencies or historically-significant art."
+    },
+    {
+      "title": "No Amateur Astrophotography (Except Fridays)",
+      "description": "Amateur (non-space agency) astrophotography is not allowed. /r/AstroPhotography, /r/Astronomy, and /r/Spaceporn are good alternatives. You may post these on Fridays."
+    },
+    {
+      "title": "No Memes or Low-Quality Images",
+      "description": "Memes, image macros, comics, and other low-quality/low-effort images are not allowed."
+    },
+    {
+      "title": "No Editorialized or Misleading Titles",
+      "description": "Editorialized, sensationalized, personalized, vague, misleading, generic, or pandering titles are not allowed."
+    },
+    {
+      "title": "No Re-Hosted Content",
+      "description": "Re-hosted content is not allowed, with the exception of GIF/WebMs with a link to the original source in the comments. NASA content may also be rehosted with a link to the original in the comments."
+    },
+    {
+      "title": "No DAE/TIL/ELI5-Style Titles",
+      "description": "DAE/TIL/ELI5/PSA/[SERIOUS]/CMV/[FIXED] styled titles are not allowed."
+    },
+    {
+      "title": "No Paywalled Websites",
+      "description": "Websites that utilize a paywall are not allowed."
+    },
+    {
+      "title": "No Petitions, Surveys, or Crowdfunders",
+      "description": "Petitions/surveys/crowdfunders are not allowed."
+    },
+    {
+      "title": "No Mobile Links, Link Shorteners, or Facebook Links",
+      "description": "Mobile links/link shorteners/facebook links are not allowed."
+    },
+    {
+      "title": "No Spam or Blogspam",
+      "description": "Any form of spam/blogspam is not allowed."
+    },
+    {
+      "title": "No Piracy",
+      "description": "Enabling or linking to piracy is not allowed."
+    },
+    {
+      "title": "No Reposts",
+      "description": "Check if your image or article has already been submitted before posting, using KarmaDecay or Reddit search."
+    },
+    {
+      "title": "No Low-Effort Comments",
+      "description": "Low-effort comments or ones that do not contribute to discussion are not allowed."
+    },
+    {
+      "title": "No Image-Only Comments",
+      "description": "Comments consisting solely of an image are not allowed."
+    },
+    {
+      "title": "No Memes, Jokes, or Spam",
+      "description": "Memes, image macros, jokes, circlejerking, or spamming are not allowed."
+    },
+    {
+      "title": "No Trolling or Hostility",
+      "description": "Trolling, insults, or excessive hostility are not allowed."
+    },
+    {
+      "title": "No Link Shorteners or Facebook Links",
+      "description": "Link shorteners or Facebook links are not allowed."
+    },
+    {
+      "title": "No Unmarked NSFW Links",
+      "description": "Unmarked NSFW links are not allowed."
+    },
+    {
+      "title": "No Piracy Links",
+      "description": "Enabling or linking to piracy is not allowed."
+    }
+  ]
+}

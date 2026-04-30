@@ -1,0 +1,2365 @@
+{
+  "suggest-from-examples": {
+    "mode": "suggest-from-examples",
+    "config": {
+      "modbench_set1": "scripts/modbench_eval5_set1_attributed.json",
+      "modbench_set2": "scripts/modbench_eval5_set2.json",
+      "n_set1": 150,
+      "n_set2": 150,
+      "n_subreddits_with_errors": 5,
+      "total_fn": 9,
+      "total_fp": 41
+    },
+    "baseline_metrics": {
+      "n_total": 150,
+      "n_errors": 0,
+      "accuracy": 0.7533,
+      "approve_precision": 0.9241,
+      "approve_recall": 0.7157,
+      "approve_f1": 0.8066,
+      "approve_fpr": 0.125,
+      "remove_precision": 0.6061,
+      "remove_recall": 0.8333,
+      "remove_f1": 0.7018,
+      "remove_fpr": 0.2549,
+      "review_precision": 0.0,
+      "review_recall": 0,
+      "review_f1": 0,
+      "review_fpr": 0.0333,
+      "accuracy_unknown": 0.7533,
+      "n_unknown": 150,
+      "per_subreddit": {
+        "AskHistorians": {
+          "n": 28,
+          "accuracy": 0.5714
+        },
+        "hiphopheads": {
+          "n": 35,
+          "accuracy": 0.9143
+        },
+        "legaladvice": {
+          "n": 29,
+          "accuracy": 0.7241
+        },
+        "relationships": {
+          "n": 28,
+          "accuracy": 0.7857
+        },
+        "science": {
+          "n": 30,
+          "accuracy": 0.7333
+        }
+      },
+      "mean_per_subreddit_accuracy": 0.7458,
+      "per_source": {
+        "pushshift_random": {
+          "n": 102,
+          "accuracy": 0.7157
+        },
+        "removal_log": {
+          "n": 48,
+          "accuracy": 0.8333
+        }
+      },
+      "confusion_matrix": {
+        "approve": {
+          "approve": 73,
+          "remove": 26,
+          "review": 3
+        },
+        "remove": {
+          "approve": 6,
+          "remove": 40,
+          "review": 2
+        },
+        "review": {
+          "approve": 0,
+          "remove": 0,
+          "review": 0
+        }
+      }
+    },
+    "updated_metrics": {
+      "n_total": 150,
+      "n_errors": 0,
+      "accuracy": 0.7867,
+      "approve_precision": 0.8737,
+      "approve_recall": 0.8137,
+      "approve_f1": 0.8426,
+      "approve_fpr": 0.25,
+      "remove_precision": 0.6481,
+      "remove_recall": 0.7292,
+      "remove_f1": 0.6863,
+      "remove_fpr": 0.1863,
+      "review_precision": 0.0,
+      "review_recall": 0,
+      "review_f1": 0,
+      "review_fpr": 0.0067,
+      "accuracy_unknown": 0.7867,
+      "n_unknown": 150,
+      "per_subreddit": {
+        "AskHistorians": {
+          "n": 28,
+          "accuracy": 0.7143
+        },
+        "hiphopheads": {
+          "n": 35,
+          "accuracy": 0.8286
+        },
+        "legaladvice": {
+          "n": 29,
+          "accuracy": 0.6897
+        },
+        "relationships": {
+          "n": 28,
+          "accuracy": 0.8571
+        },
+        "science": {
+          "n": 30,
+          "accuracy": 0.8333
+        }
+      },
+      "mean_per_subreddit_accuracy": 0.7846,
+      "per_source": {
+        "pushshift_random": {
+          "n": 102,
+          "accuracy": 0.8137
+        },
+        "removal_log": {
+          "n": 48,
+          "accuracy": 0.7292
+        }
+      },
+      "confusion_matrix": {
+        "approve": {
+          "approve": 83,
+          "remove": 19,
+          "review": 0
+        },
+        "remove": {
+          "approve": 12,
+          "remove": 35,
+          "review": 1
+        },
+        "review": {
+          "approve": 0,
+          "remove": 0,
+          "review": 0
+        }
+      }
+    },
+    "baseline_ci": {
+      "accuracy_mean": 0.7528,
+      "accuracy_ci_lower": 0.6867,
+      "accuracy_ci_upper": 0.82,
+      "ci_alpha": 0.05,
+      "n_resamples": 1000
+    },
+    "updated_ci": {
+      "accuracy_mean": 0.786,
+      "accuracy_ci_lower": 0.72,
+      "accuracy_ci_upper": 0.8533,
+      "ci_alpha": 0.05,
+      "n_resamples": 1000
+    },
+    "comparison": {
+      "n_common_pairs": 150,
+      "n_improved": 15,
+      "n_degraded": 10,
+      "n_unchanged": 125,
+      "baseline_accuracy": 0.7533,
+      "updated_accuracy": 0.7867,
+      "accuracy_delta": 0.0334
+    },
+    "mcnemar": {
+      "b_improved": 15,
+      "c_degraded": 10,
+      "chi2": 0.64,
+      "significant_p05": false
+    },
+    "suggestion_log": [
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Civility\n\nAll users are expected to behave with courtesy and politeness at all t",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Scope\n\nSubmissions to /r/AskHistorians must be either:\n* A question about the hu",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No current events\n\nTo discourage off-topic discussions of current events, questi",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Questions\n\nPeople asking questions should make every effort to ensure that their",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Homework\n\nOur users aren't here to do your homework for you, but they might be w",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "NSFW content\n\nIf your question contains (or is likely to contain) adult topics o",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No \"poll\"-type questions\n\n\"Poll\"-type questions aren't appropriate here: \"Who wa",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No \"Example Seeking\" Questions\n\nOne of our key principles regarding questions is",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No \"Soapboxing\" or Loaded Questions.\n\nThis subreddit is called AskHistorians, no",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No \"What If\" Questions\n\nQuestions should be about what did happen, not what coul",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Privacy\n\nCertain questions can lead to privacy concerns, and with this in mind, ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Limitations on Questions Concerning Historical Artifacts and Items\n\nThe goal of ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Answers\n\nAnswers in this subreddit are expected to be of a level that historians",
+        "n_fn_routed": 0,
+        "n_fp_routed": 9,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 5,
+        "n_checklist_suggestions": 5,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "cdd285ee-b9a4-4d4d-ab0a-96e2f1b322a1",
+            "parent_id": null,
+            "description": "Add a pre-filter to exempt non-answer comments (replies, thank-yous, meta-comments) from the answer-quality checklist entirely. All labeled compliant examples are short follow-up comments, not actual answers, and the current deterministic regex would incorrectly flag them as too short.",
+            "proposed_change": {
+              "id": "cdd285ee-b9a4-4d4d-ab0a-96e2f1b322a1",
+              "description": "Is the answer too short or superficial to be considered comprehensive and informative?",
+              "rule_text_anchor": "A good answer will go further than a simple short sentence.",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "^.{0,300}$",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "all",
+                "negate": false
+              },
+              "action": "continue",
+              "order": 0,
+              "note": "This parent node should only be evaluated against top-level answers (direct replies to the original post), not follow-up comments, thank-you replies, or meta-discussion. Downstream subjective checks should apply the same scoping."
+            },
+            "reasoning": "Every single labeled compliant example in the dataset is a short follow-up comment, thank-you note, or meta-discussion reply (e.g., 'Thank you so much for your response!', 'Well said. Thanks', 'Thanks! I'll check those out.'). None are actual answers to historical questions. The current regex `^.{0,300}$` would match all of them and push them into the subjective violation checks. A scoping note clarifying that the entire branch applies only to actual answers (top-level replies to the OP) is essential to prevent mass over-triggering on compliant follow-up comments."
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": "cdd285ee-b9a4-4d4d-ab0a-96e2f1b322a1",
+            "description": "Add a new deterministic pre-filter child that exempts comments which are clearly follow-up replies (e.g., thank-yous, acknowledgements, meta-questions) from further quality checks. These should be classified as compliant automatically and skip the subjective children.",
+            "proposed_change": {
+              "id": "e3a1f002-8b44-4c10-bf23-followup-exempt",
+              "description": "Is this comment a non-answer follow-up (e.g., a thank-you, acknowledgement, or meta-comment) rather than a substantive historical answer?",
+              "rule_text_anchor": "Answers in this subreddit are expected to be of a level that historians would provide",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "(?i)^\\s*(thank(s| you)|wow[,!]|well said|that'?s? (fascinating|great|helpful|interesting)|i'?ll check|don'?t know why|although i am|i actually read|this might not be|i specifically remember)",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false
+              },
+              "action": "pass",
+              "order": 0
+            },
+            "reasoning": "All 9 labeled compliant examples match patterns of follow-up or acknowledgement comments: 'Wow, thank you so much', 'Thank you! That's fascinating.', 'Thanks! I'll check those out.', 'Well said. Don't know why i struggled...thanks', 'Although I am familiar with...Thank you for pointing it out.', 'I actually read that book...', 'This might not be quite what you are looking for...', etc. A deterministic early-exit rule that identifies these non-answer patterns and marks them as passing would prevent false positives across all three downstream subjective checks."
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "9dcc7e51-ce8d-4506-9709-a43a24c8f38b",
+            "parent_id": "cdd285ee-b9a4-4d4d-ab0a-96e2f1b322a1",
+            "description": "Update the subjective prompt to explicitly instruct the model to return a low violation score (not violating) for comments that are clearly follow-up replies, acknowledgements, or meta-discussion rather than actual answers to historical questions.",
+            "proposed_change": {
+              "id": "9dcc7e51-ce8d-4506-9709-a43a24c8f38b",
+              "description": "Does the short answer fail to provide meaningful historical explanation or context?",
+              "rule_text_anchor": "good answers aren't good just because they are right \u2013 they are good because they explain",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is (a) an actual answer to a historical question and (b) if so, whether it is too brief or superficial to meet the standards of a comprehensive, historian-level response. IMPORTANT: If the comment is a follow-up reply, thank-you note, acknowledgement, meta-question, or casual banter rather than a substantive answer to the original historical question, score it as 0 (not violating). Only score substantive answer attempts. Does the answer merely state a fact without explaining context, causation, significance, or relevant historiographical background?",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment is clearly intended as an answer to the historical question AND is only one or two sentences that state a conclusion without elaboration; (2) The answer provides no historical context or explanation of why or how; (3) The answer could be dismissed as a 'yes/no' or trivially short reply; (4) The answer does not go beyond what a casual Wikipedia skim would provide. Score 0 (not violating) when: the comment is a thank-you, acknowledgement, follow-up question, meta-discussion, or casual reply that is not attempting to answer the historical question.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0,
+              "parent_id": "cdd285ee-b9a4-4d4d-ab0a-96e2f1b322a1"
+            },
+            "reasoning": "The compliant examples ('Wow, thank you so much', 'Thank you! That's fascinating.', 'Well said. thanks', etc.) are all follow-up comments, not answers. Without explicit instruction to exempt non-answers, the LLM evaluator may still score them as violating because they are short and lack historical explanation. Adding explicit guidance prevents over-triggering on these compliant follow-up comments."
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "55e8ac16-45a0-43f3-9de0-b7f04986c0f8",
+            "parent_id": null,
+            "description": "Update the subjective prompt for the explanation-quality check to explicitly exempt non-answer comments (follow-ups, thank-yous, meta-discussion) from violation scoring.",
+            "proposed_change": {
+              "id": "55e8ac16-45a0-43f3-9de0-b7f04986c0f8",
+              "description": "Does the answer fail to explain or elaborate, merely stating facts without context or reasoning?",
+              "rule_text_anchor": "you should seek not just to be right, but to explain",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is a substantive attempt to answer a historical question. IMPORTANT: If the comment is a follow-up reply, thank-you, acknowledgement, meta-comment, or casual banter rather than an answer to the original historical question, score it as 0 (not violating) \u2014 these are not subject to answer-quality standards. For comments that ARE substantive answer attempts: evaluate whether the answer provides genuine historical explanation and context, or whether it merely states a conclusion. Does the answer explain the 'why', 'how', or broader historical significance of its claims, as a trained historian would?",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment is a genuine answer attempt AND asserts a historical claim without explaining underlying causes, mechanisms, or context; (2) The answer reads like a list of facts with no analytical thread; (3) The answer does not engage with historiographical nuance or scholarly perspective; (4) The answer could be considered a bare assertion rather than a historical explanation. Score 0 (not violating) when: the comment is a thank-you, acknowledgement, follow-up question, meta-discussion, or casual reply not attempting to answer the historical question. Score lower also when the answer contextualizes events, discusses sources, explains causation, or situates the topic within broader historical developments.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 1
+            },
+            "reasoning": "Same pattern as the previous check \u2014 all compliant examples are follow-up comments, not answers. The explanation-quality check would otherwise incorrectly flag them as lacking historical explanation. Explicit exemption logic is needed."
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "d615d1ea-f3ae-4f01-af98-159255996223",
+            "parent_id": null,
+            "description": "Update the citation check's subjective prompt to explicitly exempt non-answer comments from the citation requirement, since follow-up replies and thank-you comments are not expected to cite sources.",
+            "proposed_change": {
+              "id": "d615d1ea-f3ae-4f01-af98-159255996223",
+              "description": "Does the answer lack any citation, source reference, or acknowledgment of scholarly basis?",
+              "rule_text_anchor": "You should cite or quote sources where possible.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "First, determine whether this comment is a substantive answer to a historical question. IMPORTANT: If the comment is a follow-up reply, thank-you, acknowledgement, meta-comment, or casual banter, score it as 0 (not violating) \u2014 citation standards apply only to substantive answer attempts. For comments that ARE substantive answer attempts: evaluate whether the answer makes any attempt to cite, reference, or acknowledge sources for its historical claims. Does the answer include book titles, author names, academic works, primary sources, or any indication of the scholarly basis for its assertions?",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment is a genuine answer attempt AND makes multiple historical claims with zero sourcing or attribution; (2) There is no mention of any historian, book, article, or primary source; (3) The answer reads as purely from personal memory with no scholarly grounding. Score 0 (not violating) when: the comment is a thank-you, acknowledgement, follow-up question, meta-discussion, or casual reply not attempting to answer the historical question. Score lower when the answer cites at least one work, names a historian, quotes a source, or otherwise signals engagement with historical scholarship. Note: informal but substantive answers with some sourcing gesture are acceptable.",
+                "threshold": 0.75,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "order": 2
+            },
+            "reasoning": "Follow-up comments like 'Thank you! That's fascinating.' or 'Well said. thanks' would trivially fail a citation check since they contain no sources. However, they are compliant by label. The citation check must be scoped to actual answer attempts only, not casual replies."
+          }
+        ]
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Sources\n\nSources are highly encouraged in all answers given in r/AskHistorians. ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Write an in-depth answer\n\nAn in-depth answer gives context to the events being d",
+        "n_fn_routed": 0,
+        "n_fp_routed": 9,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 4,
+        "n_checklist_suggestions": 4,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "b0188862-46dc-4c9b-bac1-cc957d30de44",
+            "parent_id": null,
+            "description": "Add a pre-check to identify replies/comments that are not substantive answers (e.g., thank-you messages, acknowledgements, brief conversational follow-ups) and exempt them from the in-depth answer rule entirely. All labeled compliant examples are short social comments, not historical answers, yet the current deterministic check (<=300 chars) would flag most of them.",
+            "reasoning": "Every single compliant example is a short reply comment \u2014 'Thank you!', 'Well said.', 'Thanks! I'll check those out.', 'I'll see what I can do about keeping the questions coming!', etc. These are social/conversational comments, not substantive historical answers. The current deterministic regex (^.{0,300}$) would match all of them and potentially route them into the subjective violation checks. The checklist needs a way to distinguish 'short because it is a social reply' from 'short because it is a poor answer attempt'.",
+            "proposed_change": {
+              "id": "b0188862-46dc-4c9b-bac1-cc957d30de44",
+              "description": "Is the answer too short or superficial to provide meaningful context and explanation?",
+              "rule_text_anchor": "An in-depth answer is usually more than a sentence or two.",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "^.{0,300}$",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false
+              },
+              "action": "continue",
+              "order": 0
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": "b0188862-46dc-4c9b-bac1-cc957d30de44",
+            "description": "Add a new first child under the short-answer parent that detects social/conversational replies (thank-yous, acknowledgements, brief follow-up chatter) and immediately marks them compliant, preventing them from being evaluated as insufficient historical answers.",
+            "reasoning": "All 9 labeled compliant examples are short social comments replying to other users \u2014 expressions of thanks, acknowledgement, brief conversational remarks \u2014 none of which are attempts at historical answers. Without this exemption, the subjective child checks (acfdac70 and 2e9c67f7) risk incorrectly flagging these as violations. Examples include: 'Wow, thank you so much for your response!', 'Thank you! That's fascinating.', 'Thanks! I'll check those out.', 'Well said. Don't know why I struggled so hard to come up with the terminology. thanks', 'Although I am familiar with the word tawhid as well, I never thought to make the connection. Thank you for pointing it out.'",
+            "proposed_change": {
+              "description": "Is this comment a social/conversational reply (e.g., a thank-you, acknowledgement, or brief follow-up) rather than an attempt at a substantive historical answer?",
+              "rule_text_anchor": "An in-depth answer gives context to the events being discussed so that someone who is unfamiliar with the area can understand.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is a social or conversational reply rather than an attempt to provide a substantive historical answer. Examples of social replies include: expressing thanks or appreciation to another commenter, brief acknowledgements ('Well said', 'Good point'), short follow-up remarks that do not attempt to answer the original question, or comments that simply engage socially without contributing historical content.",
+                "rubric": "Score higher (more likely to be a social reply, i.e., COMPLIANT and should be exempted from the in-depth answer rule) when: (1) The comment expresses gratitude, thanks, or appreciation; (2) The comment is a brief acknowledgement of something said by another user; (3) The comment does not attempt to answer the original historical question at all; (4) The comment is clearly addressed as a reply to another commenter rather than as an answer to the OP. Score lower (less likely to be a social reply) when the comment, however short, is making a factual or analytical claim about a historical topic in response to the original question.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "pass",
+              "order": 0,
+              "id": "2f96c4cd-d6fa-4ae3-98e2-77f40349b87d"
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "acfdac70-3031-4fe6-b122-95730695a795",
+            "parent_id": "b0188862-46dc-4c9b-bac1-cc957d30de44",
+            "description": "Update the order of this item to 1 (after the new social-reply exemption check at order 0) so it only evaluates short posts that have already been confirmed as genuine answer attempts, not social comments.",
+            "reasoning": "With the new social-reply exemption child added at order 0, this subjective check for short/superficial answers should run second (order 1) to avoid evaluating comments that have already been identified as harmless social replies. This prevents false positives on the many compliant thank-you/acknowledgement comments seen in the labeled examples.",
+            "proposed_change": {
+              "order": 1
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "fbe3bac9-1a95-41c4-883d-8afc02470e49",
+            "parent_id": null,
+            "description": "Refine the rubric for the link-only check to explicitly exempt cases where the commenter acknowledges they are not a subject-matter expert, defers to others, and signals the limitation of their contribution \u2014 as seen in compliant example df0xrnz (CaptainPyjamaShark), who provides a link but openly admits it may break protocol and invites an expert to respond.",
+            "reasoning": "Compliant example df0xrnz posts a link to another subreddit's answer and a brief summary ('you're right to treat it with a grain of salt') without deep original analysis, which could trigger this check. However, the comment demonstrates self-awareness about its limitations, defers to an expert, and is transparent about its shortcomings. The current rubric does not account for such self-aware, deferential link posts. Additionally, compliant example 604f6958 posts a link and an ISBN with a caveat about uncertainty of the source \u2014 this borderline case should also score lower given the explicit sourcing attempt.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this answer contributes original in-depth explanation, or whether it mainly just points to an external source (e.g. a link, a quoted passage, or a paraphrased article summary) without the author providing their own substantive historical analysis and context.",
+                "rubric": "Score higher (more likely to violate) when: (1) The answer is primarily or entirely a link to an external article or resource with no substantive commentary; (2) The answer is mainly a block quotation with little or no original commentary; (3) The answer reads as a thin paraphrase or summary of a single Google-found article with no independent expertise demonstrated; (4) The author does not demonstrate personal knowledge of the topic beyond basic web search skills. Score lower (less likely to violate) when: (1) Links or quotations are used to supplement a substantial original explanation that demonstrates expertise; (2) The author explicitly acknowledges the limitations of their knowledge, defers to a named expert, and is transparent that their contribution is supplementary rather than authoritative; (3) The author provides a specific bibliographic citation (e.g., an ISBN or book title) alongside their summary, suggesting genuine engagement with source material rather than a casual Google search.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No personal anecdotes\n\nPersonal anecdotes are not acceptable answers in this sub",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No speculation\n\nSuppositions and personal opinions are not a suitable basis for ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No partial answers or \"placeholders\"\n\nAn answer should be full and complete in a",
+        "n_fn_routed": 0,
+        "n_fp_routed": 7,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 4,
+        "n_checklist_suggestions": 4,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "c7d47648-958c-4b44-95b1-21747ef53a60",
+            "parent_id": null,
+            "description": "Add a pre-filter to exclude comments that are clearly not answers (e.g., thank-you replies, conversational follow-ups, joke responses) before running placeholder checks. All labeled examples are compliant short conversational comments, not answers at all \u2014 the checklist needs to handle non-answer comments gracefully.",
+            "reasoning": "All 7 labeled examples are compliant and consist of short conversational replies (e.g., 'Thanks!', 'Well said.', 'Wow, thank you so much'), joke responses, or follow-up comments \u2014 none are answers to historical questions. The current checklist has no mechanism to short-circuit evaluation for non-answer comments, risking over-triggering on phrases like 'I'll check those out' (example c058e114) matching 'I'll add/edit' patterns, or 'I'll see what I can do' (example b05d8a46) matching placeholder signals. A pre-filter deterministic step should detect when a comment is clearly not an answer post and exit early as compliant.",
+            "proposed_change": {
+              "id": "c7d47648-958c-4b44-95b1-21747ef53a60",
+              "description": "Is the comment structured as an answer to the thread question, rather than a conversational reply, acknowledgment, or meta-comment?",
+              "rule_text_anchor": "An answer should be full and complete in and of itself.",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\b(will (add|edit|expand|update|come back|fill in|flesh out)|more (to come|later|soon)|edit(ing)? (to add|later|soon)|placeholder|wip|work in progress|stay tuned|check back|to be (continued|expanded|updated|finished|completed)|i'll (add|edit|expand|update|come back|fill in)|part (1|one) of|unfinished|incomplete|just a start|quick answer for now|will elaborate|elaborat(e|ing) later|coming back to this|saving (this|my) spot)\\b",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false
+              },
+              "action": "continue",
+              "order": 0
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": "c7d47648-958c-4b44-95b1-21747ef53a60",
+            "description": "Add a new first-order subjective child check that screens out non-answer comments (thank-yous, conversational replies, jokes, meta-comments) before evaluating placeholder status. This prevents the downstream placeholder checks from being applied to comments that are not answers in the first place.",
+            "reasoning": "Every single labeled compliant example is a non-answer comment: simple thank-you messages (dfgvu4s, dfjp6tm, dfkxbx8), a conversational joke (dfdt2im), a light conversational reply (b05d8a46), a partial attempt that self-acknowledges it may not be appropriate (df0xrnz), and a short note about a book (92b58c39 \u2014 somewhat closer to an answer but still brief and conversational). None of these should reach the placeholder evaluation steps. A gating subjective check asking 'Is this comment an actual attempt to answer the thread question?' would prevent false positives on conversational content.",
+            "proposed_change": {
+              "description": "Is this comment actually an attempt to answer the historical question posed in the thread, rather than a thank-you, conversational reply, joke, or meta-comment about the thread?",
+              "rule_text_anchor": "An answer should be full and complete in and of itself.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Determine whether this comment is an actual attempt to answer the historical question in the thread, or whether it is instead a conversational reply (e.g., thank-you, acknowledgment, joke, meta-comment, question redirect, or off-topic remark). Only flag it for further review if it appears to be an answer attempt.",
+                "rubric": "Score higher (more likely to be an answer attempt requiring further review) when: (1) The comment directly addresses the historical question with factual content; (2) The comment provides analysis, sources, or historical context in response to the question; (3) The comment is clearly posted as a response to the question, not to another comment's conversational content. Score lower (not an answer \u2014 stop review) when: (1) The comment is a simple thank-you or acknowledgment; (2) The comment is a joke or light-hearted aside; (3) The comment is a meta-remark about the subreddit rules or redirects to another user; (4) The comment is a brief conversational follow-up not containing substantive historical content.",
+                "threshold": 0.5,
+                "examples_to_include": 5
+              },
+              "action": "continue",
+              "order": 0,
+              "id": "7b84b203-1799-4b85-9b3b-e239aa654371"
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "180375dd-bb62-4c66-b5c8-7bc268ae24c4",
+            "parent_id": "c7d47648-958c-4b44-95b1-21747ef53a60",
+            "description": "Update the order of the explicit-placeholder subjective check to run after the new non-answer gating check, and refine the rubric to more explicitly exclude conversational phrases like 'I'll check those out' or 'I'll see what I can do' that could superficially match placeholder patterns.",
+            "reasoning": "Examples like dfjp6tm ('Thanks! I'll check those out.') and b05d8a46 ('I'll see what I can do about keeping the questions coming!') contain phrases that could superficially match placeholder regex patterns ('I'll' + verb) but are clearly not placeholder answers \u2014 they are conversational replies. The rubric should be strengthened to explicitly note that first-person future-tense phrases in conversational (non-answer) context do not constitute placeholder violations.",
+            "proposed_change": {
+              "description": "Does the answer signal it is intentionally partial or will be expanded later, confirming a placeholder violation?",
+              "rule_text_anchor": "Do not provide a part-answer as a \"placeholder\" to come back to expand on later.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is a partial or placeholder answer \u2014 one that is intentionally incomplete, explicitly promises further elaboration, or is posted mainly to 'reserve a spot' in the thread rather than to provide a full, standalone answer.",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment explicitly states the author will return to add more content to their answer; (2) The comment describes itself as a partial, quick, or preliminary answer to the question; (3) The comment asks others to wait or check back for the full answer; (4) The comment is substantively thin and signals awareness that it is incomplete as an answer. Score lower when: (1) Matched keywords appear in context that is clearly not a placeholder (e.g., 'I will add a citation' in an otherwise comprehensive answer); (2) The future-tense phrase appears in a conversational reply, joke, or thank-you comment rather than an answer; (3) The comment is a non-answer conversational exchange (e.g., 'I'll check those out', 'I'll see what I can do about questions') \u2014 these are not placeholder answers.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 1
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "f40621f0-73e8-4c2c-b9a0-dd97318b1619",
+            "parent_id": null,
+            "description": "Update the subjective completeness check to explicitly exclude non-answer comments from being scored as incomplete answers, and clarify that short conversational replies are not 'partial answers' under this rule.",
+            "reasoning": "Example 92b58c39 (Qeeknique's comment about Lili Marleen) is labeled compliant but is a short, somewhat uncertain answer that self-acknowledges its limitations ('This might not be quite what you are looking for', 'Im not sure there was too much about this specific song in this very book'). This could score borderline on the completeness check. Similarly, df0xrnz acknowledges it may be 'breaking AskHistorians protocol'. The rubric should be updated to clarify that comments which acknowledge uncertainty or limitations but still provide substantive content are not automatically violations, and that non-answer conversational replies are entirely outside scope.",
+            "proposed_change": {
+              "description": "Is the answer substantively incomplete \u2014 lacking depth, context, or full explanation \u2014 even without an explicit placeholder signal?",
+              "rule_text_anchor": "If you can not answer the question fully, wait for someone who can.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment constitutes a full, standalone answer to the question posed in the thread, or whether it is a partial answer that leaves the question meaningfully unanswered. Consider whether the response could stand on its own without further expansion. Note: if the comment is not an answer attempt at all (e.g., a thank-you, joke, or conversational reply), it should not be evaluated here.",
+                "rubric": "Score higher (more likely to violate) when: (1) The answer addresses only a narrow slice of the question without acknowledging other important aspects; (2) The answer is very short (1\u20133 sentences) for a complex historical question with no explanation of why brevity is appropriate; (3) The answer raises points or evidence but does not develop them into a coherent response; (4) The comment reads more like a prompt for discussion or a hint than an actual answer. Score lower when: (1) The question is simple and a short answer is genuinely complete; (2) The answer is thorough even if it notes it cannot cover every sub-topic; (3) The comment acknowledges uncertainty about a source or scope limitation but still provides substantive historical content; (4) The comment is a conversational reply, acknowledgment, or non-answer comment \u2014 these are out of scope for this check entirely.",
+                "threshold": 0.72,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 2
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No political agendas or moralising\n\nThis subreddit is a place for learning and o",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Do not just post links or quotations\n\nDo not just post links to other sites as a",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "No plagiarism\n\nWe have a zero-tolerance policy on blatant plagiarism, such as di",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Jokes and humour\n\nA post should not consist only of a joke, a humorous remark, o",
+        "n_fn_routed": 0,
+        "n_fp_routed": 5,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "09b18175-2772-45ad-a75d-f8db08d69d06",
+            "parent_id": null,
+            "description": "Update the rubric and prompt to explicitly exclude short social/conversational replies (thank-you notes, acknowledgments, brief follow-ups) from triggering as joke/humor violations, since all labeled examples are compliant short social comments rather than jokes.",
+            "reasoning": "All five labeled examples are short, non-humorous social replies ('Thank you!', 'Well said.', 'Wow, thank you so much', etc.). One example (dd8147f3) contains a light sarcastic remark marked with '/s', yet is labeled compliant. The current checklist item's rubric could over-trigger on these posts because they lack 'substantive historical content', even though they are not jokes or humorous remarks. The rubric needs to clarify that brief conversational/social comments (acknowledgments, thank-yous, follow-ups) are a distinct category from jokes/humor and should not be flagged under this rule. The rule targets humor specifically, not the absence of historical substance in general.",
+            "proposed_change": {
+              "id": "09b18175-2772-45ad-a75d-f8db08d69d06",
+              "description": "Is the post solely a joke, humorous remark, or flippant comment without substantive historical content?",
+              "rule_text_anchor": "A post should not consist only of a joke, a humorous remark, or a flippant comment.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post consists solely of a joke, humorous remark, or flippant comment, with no substantive historical content. Does the post make any genuine attempt to answer a historical question, provide historical context, or contribute meaningful information beyond humor? Note: short social or conversational replies (e.g. expressions of thanks, acknowledgments, brief follow-ups to a prior exchange) are NOT jokes or humorous remarks and should NOT be flagged under this rule, even if they lack historical substance. This rule targets posts whose PRIMARY purpose is to amuse or be witty.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post is entirely or almost entirely a punchline, quip, or comedic remark clearly intended to amuse; (2) The post contains no factual historical information, analysis, or context AND its evident purpose is humor rather than social acknowledgment; (3) The post's evident purpose is to amuse rather than to inform or to engage socially; (4) Any historical references present are incidental to the joke rather than substantive. Score lower (less likely to violate) when: (1) Humor is used as a framing device alongside genuine historical content; (2) The post includes a thorough, sourced, or well-contextualized historical answer even if it has a witty tone; (3) The humor enhances rather than replaces historical substance; (4) The post is a brief social/conversational reply such as a thank-you, acknowledgment, or expression of appreciation \u2014 these are not jokes and do not fall under this rule; (5) A sarcastic or joking aside is clearly marked (e.g. '/s') and is secondary to an otherwise appropriate comment.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Digression\n\nAll comments should be related to the topic as outlined in the OP. S",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Follow-up questions\n\nIf you have a follow-up question to the original question, ",
+        "n_fn_routed": 0,
+        "n_fp_routed": 1,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 2,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "144ebb20-e8e7-4ced-866b-ccf313962930",
+            "parent_id": null,
+            "description": "Tighten the rubric to avoid over-triggering on comments that include a cited source alongside hedging language, since sourced contributions should score lower even when hedging phrases are present.",
+            "reasoning": "The compliant example (48c86141) contains classic hedging phrases ('Im not sure there was too much about this specific song in this very book but I quite sure it was mentioned there') AND presents uncertain information as a statement. However, it also provides a specific ISBN-cited source and substantive historical content (Lili Marleen), making it a genuine attempt at an answer rather than a rule violation. The current rubric does not explicitly instruct the model to score lower when a cited source is provided, risking a false-positive flag. Adding that guidance will reduce over-triggering on sourced-but-hedged answers.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment presents uncertain or unverified information as a statement rather than as a question. The rule requires that if a commenter is not sure about something and is not genuinely answering, they must frame their comment as a question \u2014 not as a hedged assertion like 'I'm not sure if this is true, but...' or 'Someone will correct me if I'm wrong, but...'",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment uses hedging phrases like 'I'm not sure if this is true' or 'correct me if I'm wrong' but does NOT end or reframe as a genuine question; (2) The comment appears to be offering unverified information or speculation disguised as a contribution rather than asking a follow-up question; (3) The commenter seems to want validation rather than genuinely seeking clarification; (4) The comment provides no cited source or substantive supporting detail for its claim. Score lower when: the comment is clearly phrased as a sincere question, even if prefaced with uncertainty; OR when the comment includes a specific cited source (e.g. a book title, ISBN, URL, or named reference) and makes a substantive attempt to answer the original question, even if the author hedges minor details about that source.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              }
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "34141857-efe1-4555-aae8-a14e5465cf74",
+            "parent_id": null,
+            "description": "Update the rubric to explicitly score lower when the comment provides a cited source and substantive on-topic content, preventing over-triggering on compliant sourced answers that happen to acknowledge minor uncertainty about the source details.",
+            "reasoning": "The compliant example (48c86141) could also trigger this item because it introduces related historical content as statements rather than questions and hedges about whether the specific detail appeared in the cited book. However, it clearly attempts to answer the original question with a named book and ISBN. The current rubric's 'sourced answer' guidance is present but insufficiently emphasised \u2014 adding an explicit note about partial-source uncertainty (hedging about whether a detail appeared in an otherwise cited work) will further reduce false positives.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is a non-answer that should have been framed as a question but was not. The rule states: if the commenter is not actually answering the original question, their comment must be phrased as a question. Does this comment appear to be a follow-up thought, a related claim, or a tangential observation that is not a genuine answer, but is written as a statement rather than a question?",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment does not substantively answer the original question; (2) The comment introduces a related but unverified claim or anecdote as a statement with no supporting source; (3) The comment could reasonably have been posed as a question (e.g. 'Wasn't X also related to Y?') but was instead written as a declarative assertion; (4) The comment seems to be testing or sharing a half-remembered fact rather than contributing a sourced answer. Score lower when: the comment is clearly a question; OR when it is a substantive, sourced answer to the original post \u2014 including cases where the author hedges only about minor details within an otherwise cited source (e.g. 'I'm not sure this specific detail was in this book, but here is the ISBN'); OR when the comment provides relevant on-topic historical or factual content alongside a named reference even if the author expresses minor uncertainty about that reference.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "AskHistorians",
+        "rule_text_short": "Pictures, videos and memes\n\nAny comment which consists only or mainly of an imag",
+        "n_fn_routed": 0,
+        "n_fp_routed": 3,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "5b9a0306-1000-49b2-b5f1-d2de0db0b7ca",
+            "parent_id": null,
+            "description": "Update the rubric and prompt to explicitly account for short text-only comments (no media at all) so that brief compliant replies like thank-you notes are not accidentally over-triggered by the visual-media check.",
+            "reasoning": "All three labeled examples are compliant and contain no media whatsoever \u2014 they are short, text-only acknowledgment comments ('Wow, thank you so much for your response!', 'Thank you! That's fascinating.', 'Well said. Don't know why i struggled so hard to come up with the terminology. thanks'). The current checklist item is specifically scoped to image/video/gif/meme content, so it should not flag these, but the prompt_template and rubric do not explicitly call out the 'no media present' case as a clear non-violation. Adding an explicit note that comments with zero media attachments or links are outside the scope of this check reduces the risk of the LLM scorer over-triggering on short comments that happen to lack substantive written content but also lack any visual media.",
+            "proposed_change": {
+              "id": "5b9a0306-1000-49b2-b5f1-d2de0db0b7ca",
+              "description": "Does the comment consist only or mainly of an image, video, gif, or meme without substantive written content?",
+              "rule_text_anchor": "Any comment which consists only or mainly of an image or a video or a meme will be deleted.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment consists only or mainly of an image, video, gif, or meme, with little to no substantive written explanation. Does the comment rely on visual media as its primary or sole content rather than a written answer? IMPORTANT: If the comment contains NO media at all (no images, no videos, no gifs, no meme links or embeds), it does NOT violate this rule regardless of how short or non-substantive the text is. This check is exclusively about comments whose primary payload is visual media.",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment contains only an image, gif, video, or meme link/embed and no written text; (2) The comment contains a small amount of text (e.g. a caption or one-liner) that does not stand alone as a substantive answer, with a visual being the main payload; (3) The visual content is a generic internet meme, reaction gif, or illustrative image not directly supporting a written historical answer. Score lower (less likely to violate) when: (1) The comment contains a detailed written answer and the image or video is clearly supplementary evidence supporting that answer; (2) The visual is a primary source or documentary clip explicitly cited and explained in the text; (3) The comment contains NO media whatsoever \u2014 even if the text is very short or a simple acknowledgment, the absence of any visual media means this rule does not apply.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "No Personal Information\n\nPosting personally identifiable information will get yo",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Don't Delete Posts\n\nPlease do not delete your post after you've received help. I",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Link Previous Posts\n\nIf you've posted about the same or a related issue before i",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Add Flair to Posts\n\nAfter you submit your post, please click the 'flair' button ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Joking Allowed, Advice Required\n\nIt's ok to joke around a bit, but it's not ok t",
+        "n_fn_routed": 0,
+        "n_fp_routed": 5,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 1,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "4a7df1d7-9387-4cb9-bd45-ef4793a78c83",
+            "parent_id": null,
+            "description": "Refine the rubric to better handle short, off-topic, or tangential comments that are not jokes per se but still lack any legal substance \u2014 while being careful not to over-trigger on borderline compliant examples like those in the labeled set.",
+            "reasoning": "All five labeled examples are marked compliant yet are very short, lack legal substance, and could superficially appear joke-like or off-topic (e.g., 'How else do you get the dog?', 'Oh username check out', 'How about a large Farva?'). This suggests the current rubric may over-trigger on brief, conversational comments that are nonetheless tolerated by the community. The rubric should be clarified to distinguish between pure jokes/memes (violating) and short conversational remarks or reactions that are simply not legal advice (compliant). The threshold should be raised slightly to reduce false positives on such borderline comments.",
+            "proposed_change": {
+              "id": "4a7df1d7-9387-4cb9-bd45-ef4793a78c83",
+              "description": "Is the comment exclusively a joke, pun, meme, or comedic bit with no substantive legal information or advice, in a way that actively derails or contributes nothing to the legal discussion?",
+              "rule_text_anchor": "it's not ok to ONLY joke around here. Please offer legal information if you have it, and if you don't, keep your comments to yourself.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment contains any substantive legal information, advice, or guidance. Does the comment consist entirely of jokes, memes, puns, sarcasm, or comedic bits without offering any legal insight, relevant information, or meaningful contribution to the legal question being asked? Note: very short conversational remarks, reactions, or tangential observations \u2014 while not legal advice \u2014 are not necessarily violations unless they are clearly structured as jokes or humor intended to mock or derail the thread.",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment is entirely or almost entirely a joke, pun, meme, or comedic aside with no legal substance whatsoever and is clearly intended to be humorous rather than helpful. (2) The comment makes fun of the situation, OP, or a party in a purely comedic way with no attempt to engage with the legal question. (3) The comment is a reference to a movie, TV show, meme, or pop culture solely for comedic effect with no legal relevance. Score lower (less likely to violate) when: (1) The comment contains a joke but also includes genuine legal information or advice. (2) The comment is a brief conversational remark or reaction that, while not legal advice, is not structured as a joke or pun. (3) The comment politely declines to advise while directing the user to seek proper counsel. (4) The comment is a short tangential observation that does not derail or mock the thread.",
+                "threshold": 0.78,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0
+            }
+          },
+          {
+            "suggestion_type": "rule_text",
+            "target": null,
+            "parent_id": null,
+            "description": "Clarify the rule text to explicitly note that brief conversational remarks or reactions are tolerated, but deliberate jokes, puns, memes, or comedic bits with no legal substance are not.",
+            "reasoning": "The five compliant examples ('How else do you get the dog?', 'So I guess OP is fairly-significantly-fucked?', 'My takeaway from all this is that the Amish are, in fact, assholes.', 'Oh username check out', 'How about a large Farva?') are all tolerated despite lacking legal content. This indicates the community's rule targets deliberate joke-only comments, not every short or off-topic remark. The updated rule text makes this distinction explicit, reducing over-triggering.",
+            "proposed_text": "Joking Allowed, Advice Required\n\nIt's ok to joke around a bit, but it's not ok to ONLY joke around here. Please offer legal information if you have it. If your comment is nothing more than a joke, pun, meme, or comedic bit with no legal substance, keep it to yourself. Brief conversational remarks or reactions are generally fine as long as they are not purely joke-based or disruptive to the thread."
+          }
+        ]
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "No Negative Comments\n\nPosts containing primarily negative comments, and lacking ",
+        "n_fn_routed": 0,
+        "n_fp_routed": 6,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 2,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "cbdf58b6-0b1d-4d61-b45d-a399b519b741",
+            "parent_id": null,
+            "description": "Refine the rubric to explicitly exclude short off-topic remarks, jokes, meta-commentary, and emotional venting that are not directed at the OP as personal attacks, since all labeled examples are compliant despite being non-advisory. The current rubric may over-trigger on these.",
+            "proposed_change": {
+              "id": "cbdf58b6-0b1d-4d61-b45d-a399b519b741",
+              "description": "Does the post or comment consist primarily of negative, hostile, or dismissive content directed at the OP or other users that lacks any substantive legal advice or helpful guidance?",
+              "rule_text_anchor": "Posts containing primarily negative comments, and lacking in advice, will be summarily removed without warning.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post or comment consists primarily of negative, hostile, dismissive, or flaming content directed at the OP or other users, and lacks substantive legal advice or helpful guidance. Does it mainly serve to criticize, belittle, or shame the poster rather than offer actionable legal information or perspective? Note: short jokes, meta-comments, off-topic quips, expressions of sympathy/frustration about third parties (not the OP), or brief tangential remarks should NOT be flagged unless they are hostile toward the OP or another user and add no value whatsoever to the thread.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post or comment is predominantly insulting, condescending, or mocking toward the OP or other community members; (2) It offers no meaningful legal advice, information, or direction; (3) It expresses frustration or harsh judgment directed AT the OP without any constructive guidance; (4) It reads as a flame, rant, or personal attack rather than a helpful contribution. Score lower (less likely to violate) when: (1) Criticism or bluntness is paired with actionable legal advice; (2) Negative framing is used to redirect the OP toward a better course of action; (3) The commenter clearly intends to help even if the tone is harsh; (4) The comment is a short joke, quip, or off-topic remark not directed hostilely at the OP; (5) The negative language is directed at a third party (not the OP) and the commenter is expressing empathy or solidarity with the OP; (6) The comment is brief meta-commentary or humor about the thread context rather than an attack.",
+                "threshold": 0.75,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0
+            },
+            "reasoning": "All six labeled examples are marked compliant despite containing content that could superficially trigger the current checklist item. Examples include: a vague rhetorical question about OP's situation (dfmlj3k), emotional venting about third parties with no legal advice (dflpz9u), a blunt factual statement about OP breaking the law (dfmhk1f), a humorous generalization about a group (dfls2aw), a meta-comment about a username (dfm4zaa), and a pop-culture joke (dfl5hmj). None of these are actual flames directed hostilely at the OP. The current rubric does not sufficiently distinguish between (a) hostile personal attacks on the OP and (b) off-topic remarks, jokes, emotional asides, or blunt factual statements. The revised rubric explicitly carves out these categories to reduce over-triggering, and the threshold is slightly raised to 0.75 to reflect that the bar for removal should be higher confidence in a genuine flame."
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": null,
+            "description": "Add a new pre-filter checklist item to quickly pass through short, clearly non-hostile comments (jokes, quips, meta-commentary, brief asides) before the main subjective evaluation, reducing noise and over-triggering on benign low-effort comments.",
+            "proposed_change": {
+              "description": "Is the comment clearly a short joke, quip, meta-comment, or off-topic aside that contains no hostile or attacking language directed at the OP or other users?",
+              "rule_text_anchor": "Post to help, not to flame.",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "pattern",
+                "patterns": [
+                  "^.{0,120}$"
+                ],
+                "match_action": "continue",
+                "no_match_action": "continue"
+              },
+              "action": "continue",
+              "order": -1,
+              "note": "This item flags very short comments for closer human or downstream review context; it is not itself a removal trigger. Its purpose is to annotate that brief, low-content comments should not be auto-removed solely for lacking legal advice, as shown by compliant examples dfmlj3k ('So I guess OP is is fairly-significantly-fucked?'), dfls2aw ('My takeaway from all this is that the Amish are, in fact, assholes.'), dfm4zaa ('Oh username check out'), and dfl5hmj ('How about a large Farva?').",
+              "id": "bba44ff3-72bd-40f2-a82f-ed56f6cef5c9"
+            },
+            "reasoning": "Four of the six compliant examples (dfmlj3k, dfls2aw, dfm4zaa, dfl5hmj) are very short comments (under 120 characters) that contain no legal advice but also no real flame. The existing checklist item could over-trigger on these since they are 'lacking in advice.' Adding awareness that brevity + humor/quip \u2260 violation helps the downstream subjective check make a better decision. The pattern ^.{0,120}$ is used as a heuristic signal only."
+          }
+        ]
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "No Advertising or Promotions\n\nPosts should not advertise, offer or promote any s",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "No Encouragement of Media Contact\n\nPosts or comments encouraging others to conta",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Direct Legal Questions Required\n\nPosts should contain a summary of the issue and",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Use NP Links\n\nIf you're linking to a reddit post, use NP links (http://np.reddit",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "No Private Messaging\n\nPlease do not request to be contacted or offer to contact ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "No Video Links\n\nPlease do not post links to videos, including YouTube, in either",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "No Attorney Recommendations\n\nPlease do not offer or request a recommendation for",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Include Location\n\nAlways include your location in the title or body of your post",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Update Posts\n\nIf your post is an update to a previous post, please use [Update] ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "legaladvice",
+        "rule_text_short": "Hypothetical and Political Posts\n\nHypothetical posts, political posts, law discu",
+        "n_fn_routed": 0,
+        "n_fp_routed": 4,
+        "n_fn_total_sub": 0,
+        "n_fp_total_sub": 9,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "3d61190d-976e-499a-9ad0-63581a9cfa83",
+            "parent_id": null,
+            "description": "Refine the prompt template and rubric to better handle short, contextual comments that are clearly part of a real legal thread rather than standalone hypothetical or political posts. The current checklist may over-trigger on brief comments embedded in real legal threads.",
+            "reasoning": "All four labeled examples are compliant short comments (e.g., 'How else do you get the dog?', 'When in doubt, yield, safely.', a question about a custody situation, and a brief quip). These comments are posted within real legal advice threads and clearly relate to real legal situations. The current prompt template and rubric do not explicitly address comments vs. top-level posts, nor do they account for context inherited from a parent thread. A short comment that seems ambiguous in isolation could be incorrectly flagged as hypothetical or off-topic without considering its parent thread context. Adding guidance to consider post type (comment vs. top-level post) and thread context will reduce false positives on compliant short comments.",
+            "proposed_change": {
+              "id": "3d61190d-976e-499a-9ad0-63581a9cfa83",
+              "description": "Is the post hypothetical, a general law discussion, or substantially political in nature rather than a real personal legal question?",
+              "rule_text_anchor": "Hypothetical posts, political posts, law discussions should be posted on /r/legaladviceofftopic. Questions and comments that are substantially political in nature are outside the scope of the sub",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post is hypothetical, a general law discussion, or substantially political in nature, rather than a genuine personal legal question or comment from someone participating in a real legal situation. If the post is a comment (not a top-level post), consider its role within the thread: short comments responding to or building on a real legal situation described elsewhere in the thread should not be treated as hypothetical or political on their own. Does the post (1) pose a 'what if' or 'hypothetically speaking' scenario rather than describing a real situation? (2) debate legal theory, policy, or how laws work in the abstract? (3) center on political opinions, political figures, or policy debates rather than seeking or providing actionable legal advice? (4) invite debate or opinion on legal or political topics? If the post is a comment embedded in a real legal thread and merely asks a clarifying question or offers brief practical guidance related to the thread's real legal situation, it should not be considered a violation.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post is a top-level submission that poses a hypothetical scenario ('what if someone did X', 'hypothetically speaking...') rather than describing a real situation the author is experiencing; (2) The post is a general discussion of law, legal theory, or how laws work in the abstract rather than a specific legal problem; (3) The post is substantially about politics, political figures, political events, or policy debates; (4) The post invites debate or opinion on legal or political topics rather than seeking concrete legal guidance; (5) There is no identifiable person with a real legal need anywhere in the post or its thread context. Score lower (less likely to violate) when: (1) The post describes a specific real-life situation the author or someone they know is facing and asks for practical legal advice, even if the underlying issue touches on politically charged topics; (2) The post is a comment within a thread clearly centered on a real legal situation, asking a clarifying question or offering brief practical guidance relevant to that situation \u2014 even if the comment itself is short or does not restate the full context.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "This sub is about helping people in need\n\nf you are not providing such help (i.e",
+        "n_fn_routed": 3,
+        "n_fp_routed": 4,
+        "n_fn_total_sub": 3,
+        "n_fp_total_sub": 6,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "ce9d08ba-9109-40d6-9979-74c2774cd4dd",
+            "parent_id": null,
+            "description": "Refine the rubric and prompt to better handle edge cases revealed by labeled examples: (1) comments that debate or critique another commenter's viewpoint rather than helping OP (labeled violating), and (2) dismissive/mocking one-liners about the OP or their situation (labeled compliant but arguably mockery). Also clarify that comments engaging in back-and-forth debate with other commenters \u2014 even when substantive \u2014 are off-topic relative to the sub's helping purpose.",
+            "reasoning": "Three key patterns emerged from the labeled examples: (A) Violating examples d0e47982 and 6137e58d and e05954a6 show that comments addressing other commenters or debating their points \u2014 even constructively \u2014 are treated as violations rather than genuine help to OP. The current rubric mentions 'fighting with other posters' but doesn't clearly flag substantive debate/critique of other commenters as a violation. (B) Compliant example 62c792b7 ('Oh wow he's so woke cuz he reads the New York Times lmaooo') is a dismissive, mocking one-liner that seems joke-like yet was labeled compliant \u2014 suggesting that mocking/sarcasm directed at a third party (not OP) in context of a discussion thread may be tolerated. (C) Compliant examples b2d5998a and 6a9778d2 show that short factual or debating replies to other commenters can be compliant. The rubric threshold and prompt need to more precisely distinguish: comments primarily addressing OP's situation (compliant) vs. comments primarily addressing another commenter's argument (violating when it becomes a tangent), while not over-flagging brief factual replies.",
+            "proposed_change": {
+              "id": "ce9d08ba-9109-40d6-9979-74c2774cd4dd",
+              "description": "Is the comment abusive, joke-like, meta-argumentative, combative toward other posters, or otherwise failing to provide genuine help to the person in need?",
+              "rule_text_anchor": "if you are not providing such help (i.e. abuse, jokes, meta arguments, fighting with other posters, pointless tangents), your comments may be removed",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is genuinely helping the person who posted the relationship question. The comment should be assessed for whether it provides advice, support, or constructive perspective to the original poster (OP). Does this comment instead: consist of abuse or personal attacks against OP or another commenter; mock or make jokes at someone's expense with no helpful intent; argue about subreddit rules or moderation (meta-arguments); engage in extended back-and-forth debate or argument with another commenter rather than focusing on OP's situation; go on a tangent that is primarily about disputing another commenter's viewpoint rather than addressing OP's problem; or otherwise fail to contribute meaningfully to helping OP? Note: A brief factual reply or clarification directed at another commenter may still be compliant if it adds relevant information to the discussion. However, a comment that is primarily a rebuttal or critique of another commenter's argument \u2014 with little to no relevance to helping OP \u2014 should be considered a violation.",
+                "rubric": "Score high (more likely to violate) when the comment: (1) Is directed at insulting, mocking, or attacking the original poster or another commenter rather than helping OP; (2) Is a joke or sarcastic remark that provides no genuine advice or support to OP; (3) Argues about subreddit rules, moderation decisions, or other meta topics; (4) Is primarily a back-and-forth argument, debate, or rebuttal directed at another commenter rather than engagement with OP's situation \u2014 even if the content is substantive, if the primary audience is another commenter rather than OP, it is likely a violation; (5) Goes on a tangent completely unrelated to OP's problem; (6) Critiques or dissects another commenter's reasoning or framing at length without offering any new help or perspective to OP. Score low (less likely to violate) when the comment: offers advice, empathy, perspective, or constructive criticism directly aimed at helping OP navigate their situation; provides a brief factual clarification or relevant information even if framed as a reply to another commenter; offers a direct alternative viewpoint to OP even if it indirectly addresses what another commenter said.",
+                "threshold": 0.65,
+                "examples_to_include": 6
+              },
+              "action": "remove",
+              "order": 0
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Ages, genders and relationship length required!",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Spelling, grammar, and readability count!",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Include a TL;DR\n\na brief summary at the end of your post. No \"See title\"",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "First Person Posts Only",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "No Gift or Activity Questions",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "No General/Meta Questions",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "No polling questions or \"opinion gathering\"",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "No questions directed at a single gender. ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "No photos, links, or videos",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Do not repost removed material",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Do not request personal info, including pics.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "No Agendas",
+        "n_fn_routed": 0,
+        "n_fp_routed": 2,
+        "n_fn_total_sub": 3,
+        "n_fp_total_sub": 6,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "a0c6e82a-2b63-43b4-8346-cb946892c2e4",
+            "parent_id": null,
+            "description": "Refine the rubric to better distinguish genuinely agenda-driven posts from emotionally charged but contextually grounded comments. The current rubric may over-trigger on posts that make broad generalizations in the context of directly responding to or critiquing specific advice, or that express strong opinions as part of a conversational reply rather than as a standalone manifesto.",
+            "reasoning": "The two labeled compliant examples reveal edge cases the current rubric may struggle with. Example 'dfmhpbr' (Mariiriin) uses sweeping language ('all men', generalizations about manipulation) and rhetorical framing \u2014 surface features the rubric flags \u2014 but it is clearly a direct reply in a conversation thread, critiquing manipulative dating advice rather than pushing an ideological agenda. The rubric's criterion (5) about 'sweeping statements about all men/all women' could cause this to over-trigger. Example 'dfmespi' (supreme_mugwump) is a brief sarcastic comment mocking someone for reading the NYT, which has a political overtone but is not agenda-pushing in the 'No Agendas' sense. The rubric should clarify that short reactive/sarcastic comments and direct rebuttals to advice \u2014 even if opinionated \u2014 should score lower unless they are structured as standalone agenda-promotion pieces.",
+            "proposed_change": {
+              "description": "Does the post appear to be pushing a personal, political, or ideological agenda rather than genuinely seeking relationship advice?",
+              "rule_text_anchor": "No Agendas",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post is primarily pushing an agenda rather than sincerely seeking relationship advice or engaging in normal discussion. Does the post seem designed to promote a particular viewpoint, ideology, gender narrative, political stance, or social agenda, rather than to genuinely seek help with a personal relationship situation or respond to one?",
+                "rubric": "Score higher (more likely to violate) when: (1) The post frames the situation in a way that seems designed to validate or spread a predetermined ideological or political viewpoint rather than seek advice; (2) The post uses the relationship scenario as a vehicle to make broader generalizations about a gender, group, or political position, and this generalization is the clear primary purpose of the post rather than incidental; (3) The post's 'question' is rhetorical and the author seems to already have a fixed conclusion they want readers to affirm, with no genuine personal situation underlying it; (4) The post reads more like a standalone manifesto, rant, or opinion piece than a personal request for help or a contextual reply; (5) The post contains language that signals an agenda (e.g., sweeping statements about 'all men', 'all women', ideological buzzwords used as framing devices) AND these are the primary thrust of the post rather than incidental to a personal situation or a direct rebuttal of specific advice. Score lower when: the post, even if emotionally charged, is clearly centered on a specific personal situation and the author is genuinely asking for guidance; the post is a short reactive or sarcastic comment replying to another comment rather than a standalone agenda-driven piece; the post makes broad statements in the context of directly critiquing or rebutting specific advice given in the thread (even if opinionated or generalized); the post's opinionated or political language is incidental to an otherwise personal and advice-seeking narrative.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "No Politics",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Do not encourage violence or criminal behavior, even as a joke.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Do not mention upvotes or downvotes. We do not allow vote manipulation.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Be respectful at all times.",
+        "n_fn_routed": 0,
+        "n_fp_routed": 2,
+        "n_fn_total_sub": 3,
+        "n_fp_total_sub": 6,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 2,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "9bd3f808-0dcb-4a20-b92f-b1ef2c7e5be6",
+            "parent_id": null,
+            "description": "Refine the subjective rubric to better distinguish comments about a third party (e.g., the OP's abusive partner) from comments directed at a community member. The compliant example calling someone a 'rotten man' refers to the OP's partner, not a community member, and should not be flagged.",
+            "reasoning": "The compliant example (dfmncgl) uses language like 'rotten man' and 'abusive' to describe the OP's partner, not another community member. The current rubric mentions 'a third party being discussed' as a lower-scoring scenario but does not clearly distinguish between describing a third party's character vs. attacking a community member. Clarifying this boundary reduces over-triggering on supportive advice that characterizes an abuser.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post or comment uses disrespectful, hostile, or abusive language directed at another person IN THE COMMUNITY (e.g. the original poster, a commenter, or another participant in the thread). Does the tone attack, demean, or insult a community member rather than critique a situation, behavior, or a third party being discussed (such as someone the OP is seeking advice about)?",
+                "rubric": "Score higher (more likely to violate) when: (1) The language directly attacks or demeans a community member (OP, commenter, etc.) rather than their actions or situation; (2) The tone is contemptuous, mocking, or hostile toward a community participant; (3) There is name-calling, personal insults, or aggressive commands directed at someone in the thread; (4) The content would make a reasonable community member feel attacked or humiliated. Score lower when: (1) Harsh words appear in a quote; (2) Strong or negative characterizations describe a third party outside the community (e.g., an abusive partner, a boss, an ex) rather than a community member; (3) The language is part of supportive advice that describes the OP's situation or the behavior of someone the OP is discussing; (4) The content is clearly venting about a non-community-member.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              }
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "43810816-d432-4d4c-aecb-ab0011bcd4c8",
+            "parent_id": null,
+            "description": "Refine the tone-based subjective check to reduce over-triggering on sarcastic or dismissive remarks about third parties or general situations rather than community members. The compliant example (dfmespi) uses a mocking tone ('lmaooo give me a break') about the OP's partner's reading habits, not about the OP or another commenter.",
+            "reasoning": "The compliant example (dfmespi) is sarcastic and dismissive in tone ('Oh wow he's so woke... give me a break'), but it mocks a third party (the OP's partner), not a community member. The current rubric could over-trigger on this since it mentions sarcasm and contemptuous tone generally. Adding explicit guidance that the target of disrespect must be a community member (OP, commenter, or thread participant) will reduce false positives.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post or comment is disrespectful in tone toward another person IN THE COMMUNITY \u2014 such as the original poster, a commenter, or another thread participant \u2014 even without explicit insults or slurs. Does it demean, belittle, dismiss, or condescend toward a community participant? Consider the overall tone and framing, and importantly, identify WHO the disrespect is directed at.",
+                "rubric": "Score higher (more likely to violate) when: (1) The content is dismissive or mocking of the OP or another commenter specifically; (2) The commenter lectures or shames the OP in a harsh, unkind way; (3) The response is sarcastic or contemptuous toward another community participant rather than being constructive; (4) The post/comment belittles a community member's feelings, intelligence, or worth as a person. Score lower when: (1) The content is blunt but well-intentioned or offers tough-love advice with empathy; (2) The sarcasm, mockery, or dismissiveness is directed at a third party outside the community (e.g., the OP's partner, boss, or ex) rather than a community member; (3) The content critiques a behavior or situation rather than attacking a community member as a person; (4) Strong characterizations describe someone the OP is seeking advice about.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Creative writing projects and trolls are not welcome. ",
+        "n_fn_routed": 0,
+        "n_fp_routed": 1,
+        "n_fn_total_sub": 3,
+        "n_fp_total_sub": 6,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 2,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "56e2f280-be59-455e-af7f-ee532e24540d",
+            "parent_id": null,
+            "description": "Refine the creative writing rubric to explicitly score lower for short, casual, low-effort comments that lack narrative structure \u2014 preventing over-triggering on genuine (if dismissive or snarky) comments.",
+            "reasoning": "The single labeled compliant example ('Oh wow he's so woke cuz he reads the New York Times lmaooo give me a break') is a short, informal comment with no narrative arc, no polished prose, and no fictional tropes. The existing rubric focuses on 'polished prose' and 'narrative arcs' which this post clearly lacks, so the risk of over-triggering here is low \u2014 but adding an explicit note to score lower for brief, casual, low-effort comments strengthens the guardrail and better aligns the checklist with this compliant example.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post appears to be a creative writing project or fictional scenario rather than a genuine personal relationship situation the author is experiencing. Consider the narrative style, level of dramatic detail, and whether the post reads like a story crafted for entertainment rather than an authentic request for advice. Note: short, casual, or low-effort comments (even if snarky or dismissive) are very unlikely to be creative writing projects.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post reads like a short story with polished prose, narrative arcs, or fictional tropes (e.g. dramatic twists, overly cinematic descriptions); (2) The scenario is implausibly elaborate or sensationalized beyond what a real person seeking advice would write; (3) The post lacks genuine distress, uncertainty, or a real question \u2014 it reads as entertainment rather than a cry for help; (4) The writing style is inconsistent with someone emotionally involved in the situation (e.g. detached omniscient narration, excessive metaphor, cliffhanger endings). Score lower when: the post is messy, emotionally raw, or imperfect in ways consistent with genuine distress; OR the post is a short, casual, one-sentence or informal comment with no narrative structure whatsoever.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              }
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "b6d48ea8-fcca-47fa-a69c-b3d4d6bf8be6",
+            "parent_id": null,
+            "description": "Refine the trolling rubric to clarify that brief snarky or sarcastic comments directed at another person (e.g. mocking someone in a thread) do not automatically qualify as troll posts \u2014 troll posts must be bad-faith submissions seeking to provoke the broader community, not just casual dismissive commentary.",
+            "reasoning": "The labeled compliant example ('Oh wow he's so woke cuz he reads the New York Times lmaooo give me a break') is a sarcastic comment that could superficially trigger the 'winking or self-aware humor' criterion (point 2) or 'designed to provoke strong emotional reactions' (point 3) in the current rubric. However, it is a short reply comment directed at a specific person in a thread, not a bad-faith submission designed to bait the community. The rubric needs to distinguish between a dismissive/sarcastic comment and an actual troll post.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post appears to be a troll post \u2014 content submitted in bad faith to provoke, shock, or entertain rather than to genuinely seek relationship advice. Consider whether the scenario is designed to outrage or amuse rather than to get help. Note: brief sarcastic or dismissive replies directed at another commenter are not troll posts \u2014 trolling requires a bad-faith submission targeting the broader community or fabricating a scenario to bait reactions.",
+                "rubric": "Score higher (more likely to violate) when: (1) The situation described is deliberately absurd, implausible, or designed for shock value; (2) The post includes winking or self-aware humor that signals the author does not take the situation seriously AND the post is a top-level submission or extended narrative rather than a short reply; (3) The post seems designed to provoke strong emotional reactions (outrage, disgust, disbelief) from the community at large rather than seek actionable advice; (4) The 'question' at the end is insincere or rhetorical. Score lower when: the post is earnest, emotionally grounded, and asks a clear genuine question even if the situation seems unusual; OR the post is a short, casual comment or reply directed at a specific person rather than a fabricated scenario targeting the community.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Most importantly, abuse, bigotry, misogyny, misandry, racism, homophobia, gender",
+        "n_fn_routed": 0,
+        "n_fp_routed": 2,
+        "n_fn_total_sub": 3,
+        "n_fp_total_sub": 6,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 2,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "60bb9d59-8535-4efb-bdc8-4584e99831e4",
+            "parent_id": null,
+            "description": "Refine the rubric for item 60bb9d59 to explicitly account for posts that critique abusive behaviour or manipulation tactics (such as 'negging') without themselves being abusive, and posts that use words like 'abusive' or 'rotten' to describe a third party's behaviour rather than to demean an identity group. This prevents over-triggering on compliant posts.",
+            "reasoning": "Both labeled compliant examples could trigger this item under a broad reading: example e308aa44 uses the word 'abusive' and discusses manipulation/negging tactics directed at gender groups, while example 7e883a88 calls a specific man 'rotten' and discusses abuse. The current rubric does not clearly exempt language that critiques abusive behaviour or characterises a specific individual's actions. Adding explicit LOW-score guidance for these patterns prevents false positives.",
+            "proposed_change": {
+              "description": "Does the post exhibit abuse, bigotry, misogyny, misandry, racism, homophobia, or a hidden agenda even without explicit slur keywords?",
+              "rule_text_anchor": "abuse, bigotry, misogyny, misandry, racism, homophobia, gendered slurs, agendas and encouraging violence are not tolerated in our community and will result in a ban. Don't be rude.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post from a relationships advice community contains any of the following: abuse directed at a person or group, bigotry, misogyny, misandry, racism, homophobia, a clear ideological agenda, or general rudeness that violates community standards.\n\nPost title: {{title}}\nPost body: {{body}}",
+                "rubric": "Score HIGH (violation) when: (1) The author demeans, stereotypes, or attacks a person or group based on gender, race, sexuality, or other identity characteristics; (2) The post pushes a clear ideological agenda (e.g. all men are X, all women are Y) as a statement of fact rather than seeking genuine relationship advice; (3) The author is overtly rude, insulting, or dismissive toward another community member; (4) The post encourages harmful or illegal behaviour toward another person even without explicit keywords. Score LOW (not a violation) when: (1) The author expresses frustration about their personal situation without generalising negatively to an identity group; (2) Critical or strong language (e.g. 'abusive', 'rotten', 'manipulative') is directed at a specific individual's behaviour rather than at an identity group; (3) The post discusses, critiques, or names manipulative or abusive tactics (such as negging) in order to warn against them rather than to promote them; (4) Rhetorical or sarcastic questions are used to highlight a double standard or unfairness without genuinely advocating for harm; (5) The tone is blunt or direct but not demeaning toward a person or group.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 1
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "50730f8e-9ed1-410a-b4ee-b18d1d9a9cdb",
+            "parent_id": null,
+            "description": "Refine the rubric for item 50730f8e (child of the deterministic slur/incitement check) to add explicit LOW-score guidance for posts that use flagged terms within a critical or educational framing \u2014 specifically where the author names a harmful behaviour (e.g. calling something 'abusive') to condemn it, not to perpetrate it.",
+            "reasoning": "Example e308aa44 explicitly labels manipulation tactics as 'abusive' in a critical, protective framing. Without this clarification, a model scoring this item could misread the word 'abusive' and the discussion of manipulation as endorsement rather than critique. Adding this to the rubric reduces false positives for compliant advisory posts.",
+            "proposed_change": {
+              "description": "Does the flagged language constitute genuine abuse, a slur, or incitement rather than a quote, educational reference, critique of harmful behaviour, or fictional context?",
+              "rule_text_anchor": "abuse, bigotry, misogyny, misandry, racism, homophobia, gendered slurs, agendas and encouraging violence are not tolerated",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "A post in a relationships advice community has been flagged for potentially containing abusive language, slurs, or incitement to violence. Evaluate whether the flagged content is a genuine instance of abuse, hate speech, a slur, or encouragement of violence \u2014 as opposed to a quoted passage, educational reference, critique of harmful behaviour, or clearly fictional/hypothetical framing.\n\nPost title: {{title}}\nPost body: {{body}}",
+                "rubric": "Score HIGH (violation) when: (1) The author uses slurs to demean a person or group; (2) The author genuinely encourages harming someone; (3) The language is directed aggressively at a person or group with clear intent to degrade or threaten. Score LOW (not a violation) when: (1) The term appears in a direct quote from someone else being criticised; (2) The context is clearly educational or analytical; (3) The phrasing is hypothetical without real encouragement; (4) The author names or labels a harmful behaviour (e.g. calling manipulation tactics 'abusive') specifically to condemn or warn against it rather than to perpetrate it; (5) Strong negative language describes a specific individual's conduct in the context of seeking or giving advice, without targeting an identity group.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0,
+              "parent_id": "4a9d8be8-f9a0-46ce-818d-6b42822d972e"
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "relationships",
+        "rule_text_short": "Assign Proper Flair\n\nRelationships -issues in ongoing romantic relationships\n In",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "Directly link to published peer-reviewed research articles or a brief media summ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "No summaries of summaries, reviews or popular reposts (over 100 upvotes).",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "Research must be less than 6 months old.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "No sensationalized titles, all titles must include the model where applicable.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "No blogspam, images, videos, infographics.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "All submissions must be flaired and contain a link to the published article, eit",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "On-topic. No memes/jokes/etc.",
+        "n_fn_routed": 0,
+        "n_fp_routed": 12,
+        "n_fn_total_sub": 1,
+        "n_fp_total_sub": 14,
+        "n_suggestions": 4,
+        "n_checklist_suggestions": 4,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "ea094d09-49e3-4130-8f60-3c6a8128aaf2",
+            "parent_id": null,
+            "description": "Broaden the off-topic check to explicitly allow personal anecdotes, questions, and social comments that are contextually relevant to a science thread, since all labeled compliant examples are comments (not standalone posts) and many are loosely on-topic only by virtue of thread context.",
+            "reasoning": "Several compliant examples (e.g., 'Will my grandma ever be herself again?', 'I couldn't go to bed early for the life of me...', 'Thanks for your service...what is your favorite aquatic animal?') would score high on the current off-topic rubric if evaluated in isolation. They are compliant because they are comments within science threads. The rubric needs to account for comment context \u2014 a comment that is loosely related to the parent science thread should not be flagged as off-topic.",
+            "proposed_change": {
+              "description": "Is the post off-topic or unrelated to science?",
+              "rule_text_anchor": "On-topic.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post is on-topic for a science community. If the post is a comment (not a top-level post), consider it in the context of its thread \u2014 a comment that engages with, responds to, or is prompted by a scientific discussion is generally on-topic even if the comment itself does not use scientific language. For top-level posts, assess whether the post substantively engages with a scientific topic, research finding, or scientific question. Is the post primarily about something entirely unrelated to science (e.g., politics, entertainment, personal life, sports) with only a superficial or forced connection to science?",
+                "rubric": "Score high (more likely to violate) when: (1) The post is a top-level post with no clear connection to any scientific field or research. (2) The post uses science as a thin pretext for an unrelated discussion. (3) The post is about current events, pop culture, or personal matters without any scientific substance and is not a comment in a science thread. Score low when: (1) The post substantively discusses research, scientific methodology, data, or a scientific phenomenon \u2014 even if the topic is interdisciplinary or applied. (2) The post is a comment that is a direct response or reaction to content in a science thread, including personal anecdotes, clarifying questions, or expressions of support \u2014 these are on-topic by context even if not scientifically substantive in isolation.",
+                "threshold": 0.75,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 1
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "8fd8822c-29f0-4681-80eb-6866ad6634eb",
+            "parent_id": "d7d2d1f9-0336-47f6-8443-857f97ecc023",
+            "description": "Update the meme/joke subjective check rubric to explicitly score low for comments that use casual language or mild humor while still engaging with or responding to a science thread, to reduce false positives on compliant examples.",
+            "reasoning": "Compliant examples like 'cool...now we need to solve the obvious problem with hundreds of thousands of people being born daily and no one dying...' use ironic or humorous framing but are genuine (if informal) responses to science content. The current rubric could over-trigger on such posts. Adding explicit guidance to score low for sarcastic-but-sincere engagement with science content will reduce over-triggering.",
+            "proposed_change": {
+              "description": "Does the post read primarily as a meme, joke, or humorous non-scientific content rather than a genuine scientific discussion?",
+              "rule_text_anchor": "No memes/jokes/etc.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post is primarily a meme, joke, or humorous content rather than a genuine scientific discussion or inquiry. Does the post use humor, irony, or internet meme formats as its main vehicle rather than engaging substantively with scientific content?",
+                "rubric": "Score high (more likely to violate) when: (1) The post is formatted as or references a meme template. (2) The primary intent is to be funny rather than to discuss science. (3) The post contains punchlines, joke structures, or comedic framing with no substantive scientific content whatsoever. (4) The post uses internet slang or reactions as its core content with no scientific engagement. Score low when: (1) Humor appears incidentally in an otherwise substantive scientific post. (2) The post uses sarcasm, irony, or casual tone while still making a genuine point about scientific content or responding meaningfully to a science thread. (3) The post is a comment that reacts informally (e.g., expressing mild skepticism, asking a casual question, sharing a personal anecdote) to science content \u2014 informal tone alone does not make a post a meme or joke.",
+                "threshold": 0.75,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0,
+              "parent_id": "d7d2d1f9-0336-47f6-8443-857f97ecc023"
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": null,
+            "description": "Add a new root-level checklist item to check whether the post is a comment vs. a top-level post, and route them through different evaluation paths. Comments in science threads have a much lower bar for on-topic compliance than top-level posts.",
+            "reasoning": "All 12 labeled compliant examples are comments (post_type: 'comment'), not top-level posts. Several of them (e.g., 'Will my grandma ever be herself again?', 'You can contact me if you like', 'Hey friend, good luck!') would be borderline or violating if evaluated as standalone posts. The checklist needs a structural distinction between comments and top-level posts to avoid over-triggering on comment threads. This new item should be the first check so that comments in legitimate science threads are quickly identified as low-risk.",
+            "proposed_change": {
+              "description": "Is this post a comment within an existing science thread (as opposed to a top-level/standalone post)?",
+              "rule_text_anchor": "On-topic.",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "field": "post_type",
+                    "value": "comment",
+                    "match_mode": "equals"
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false
+              },
+              "action": "continue",
+              "order": 0,
+              "id": "73b21f5e-66c2-4182-8fef-44e74ff8fa4b"
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": null,
+            "description": "Add a new root-level subjective check for comments that are purely social/conversational with zero connection to the science thread topic, such as purely personal greetings or off-topic side conversations that hijack a thread.",
+            "reasoning": "While comments are generally lower-risk, some comments in the examples (e.g., purely social ones like 'You can contact me if you like') are borderline \u2014 they are compliant because they are brief and contextually motivated. However, the checklist should still catch comments that have zero connection to the thread's science topic and are purely off-topic social hijacking. This check should be a child of the comment detection item or a separate high-threshold check.",
+            "proposed_change": {
+              "description": "Is the post a comment that is purely social, personal, or off-topic with absolutely no connection to the science discussion in the thread?",
+              "rule_text_anchor": "On-topic.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "This post is a comment in a science thread. Evaluate whether this comment has any connection whatsoever to the scientific discussion happening in the thread. A comment can be brief, informal, personal, or even just supportive/social and still be on-topic if it is a direct response to something in the thread. Only flag comments that are completely unrelated to the thread topic and appear to be pure off-topic social conversation or spam.",
+                "rubric": "Score high (more likely to violate) when: (1) The comment has no discernible connection to the science topic of the thread. (2) The comment appears to be a private conversation, self-promotion, or spam inserted into a science thread. Score low when: (1) The comment directly responds to another user's statement in the thread, even if informally. (2) The comment asks a question or shares a personal experience related to the thread's science topic. (3) The comment is brief encouragement, agreement, or acknowledgment that is contextually appropriate to the thread.",
+                "threshold": 0.85,
+                "examples_to_include": 3
+              },
+              "action": "remove",
+              "order": 2,
+              "id": "2f297848-f8da-4bcb-85ab-1b5396369786"
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "No abusive/offensive/spam comments.",
+        "n_fn_routed": 0,
+        "n_fp_routed": 2,
+        "n_fn_total_sub": 1,
+        "n_fp_total_sub": 14,
+        "n_suggestions": 3,
+        "n_checklist_suggestions": 3,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "b674c559-8d2a-4209-9e67-d50d14f7c6b9",
+            "parent_id": null,
+            "description": "Raise the threshold for the catch-all subjective abusive/offensive check to reduce over-triggering on borderline-compliant comments that use mildly dismissive language in a social context.",
+            "reasoning": "The two labeled compliant examples ('bitter c-section moms' and 'extremely biased against anything that leans even remotely natural') use language that could superficially appear condescending or dismissive. 'Bitter c-section moms' in particular contains a mild characterization of a group. These were labeled compliant, suggesting the current threshold of 0.7 may still be too low and risks flagging social commentary that isn't a direct personal attack. Raising the threshold slightly and clarifying the rubric to distinguish group characterizations from targeted personal attacks will reduce false positives.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is abusive, offensive, or constitutes a personal attack against another user or group, even if it does not use explicit slurs or profanity. Consider sarcasm, condescension, mockery, and dismissive hostility. Note: mildly characterizing a group in passing (e.g. describing a group as biased or emotional) is different from a sustained or targeted personal attack.",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment is contemptuous or mocking toward a specific named user rather than critiquing ideas or a general group; (2) The comment uses sarcasm or condescension to demean a specific individual; (3) The overall tone is hostile and targeted rather than constructively critical. Score lower when: the comment is a blunt but good-faith scientific critique of an idea or study; when the comment makes a passing characterization of a broad group without singling out an individual for attack; or when the comment expresses social solidarity with another user even if using informal or mildly loaded language.",
+                "threshold": 0.78,
+                "examples_to_include": 5
+              }
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "0d6c002a-c6f6-42d7-a1b4-22613db7205c",
+            "parent_id": null,
+            "description": "Remove 'bitter' and similar mild sentiment adjectives from the deterministic keyword regex scope by ensuring the pattern does not over-match common social words. Refine the regex to avoid false positives on words like 'bitter' which appeared in a compliant example.",
+            "reasoning": "The compliant example 'sorry you're getting downvoted by bitter c-section moms' does not currently match the existing regex (the word 'bitter' is not in the pattern), so no regex change is strictly needed. However, reviewing the pattern confirms it is appropriately scoped. No regex update is required for this item since violating_example_count is below the threshold of 3.",
+            "proposed_change": {
+              "description": "Does the comment contain abusive or offensive language (slurs, insults, hate speech, or personal attacks)? Note: mild sentiment words (e.g. 'bitter', 'biased') used to characterize groups in passing do not by themselves constitute a match."
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": "b674c559-8d2a-4209-9e67-d50d14f7c6b9",
+            "description": "Add a new child exemption check: if the comment is expressing social solidarity with another user (e.g. sympathizing about downvotes) or characterizing a broad group in a passing, non-targeted way, it should be treated as compliant even if mildly loaded language is used.",
+            "reasoning": "The compliant example 'Completely agree with you, sorry you're getting downvoted by bitter c-section moms' shows a user expressing solidarity. This pattern \u2014 sympathizing with another user and attributing downvotes to a third group \u2014 is social commentary rather than a personal attack. Without an explicit carve-out, a subjective model might flag this. Adding a child item that positively identifies solidarity/sympathy expressions as non-violating provides a safety valve.",
+            "proposed_change": {
+              "description": "Is the comment primarily expressing social solidarity, sympathy, or agreement with another user, even if it incidentally characterizes a third group in mildly loaded terms?",
+              "rule_text_anchor": "No abusive/offensive/spam comments.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is primarily an expression of social solidarity, sympathy, or agreement with another user. Does it incidentally reference or characterize a third group (e.g. attributing downvotes to a group) rather than directly attacking a specific person?",
+                "rubric": "Score higher (more likely to be COMPLIANT and NOT a violation) when: (1) The comment expresses agreement or sympathy with the person being replied to; (2) Any negative characterization is directed at a diffuse third group rather than a specific individual in the thread; (3) The overall intent appears to be supportive rather than harassing. Score lower (more likely to violate) when the comment uses the characterization as a vehicle to demean or harass a specific user.",
+                "threshold": 0.5,
+                "examples_to_include": 3
+              },
+              "action": "pass",
+              "order": 0,
+              "id": "12aadf56-5855-433c-ad19-913bf556a6a4"
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "Non-professional personal anecdotes may be removed.",
+        "n_fn_routed": 0,
+        "n_fp_routed": 3,
+        "n_fn_total_sub": 1,
+        "n_fp_total_sub": 14,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "a41ef7d4-5cc5-4159-b8be-3a63dbc46432",
+            "parent_id": null,
+            "description": "Refine the rubric and threshold to reduce over-triggering on compliant posts that are personal but non-anecdotal in the violating sense (e.g., brief questions, hypothesizing, or tangential personal remarks). The labeled compliant examples include a personal habit share (lights off before bed), casual speculation, and a personal question \u2014 none of which are extended anecdotes presenting unverified personal experience as evidence. The rubric should better distinguish between short personal remarks/questions and substantive anecdotes that substitute personal experience for scientific evidence.",
+            "reasoning": "All three labeled examples are marked compliant, yet some (e.g., 'I couldn't go to bed early...' and the munchies comment) contain first-person language and no citations \u2014 features the current rubric scores as violations. This suggests the current threshold (0.7) and rubric may over-trigger on short personal remarks, casual hypothesizing, or personal questions. The rubric needs to explicitly carve out: (1) brief personal comments used as conversational engagement rather than evidence claims, (2) speculative/hypothetical musing explicitly flagged as such, and (3) personal questions. The threshold should be raised slightly to reduce false positives.",
+            "proposed_change": {
+              "id": "a41ef7d4-5cc5-4159-b8be-3a63dbc46432",
+              "description": "Does the post consist primarily of a non-professional personal anecdote presented as evidence or a substantive claim, rather than scientific discussion, a genuine question, or casual engagement?",
+              "rule_text_anchor": "Non-professional personal anecdotes may be removed.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post is primarily a non-professional personal anecdote presented as if it constitutes evidence or a substantive scientific claim. Does it mainly recount the author's personal experience or observation \u2014 without grounding it in peer-reviewed research, professional expertise, or scientific evidence \u2014 in a way that substitutes personal testimony for scientific discussion? Note: short conversational remarks, casual speculation explicitly framed as hypothesizing, and personal questions do NOT qualify as anecdotes under this rule.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post is written in first person and centers on what the author personally experienced or observed (e.g. 'I noticed that...', 'This happened to me...', 'In my experience...') AND presents this experience as evidence for or against a scientific claim; (2) The post offers no citations, links, or references to scientific literature; (3) The author gives no indication of professional or scientific credentials relevant to the claim; (4) The post reads as a personal story or testimonial of meaningful length rather than a brief remark or question. Score lower (less likely to violate) when: (a) The personal mention is brief, incidental, or conversational rather than the core argument; (b) The author explicitly frames their remarks as speculation or hypothesizing rather than asserting experience as fact; (c) The post is primarily a question (even a personal one); (d) The personal experience is used to introduce or contextualize a genuine scientific question or linked study; (e) The author demonstrates domain expertise.",
+                "threshold": 0.78,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "order": 0
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "Arguments dismissing established scientific theories must contain substantial, p",
+        "n_fn_routed": 1,
+        "n_fp_routed": 0,
+        "n_fn_total_sub": 1,
+        "n_fp_total_sub": 14,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 2,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "d758e977-c264-4627-a436-e394c44e0b4c",
+            "parent_id": null,
+            "description": "Update the rubric for the first checklist item to better distinguish methodological critiques (like pointing out lack of controls or confounds) from genuine dismissals of established scientific theories. The labeled violating example is a comment critiquing a study's methodology, which should NOT score high on this item.",
+            "reasoning": "The single labeled violating example (a5610db3) is a comment saying 'The study doesn't control for genetics so no conclusions about causality can be drawn.' This is a methodological critique of a specific study, not a dismissal of an established scientific theory. The current rubric may over-trigger on such comments because they express skepticism about a scientific claim. The rubric needs to explicitly score these lower to avoid false positives. This aligns with the 'Score low' condition about discussing nuances or limitations, which should be expanded to include methodological critiques of individual studies.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post dismisses or challenges an established scientific theory (e.g., evolution, climate change, germ theory, vaccine efficacy, relativity, the Big Bang). Does the post argue against, deny, or cast significant doubt on a scientific theory that has broad consensus in the relevant scientific community? Note: critiquing the methodology, controls, or causal conclusions of a single study is NOT the same as dismissing an established scientific theory.",
+                "rubric": "Score high (more likely to violate) when: (1) The post explicitly rejects or denies a well-established scientific theory; (2) The post frames a fringe or minority view as equivalent to or superior to scientific consensus; (3) The post uses rhetorical dismissal (e.g., 'scientists are wrong about X', 'X is a hoax', 'X has never been proven') without engaging with the scientific literature. Score low (less likely to violate) when: (1) The post discusses nuances, limitations, or open questions within a theory while accepting its core; (2) The post presents a genuinely novel peer-reviewed challenge to a specific aspect of a theory; (3) The post critiques the methodology, experimental controls, or causal inferences of a single study without rejecting the broader scientific theory it relates to; (4) The post points out confounds, lack of controls, or overstated conclusions in a specific piece of research.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              }
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": "d758e977-c264-4627-a436-e394c44e0b4c",
+            "description": "Add a new child checklist item to explicitly check whether the post is a methodological or causal critique of a single study rather than a dismissal of an established theory. This acts as a gate to prevent over-triggering on legitimate scientific discourse.",
+            "reasoning": "The labeled violating example (a5610db3) critiques a study for not controlling for genetics and warns against causal conclusions \u2014 this is standard scientific discourse and should not be flagged as a violation. Adding an explicit gate item ensures such posts are correctly identified as compliant before reaching the evidence check. This addresses the over-triggering pattern identified in the single labeled example.",
+            "proposed_change": {
+              "description": "Is the post solely critiquing the methodology, controls, or causal conclusions of a specific study, rather than dismissing the broader established scientific theory?",
+              "rule_text_anchor": "Arguments dismissing established scientific theories",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post is focused on critiquing the methodology, experimental design, statistical approach, or causal reasoning of a single study or paper \u2014 as opposed to dismissing or denying the broader established scientific theory that the study relates to. For example, a comment saying 'this study doesn't control for genetics so causality can't be inferred' is a methodological critique, not a denial of a scientific theory.",
+                "rubric": "Score high (indicating the post IS only a methodological critique \u2014 i.e., NOT a theory dismissal) when: (1) The post points out specific flaws in a study's design, controls, or statistical methods; (2) The post warns against overstating causal conclusions from correlational or observational data; (3) The post accepts the general scientific field while questioning a particular study's conclusions. Score low (indicating the post IS dismissing a theory) when: (1) The post uses a study's perceived flaw as a springboard to reject the entire field or consensus; (2) The post implies the scientific theory itself is invalid based on one study's limitations.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "pass",
+              "order": 1,
+              "id": "11a47354-073d-4f31-a2ca-64af59491c8e"
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "science",
+        "rule_text_short": "No medical advice!",
+        "n_fn_routed": 0,
+        "n_fp_routed": 1,
+        "n_fn_total_sub": 1,
+        "n_fp_total_sub": 14,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "66c7c20e-d66e-4ea5-bd2b-9b452b212ffa",
+            "parent_id": null,
+            "description": "Refine the rubric to explicitly handle the case where a user is *asking* for medical advice (as opposed to *giving* it). A person soliciting advice or posing questions about a family member's condition is not themselves providing medical advice and should score low (compliant). The current rubric does not clearly distinguish between posts that ask questions versus posts that make recommendations.",
+            "reasoning": "The labeled compliant example (id: 9b58e7d1) is a post where a community member is *asking* questions about a family member's dementia, mentioning possible treatments (nicotine, caffeine, thiamine, omega-3, exercise) purely as queries \u2014 not recommending them to anyone. Without a clear rubric distinction, the checklist could over-trigger on this post because it mentions specific treatments and health conditions. Adding explicit guidance that questions/requests for information are compliant prevents false positives.",
+            "proposed_change": {
+              "description": "Does the post or comment constitute medical advice \u2014 recommending diagnoses, treatments, medications, or health decisions to an individual? (Note: posts that merely *ask* questions or solicit information about health topics are NOT medical advice and should not be flagged.)",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post or comment constitutes medical advice. Does it recommend a specific diagnosis, treatment, medication, dosage, or health-related course of action to an individual or in response to a personal medical situation? Note: if the post is asking a question or requesting information \u2014 even about specific treatments or conditions \u2014 it is NOT giving medical advice.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post or comment tells a specific person what they should do about a health condition (e.g. 'you should take X', 'this sounds like Y disease', 'stop taking Z'); (2) It responds to a described personal symptom or condition with a direct recommendation or diagnosis; (3) It prescribes a course of action rather than discussing research findings in general terms. Score lower (more likely compliant) when: (1) The post is asking a question or soliciting advice, even if it mentions specific treatments, medications, or conditions by name \u2014 the author is seeking information, not dispensing it; (2) The post discusses scientific findings or general population-level statistics without directing advice at an individual; (3) The post summarizes peer-reviewed research without personalizing it; (4) The comment explains what a study found without telling anyone what to do about their own health; (5) The author is describing a situation (e.g. about a family member) and asking what options exist, rather than recommending those options to someone else.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Be Civil\n\nOverly-aggressive and obvious flamewars will be removed in extreme cir",
+        "n_fn_routed": 1,
+        "n_fp_routed": 0,
+        "n_fn_total_sub": 5,
+        "n_fp_total_sub": 3,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "ce250901-417d-4c71-bc5f-4c7be146c5f9",
+            "parent_id": null,
+            "description": "Update the rubric to explicitly account for content that uses extreme profanity or all-caps outbursts even when not directly targeting a specific user, and lower threshold slightly to capture these edge cases.",
+            "reasoning": "The violating example (ab34bf41) contains 'FUCK THAT CURSE MORE' \u2014 extreme profanity used in an all-caps, emotionally escalated manner. While it is not directly insulting a named user, it is clearly aggressive and inflammatory in tone. The current rubric's condition 'uses slurs, threats, or extreme profanity aimed at a person' may cause this to score too low because it isn't 'aimed at a person' per se. The rubric needs to clarify that extreme profanity used in an aggressive, shouted (all-caps) manner \u2014 even without a direct personal target \u2014 can still constitute a violation. The threshold should be slightly reduced from 0.8 to 0.75 to better capture these borderline but clearly hostile posts.",
+            "proposed_change": {
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post or comment is overly aggressive, hostile, or designed to incite a flamewar. Does it attack other users personally, use extreme insults, or deliberately provoke heated conflict rather than engaging in good-faith discussion? Also consider whether the content uses extreme profanity or aggressive all-caps outbursts in a way that is hostile in tone, even if not directed at a specific named user.",
+                "rubric": "Score higher (more likely to violate) when: (1) The content directly insults or demeans another user rather than critiquing their argument; (2) The content uses slurs, threats, or extreme profanity aimed at a person or expressed in an aggressive, inflammatory manner (e.g., all-caps shouting of profanity); (3) The content is clearly intended to bait or escalate a heated argument rather than contribute to discussion; (4) The content shows no attempt at good-faith engagement; (5) The content consists predominantly of aggressive profanity or hostile exclamations with little or no substantive communicative value. Score lower when the content is simply blunt, critical, or uses mild profanity without targeting a specific person or displaying clear hostility. Remember: only 'extreme circumstances' warrant removal per the rule.",
+                "threshold": 0.75,
+                "examples_to_include": 5
+              }
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Remove Lyric/Pun Chains\n\nLyric/pun chains and overused memes will be removed at ",
+        "n_fn_routed": 2,
+        "n_fp_routed": 3,
+        "n_fn_total_sub": 5,
+        "n_fp_total_sub": 3,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 1,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "93242cc9-0412-4ea1-9dde-be081a1ce73e",
+            "parent_id": null,
+            "description": "Expand the rubric to explicitly address 'time-ago' meme comments and wishlist-style low-effort comments that don't involve lyrics or puns but are still overused meme formats. Also clarify that short hype reactions (e.g. 'KENDRICK WITH THE SLAPPERS') and deadline/countdown references in context are compliant.",
+            "reasoning": "Two violating examples reveal edge cases the current rubric doesn't handle well. Example 'removal-594' ('Bruh 2007.... Was 10 years ago') is a classic overused meme format \u2014 the 'X was Y years ago' shock-value comment \u2014 which doesn't fit neatly into lyric/pun chain language. Example 'removal-6830' appears to be a low-effort wishlist/acronym drop (BITNSM + Frank) with no real discussion. Meanwhile, compliant examples like 'KENDRICK WITH THE SLAPPERS' (genuine hype reaction) and 'YOU GOT TILL APRIL 7TH' (contextual deadline reference) risk being over-flagged if the rubric only focuses on chains. The rubric needs to explicitly call out 'time-ago' meme formats and wishlist/acronym drops as violating, while clarifying that short but contextually relevant reactions are compliant.",
+            "proposed_change": {
+              "id": "93242cc9-0412-4ea1-9dde-be081a1ce73e",
+              "description": "Is the comment part of a lyric/pun chain, does it perpetuate an overused meme, or is it a low-effort recurring joke format with no substantive contribution?",
+              "rule_text_anchor": "Lyric/pun chains and overused memes will be removed at our discretion.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this comment is part of a lyric/pun chain, reproduces an overused meme format, or is otherwise a low-effort recurring joke that adds no discussion value. A lyric chain is when a commenter quotes or continues song lyrics (often building on a previous comment) rather than contributing genuine discussion. A pun chain is when commenters riff on wordplay in sequence. An overused meme includes: (a) joke formats that have been repeated so many times they add no value (e.g. 'X was Y years ago' time-shock comments); (b) wishlist drops or acronym/artist-name dumps with no context or discussion; (c) stock reaction copy-pastas or recurring joke templates. A short but contextually relevant reaction (e.g. expressing genuine excitement about a specific release) is NOT a violation simply because it is brief.",
+                "rubric": "Score higher (more likely to violate) when: (1) The comment is primarily a song lyric quote, especially one that appears to continue or start a chain of lyric responses; (2) The comment makes a pun or wordplay joke that seems designed to invite further pun replies rather than discuss the topic; (3) The comment reproduces a well-known, frequently repeated meme format \u2014 including 'X was Y years ago' time-shock formats, wishlist/acronym dumps (e.g. listing artist names or album abbreviations with no context), copy-pastas, or recurring joke templates \u2014 with little original content; (4) The comment contributes no substantive discussion about the hip-hop topic at hand. Score lower (less likely to violate) when: (a) The comment uses a lyric or cultural reference incidentally to make a genuine point; (b) The comment is a short but contextually grounded reaction (e.g. expressing hype about a specific named artist or release); (c) The comment references a specific date or deadline that is clearly tied to an ongoing thread discussion.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0
+            }
+          },
+          {
+            "suggestion_type": "rule_text",
+            "target": null,
+            "parent_id": null,
+            "description": "Clarify the rule text to make explicit that 'overused memes' includes recurring low-effort joke formats beyond just lyric/pun chains, such as time-shock comments and content-free wishlist drops.",
+            "reasoning": "The violating examples (removal-594: 'Bruh 2007.... Was 10 years ago' and removal-6830: a wishlist/acronym drop) demonstrate that the community enforces removal of low-effort recurring joke formats that go beyond the literal meaning of 'lyric/pun chains.' The rule text only names lyric/pun chains and 'overused memes' without giving users any signal about what counts as an overused meme. Adding brief clarifying examples will make the rule more transparent and help the checklist stay aligned.",
+            "proposed_text": "Remove Lyric/Pun Chains\n\nLyric/pun chains and overused memes will be removed at our discretion. This includes comments that continue song lyric or pun threads, as well as recurring low-effort joke formats \u2014 such as \"X was Y years ago\" time-shock comments or content-free artist/album wishlist drops \u2014 that add no genuine discussion to the community."
+          }
+        ]
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Emojis\n\nDon't use emojis.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Comment Length in Official Discussions\n\nIn discussion threads top level comments",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Posting guidelines\n\nPlease read our rules and the rules of Reddit carefully prio",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Song Posting Requirements\n\nAll song posts must contain at least the ARTIST'S NAM",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Opinion in Link Titles\n\nDon't inject opinion or hyperbole into link titles.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Post Tag Usage\n\nUse one of the approved tags if relevant; misusing a tag or usin",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "NP Links Only\n\nAll links to other subreddits must be np links. We have the autom",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Fresh Fridays Rule\n\nFridays are \"Fresh Fridays\". On these days the only songs th",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Interviews Title Guidelines\n\nInterviews with editorialized titles will be remove",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Do Not Post Featured Thread Content\n\nIf your post belongs in one of the recurrin",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Songs from Favorites List\n\nNo songs from Favorites List: Check out hiphop101 ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Frequent/Reposted Content\n\nNo posts that have been made frequently or recentl",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Images and Vines Without Exceptions\n\nNo images and Vines. Check out hiphopima",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Bashing Threads\n\nNo threads that are specifically designed to bash an artist/",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Social Media Requests for Upvotes\n\nPosts linked by a Social Media post asking",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Social Media Comments (Except Announcements)\n\nSocial Media comments (EXCEPTIO",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "AMA Approval Required\n\nAMA requests or updates without explicit moderator approv",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Playlists\n\nPlaylists are not allowed.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Birthday Threads\n\nBirthday Threads are not allowed.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Concert Review Standards\n\nExample. If it doesn't look like this one or at least ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No \"I Met A Rapper!\" Threads\n\nThese threads should go in the Daily Discussion th",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "Official Streams Only\n\nOnly Official Streams are allowed, this serves as a tool ",
+        "n_fn_routed": 1,
+        "n_fp_routed": 0,
+        "n_fn_total_sub": 5,
+        "n_fp_total_sub": 3,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 2,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "c4479b1d-eb35-493c-b338-99778ed858b6",
+            "parent_id": null,
+            "description": "Update the subjective check to clarify that SoundCloud links are only compliant when they belong to an official artist/label account \u2014 unofficial or fan-curated SoundCloud playlist links (e.g. /sets/) should be treated as violations.",
+            "reasoning": "The violating example (24eb972f) is a SoundCloud link to a user-curated playlist (/sets/for-the-culture) on an unofficial account ('dopekiidjt'), not an official artist or label page. The current prompt template lists 'SoundCloud (official artist accounts)' as official but the rubric does not clearly guide the model to distinguish unofficial SoundCloud accounts or fan playlists from official ones. Strengthening this guidance will reduce under-triggering for unofficial SoundCloud links.",
+            "proposed_change": {
+              "id": "c4479b1d-eb35-493c-b338-99778ed858b6",
+              "description": "Does the linked domain appear to be an unofficial or third-party host, or an unofficial/fan account on an otherwise recognized platform?",
+              "rule_text_anchor": "spam and shady websites getting cash instead of the artists",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether the URL(s) in this post link to unofficial or third-party hosting sites rather than official music streaming platforms, OR link to unofficial/fan accounts on platforms that otherwise qualify. Official platforms include Spotify, Apple Music, Tidal, YouTube (official artist/label channels), SoundCloud (only official verified artist or label accounts \u2014 NOT fan pages, unofficial curators, or user-created playlists by non-artists), Amazon Music, Deezer, Bandcamp (official artist pages), and similar major services. Does this post link to a site that is not an official streaming service, or to an unofficial/fan account on an otherwise recognized platform?",
+                "rubric": "Score high (more likely to violate) when: (1) The link goes to a file-sharing or download site. (2) The link goes to a lesser-known or unverified streaming aggregator. (3) The link goes to a personal cloud storage service. (4) The link goes to a site known for hosting pirated or unofficial music. (5) The link goes to a SoundCloud account that is clearly a fan page, unofficial curator, or non-artist user (e.g. username does not match the artist, or the URL path contains /sets/ belonging to an unofficial user). Score low when the link is to a verified, well-known official streaming platform or an official artist/label YouTube channel or verified official SoundCloud artist page.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0,
+              "parent_id": "88424057-d0b1-49b2-914d-cef3a3fd1afe"
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": "314de602-a2f8-461c-9e64-91e8f2d079d7",
+            "parent_id": null,
+            "description": "Update the subjective check to also flag posts that consist solely of a bare SoundCloud link (especially to unofficial/fan accounts or playlists), even when the post body has no title or descriptive text, to reduce under-triggering on comment-style stream posts.",
+            "reasoning": "The violating example (24eb972f) is a comment post with an empty title and a body consisting only of a SoundCloud URL to an unofficial user's playlist (/sets/). The current prompt focuses on 'song or music release posts' with titles/bodies suggesting a release, which may cause the model to score such bare-link comments low. Expanding the rubric to cover bare-link comments ensures these are caught.",
+            "proposed_change": {
+              "id": "314de602-a2f8-461c-9e64-91e8f2d079d7",
+              "description": "Does the post appear to be a song/stream post (including bare-link posts) that should contain an official streaming link but does not, or links only to an unofficial source?",
+              "rule_text_anchor": "Only Official Streams are allowed",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post is attempting to share a song or music stream but does not include a link to any recognized official streaming platform (e.g. Spotify, Apple Music, Tidal, YouTube official artist/label channel, SoundCloud official artist account, Amazon Music, Deezer, Bandcamp official artist page). This includes posts that consist solely of a bare URL with no title or descriptive text. Is this post a song or stream submission \u2014 including bare-link posts \u2014 that lacks a proper official streaming link or only links to an unofficial source?",
+                "rubric": "Score high (more likely to violate) when: (1) The post title or body suggests this is a song or music release post. (2) The post is a bare link (title or body consists only of a URL) with no other context. (3) There is no link to a major recognized streaming platform. (4) Any link present goes to an unofficial or unknown source, an unofficial SoundCloud account, or a fan/curator playlist. Score low when the post is a discussion, news article, or interview rather than a direct song/stream submission, or when the link clearly goes to an official artist page on a recognized platform.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "order": 0,
+              "parent_id": "f786bbf7-dcd6-414e-a3de-5743e5321264"
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Timed Posts\n\nDon't make those damn timed posts. \"When this post is X hours ol",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Snippets\n\nSnippets are not allowed. You can discuss them in DD or a relevant ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Political Endorsements\n\nInterviews are fine, but someone just saying they lik",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Vague Announcements\n\nA picture of 2 rappers together is not an announcement o",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Illegal Downloads\n\nPlease do not request or distribute links to retail projec",
+        "n_fn_routed": 1,
+        "n_fp_routed": 0,
+        "n_fn_total_sub": 5,
+        "n_fp_total_sub": 3,
+        "n_suggestions": 2,
+        "n_checklist_suggestions": 2,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "2be911f1-d5a9-4371-8c6d-9a8535151e40",
+            "parent_id": null,
+            "description": "Add SoundCloud links (especially sets/playlists) as a pattern to the deterministic parent check, since the violating example uses a soundcloud.com/sets link which is not currently captured by any regex pattern.",
+            "reasoning": "The violating example (02a1dc3e) contains only a SoundCloud link (https://soundcloud.com/dopekiidjt/sets/for-the-culture) with no keywords like 'download', 'leak', 'mp3', etc. The current regex patterns would completely miss this post because it relies solely on keyword matching and does not consider direct file-sharing or streaming links to potentially unauthorized uploads. SoundCloud is frequently used to host unofficial/leaked music, and direct links to SoundCloud sets without contextual keywords still warrant review.",
+            "proposed_change": {
+              "id": "2be911f1-d5a9-4371-8c6d-9a8535151e40",
+              "description": "Does the post request or distribute links to illegal downloads or unauthorized streams of retail (paid/commercial) music projects?",
+              "rule_text_anchor": "do not request or distribute links to retail projects",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\b(download|leak|leaked|free download|mp3|zip|rar|mediafire|mega\\.nz|zippyshare|dropbox\\.com|drive\\.google\\.com|pirate|torrent|magnet link|dl link|DL\\?|where can i (get|find|download)|does anyone have (the|a) (zip|rar|mp3|download)|anyone got (the|a) (zip|rar|mp3|download)|drop (the|a) link|send (me )?(the|a) link)\\b",
+                    "case_sensitive": false
+                  },
+                  {
+                    "regex": "soundcloud\\.com\\/[^\\/]+\\/(sets\\/[^\\/\\s]+|[^\\/\\s]+)",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false
+              },
+              "action": "continue",
+              "order": 0
+            }
+          },
+          {
+            "suggestion_type": "checklist",
+            "target": null,
+            "parent_id": "2be911f1-d5a9-4371-8c6d-9a8535151e40",
+            "description": "Add a new subjective child check specifically for posts that contain only a bare link (e.g., SoundCloud, YouTube, or other streaming/hosting URLs) without accompanying download keywords, to evaluate whether the linked content is an unauthorized upload of a retail project.",
+            "reasoning": "The violating example (02a1dc3e) is a bare SoundCloud link with no surrounding text or keywords. The existing subjective child item (40ac7b3a) is well-designed for keyword-rich posts but its rubric and prompt are framed around explicit download requests and piracy file hosts. A dedicated check for bare or context-free streaming links ensures that posts sharing unauthorized streams of retail projects on platforms like SoundCloud are also evaluated, not just direct download requests.",
+            "proposed_change": {
+              "description": "Does the post contain a bare or context-free link to a streaming or hosting platform (e.g., SoundCloud, YouTube, Audiomack) that appears to be an unauthorized upload or stream of a retail (commercially sold) music project?",
+              "rule_text_anchor": "do not request or distribute links to retail projects",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post contains a link to a streaming or hosting platform (such as SoundCloud, YouTube, Audiomack, etc.) that hosts an unauthorized upload or stream of a retail (commercially sold) music project. Does the linked content appear to be a full album, EP, or song that is sold commercially but uploaded without authorization?",
+                "rubric": "Score higher (more likely to violate) when: (1) The post is a bare link or near-bare link to SoundCloud, YouTube, Audiomack, or similar platforms with no official artist or label account association. (2) The linked content is a full album, full EP, or collection of tracks from a commercially released project. (3) The uploader account name does not match the artist or official label. (4) The content appears to be a rip, re-upload, or unofficial mirror of a retail release. Score lower when: (1) The link points to an official artist or label account on the platform. (2) The project is a free mixtape or officially released for free streaming. (3) The post links to a single promotional or officially released free track.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 1,
+              "id": "19bf8642-1452-4443-aa0c-e5f1616c4608"
+            }
+          }
+        ]
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Petitions\n\nPlease don't post petitions (change.org or similar). These can go ",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Ticket Sales\n\nPlease do not post requests to buy or sell tickets.",
+        "n_fn": 0,
+        "n_fp": 0,
+        "n_suggestions": 0,
+        "n_checklist_suggestions": 0,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [],
+        "skipped_reason": "no relevant errors"
+      },
+      {
+        "subreddit": "hiphopheads",
+        "rule_text_short": "No Ranking Questions\n\nQuestions like \"What's your favorite __?\" should be taken ",
+        "n_fn_routed": 1,
+        "n_fp_routed": 0,
+        "n_fn_total_sub": 5,
+        "n_fp_total_sub": 3,
+        "n_suggestions": 1,
+        "n_checklist_suggestions": 1,
+        "n_rule_text_suggestions": 0,
+        "suggestions": [
+          {
+            "suggestion_type": "checklist",
+            "target": "5c698eec-8b10-43cb-a57a-25456e0f44a8",
+            "parent_id": null,
+            "description": "Expand the rubric to explicitly cover 'Top X' ranking questions about non-hip-hop content posted to the community, and clarify that the rule applies regardless of whether the subject matter is hip-hop or non-hip-hop.",
+            "reasoning": "The single labeled violating example ('Top non hip hop albums of the year?') is a clear ranking/top-list question but is framed around non-hip-hop content. The current rubric focuses primarily on hip-hop artists, albums, songs, etc. This could cause the checker to score lower because the content is explicitly non-hip-hop. The rubric and prompt should make clear that ranking/favorite questions are violations regardless of whether the subject is hip-hop or non-hip-hop content, since the rule targets the question format, not the subject matter.",
+            "proposed_change": {
+              "description": "Is the post a ranking or 'favorite' question (about any topic) that should belong in the Daily Discussion Thread?",
+              "rule_text_anchor": "Questions like \"What's your favorite __?\" should be taken to the Daily Discussion Thread.",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post is a ranking or 'favorite' question that solicits subjective rankings, preferences, or top lists from the community (e.g. 'What's your favorite album?', 'Who is the best rapper of all time?', 'Rank these albums', 'Top 5 rappers?', 'Top non hip hop albums of the year?', 'Best movies of the year?'). These belong in the Daily Discussion Thread, not as standalone posts. Note: this applies regardless of whether the subject matter is hip-hop or non-hip-hop \u2014 the post format (ranking/favorite question) is what matters.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post explicitly asks users to rank, rate, or choose their favorite among artists, albums, songs, or any other content (hip-hop or non-hip-hop); (2) The post solicits a subjective 'best', 'worst', 'top', or 'favorite' list on any subject; (3) The post is a poll-style question with no substantive news or discussion anchor beyond the ranking prompt itself; (4) The post could easily fit inside a Daily Discussion Thread rather than standing alone; (5) The post uses phrasing like 'Top [X] ___?', 'What are your favorites?', 'Best ___ of the year?' even if the topic is outside of hip-hop. Score lower when the post contains a substantive discussion point, news hook, or analytical framing beyond a simple ranking prompt.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "order": 0
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

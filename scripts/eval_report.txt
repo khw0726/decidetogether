@@ -1,0 +1,162 @@
+AUTOMOD AGENT V2 — EVALUATION REPORT
+======================================================================
+
+======================================================================
+Q1: Compilation Accuracy (Functional)
+======================================================================
+
+Pairs evaluated: 300
+Overall accuracy: 47.7%
+  95% CI: [42.0%, 53.0%]
+Per-subreddit accuracy: 47.9%
+
+   approve: P=0.894  R=0.292  F1=0.440
+    remove: P=0.444  R=0.857  F1=0.585
+    review: P=0.000  R=0.000  F1=0.000
+
+
+  Confusion Matrix (rows=truth, cols=predicted):
+             approve   remove   review
+   approve        59      105       38
+    remove         7       84        7
+    review         0        0        0
+
+  Compilation Quality (LLM-judge, 1-5 scale):
+    coverage               2.40
+    logic_specificity      2.60
+    item_type_fit          3.60
+    example_quality        3.80
+    anchor_accuracy        4.60
+    mean                   3.40
+
+  Structural checks (pass rate):
+    anchor_in_rule         100%
+    non_leaf_action        100%
+    regex_compiles         100%
+    tree_depth_ok          100%
+    example_count_ok       0%
+    rubric_nonempty        100%
+
+======================================================================
+Q2: Alignment/Suggestion Accuracy
+======================================================================
+
+
+  RQ2A: suggest_from_examples
+  Set 1 errors: 5 FN + 76 FP
+  Baseline accuracy (set 2): 46.0%
+  Updated accuracy (set 2):  50.0%
+  Delta:                     +4.0%
+  Improved: 23, Degraded: 17, Unchanged: 110
+  McNemar: chi2=0.62 (n.s. at p<.05)
+
+  RQ2C: recompile_with_diff
+  Mean diff accuracy:  61.0%
+  Mean fresh accuracy: 59.0%
+  Mean delta:          +2.0%
+  Mean agreement rate: 88.7%
+
+  By edit type:
+    minor_rewording: diff=62.3% fresh=59.7% agree=86.7% (n=5)
+    add_clause: diff=59.7% fresh=58.3% agree=90.7% (n=5)
+
+======================================================================
+Q3: Checklist Pipeline vs. Direct Prompting
+======================================================================
+
+Metric                        Checklist     Direct      Delta
+------------------------------------------------------------
+  Accuracy                       47.7%     43.3% +     4.3%
+  Per-subreddit accuracy         47.9%     42.9% +     5.0%
+  Remove F1                      58.5%     52.1% +     6.5%
+  Approve F1                     44.0%     33.2% +    10.8%
+
+  McNemar: b=42, c=29, chi2=2.03 (n.s. at p<.05)
+
+======================================================================
+Q4: Effect of Examples on Moderation
+======================================================================
+
+  With examples:    47.7%
+  Without examples: 43.3%
+  Delta:            +4.3%
+  Changed verdicts: 76
+  Improved: 37, Degraded: 24
+
+  McNemar: chi2=2.36 (n.s. at p<.05)
+
+  By subjective item count:
+    3+_subjective      n= 300  delta=+4.3%
+
+======================================================================
+Q5a: Cross-LLM Compilation Comparison
+======================================================================
+
+  Model                          Accuracy  Remove F1    Per-sub
+  ------------------------------------------------------------
+  claude-haiku_compile             68.5%     0.640     68.5%
+  gemini-flash_compile              0.0%     0.000      0.0%
+  gpt-5.4-mini_compile             74.5%     0.648     74.5%
+
+  Compilation Quality (LLM-judge, 1-5 scale):
+  Dimension             claude-haiku_compilegemini-flash_compilegpt-5.4-mini_compile
+  ----------------------------------------------------------------
+  coverage                        3.50          0.00          3.33
+  logical_correctness             0.00          0.00          0.00
+  minimality                      0.00          0.00          0.00
+  clarity                         0.00          0.00          0.00
+  anchor_accuracy                 4.67          0.00          4.83
+  example_quality                 3.33          0.00          2.83
+  mean                            3.73          0.00          3.60
+
+======================================================================
+Q5b: Cross-LLM Evaluation Comparison
+======================================================================
+
+  Model                          Accuracy  Remove F1    Per-sub
+  ------------------------------------------------------------
+  claude-sonnet-bedrock_compile      0.0%     0.000      0.0%
+  gemini-pro_compile                0.0%     0.000      0.0%
+  gpt-5.4_compile                   0.0%     0.000      0.0%
+
+  Compilation Quality (LLM-judge, 1-5 scale):
+  Dimension             claude-sonnet-bedrock_compilegemini-pro_compilegpt-5.4_compile
+  ----------------------------------------------------------------
+  coverage                        4.74          4.03          4.26
+  logical_correctness             4.42          3.95          4.34
+  minimality                      4.84          4.62          5.00
+  clarity                         4.63          3.54          3.71
+  anchor_accuracy                 4.97          4.35          5.00
+  example_quality                 3.92          1.59          2.24
+  mean                            4.59          3.68          4.09
+
+======================================================================
+Q6: Effect of Community Atmosphere on Compilation
+======================================================================
+
+  With atmosphere:    88.5%
+  Without atmosphere: 89.0%
+  Delta:              -0.5%
+  Changed verdicts:   13
+  Improved: 6, Degraded: 7
+
+  McNemar: chi2=0.00 (n.s. at p<.05)
+
+  Per subreddit:
+    books                     delta=-0.5% (n=200)
+
+  By rule subjectivity:
+    mostly_subjective         n= 200  delta=-0.5%
+
+  Atmosphere influence on checklist items:
+    books                     7/15 (47%)
+
+  Compilation Quality (LLM-judge, 1-5 scale):
+  Dimension                  With  Without    Delta
+  ----------------------------------------------
+  coverage                   2.50     2.17 +   0.33
+  logic_specificity          2.50     2.50 +   0.00
+  item_type_fit              3.50     3.50 +   0.00
+  example_quality            3.83     3.67 +   0.17
+  anchor_accuracy            4.00     4.33   -0.33
+  mean                       3.27     3.23 +   0.03

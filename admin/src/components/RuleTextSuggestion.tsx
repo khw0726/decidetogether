@@ -4,6 +4,7 @@ import {
   suggestRuleText,
   type SuggestRuleTextResponse,
   type PeerRuleOption,
+  type DistinctiveCluster,
 } from '../api/client'
 
 type ContextBundle = { dimension: string; tag: string }
@@ -58,6 +59,28 @@ function TagChip({ b, shared }: { b: ContextBundle; shared: boolean }) {
   )
 }
 
+// Distinctive-cluster chip — one per dimension, prefixed with the dimension name.
+// Highlighted if the source community shares this cluster with the target;
+// otherwise rendered in a contrasting amber to mark "this is what's different".
+function ClusterChip({ c }: { c: DistinctiveCluster }) {
+  const cls = c.is_shared
+    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+    : 'bg-amber-50 text-amber-800 border-amber-200'
+  return (
+    <span
+      className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${cls}`}
+      title={
+        c.is_shared
+          ? `${c.dimension}: also true in your community`
+          : `${c.dimension}: distinctive of the source community`
+      }
+    >
+      <span className="text-[9px] uppercase tracking-wide opacity-60 mr-1">{c.dimension}</span>
+      {c.label}
+    </span>
+  )
+}
+
 type CarouselSlide =
   | {
       kind: 'draft'
@@ -70,9 +93,9 @@ type CarouselSlide =
   | {
       kind: 'peer'
       communityName: string
+      title: string
       text: string
-      tags: { dimension: string; tag: string }[]
-      sharedKeys: Set<string>
+      clusters: DistinctiveCluster[]
       footer: React.ReactNode
       onUse: () => void
     }
@@ -185,6 +208,13 @@ export function RuleTextSuggestion({
         </div>
       )}
 
+      {data && !loading && data.peer_options.length === 0 && (
+        <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+          No closely-matching rules from peer communities — this rule looks niche.
+          The drafted option below is grounded only in your community context.
+        </div>
+      )}
+
       {error && !loading && (
         <div className="text-xs text-red-600">{error}</div>
       )}
@@ -226,16 +256,19 @@ function CarouselBody({
       })
     }
     for (const p of data.peer_options as PeerRuleOption[]) {
+      const clusters = p.distinctive_clusters || []
+      const sharedCount = clusters.filter(c => c.is_shared).length
       out.push({
         kind: 'peer',
         communityName: p.community_name,
+        title: p.rule_title,
         text: p.rule_text,
-        tags: p.peer_context_tags,
-        sharedKeys: new Set(p.shared_tags.map(t => `${t.dimension}::${t.tag}`)),
+        clusters,
         footer: (
           <span className="text-[10px] text-gray-500">
-            {p.shared_tags.length}/{p.peer_context_tags.length} of this rule's context tags
-            {' '}also exist in your community
+            {clusters.length > 0
+              ? `Source community is most distinctive on ${clusters.length} dimension${clusters.length === 1 ? '' : 's'}; ${sharedCount} also true in yours`
+              : `Source community context unavailable`}
           </span>
         ),
         onUse: () => onApply(p.rule_text, p.shared_tags, p.rule_title),
@@ -285,9 +318,9 @@ function CarouselBody({
           ) : (
             <OptionCard
               header={<SourceLabel kind="peer" communityName={slide.communityName} />}
+              title={slide.title}
               text={slide.text}
-              tags={slide.tags}
-              sharedKeys={slide.sharedKeys}
+              clusters={slide.clusters}
               footer={slide.footer}
               onUse={slide.onUse}
               useLabel="Use as starting point"
@@ -333,17 +366,22 @@ function CarouselBody({
 
 function OptionCard({
   header,
+  title,
   text,
   tags,
   sharedKeys,
+  clusters,
   footer,
   onUse,
   useLabel = 'Use this',
 }: {
   header: React.ReactNode
+  title?: string
   text: string
-  tags: ContextBundle[]
-  sharedKeys: Set<string>
+  // Either flat tags (draft option) or per-dimension distinctive clusters (peer option).
+  tags?: ContextBundle[]
+  sharedKeys?: Set<string>
+  clusters?: DistinctiveCluster[]
   footer: React.ReactNode
   onUse: () => void
   useLabel?: string
@@ -360,15 +398,25 @@ function OptionCard({
           {useLabel}
         </button>
       </div>
+      {title && (
+        <div className="text-sm font-semibold text-gray-900">{title}</div>
+      )}
       <div className="text-sm text-gray-800 whitespace-pre-wrap">{text}</div>
-      {tags.length > 0 && (
+      {tags && tags.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {tags.map((t, j) => (
             <TagChip
               key={`${t.dimension}::${t.tag}::${j}`}
               b={t}
-              shared={sharedKeys.has(`${t.dimension}::${t.tag}`)}
+              shared={sharedKeys?.has(`${t.dimension}::${t.tag}`) ?? false}
             />
+          ))}
+        </div>
+      )}
+      {clusters && clusters.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {clusters.map((c, j) => (
+            <ClusterChip key={`${c.dimension}::${c.cluster}::${j}`} c={c} />
           ))}
         </div>
       )}

@@ -1,0 +1,1392 @@
+[
+  {
+    "subreddit": "AskReddit",
+    "about": {
+      "name": "AskReddit",
+      "description": "r/AskReddit is the place to ask and answer thought-provoking questions.",
+      "subscribers": 58299509,
+      "over18": false
+    },
+    "community_context": {
+      "purpose": {
+        "prose": "AskReddit functions in practice as a mass-participation opinion and storytelling forum, where open-ended questions serve as prompts for communal reflection, humor, nostalgia, and \u2014 most dominantly in celebrated content \u2014 politically charged commentary. The highest-scoring posts are almost universally pointed political questions about Trump, US foreign policy, and economic grievances, meaning political opinion threads are core on-topic content, not edge cases to be managed. Moderators should treat closed-ended or advice-seeking posts as off-topic, but should recognize that lightly loaded political framing ('How do you feel about...') is the community's native question format and not itself a violation, even if it nominally brushes Rule 5.",
+        "tags": [
+          "opinion-sharing",
+          "political-discussion",
+          "nostalgia-and-storytelling",
+          "mass-participation",
+          "open-ended-prompts"
+        ]
+      },
+      "participants": {
+        "prose": "The participant base is a very large, politically engaged general adult audience that skews toward left-leaning American perspectives, as evidenced by the uniformly critical framing of Trump-related questions and the overwhelmingly upvoted anti-administration comments. Participants self-select into threads by interest, are accustomed to irreverent and candid self-disclosure (admitting addictions, emotional vulnerability, sexual awakenings), and are not presenting as fragile or in crisis \u2014 they are recreational contributors who treat the platform as a public commons for venting, reminiscing, and scoring political points. The moderation-relevant at-risk population is narrow: bad-faith actors flooding political threads with disinformation or brigading behavior are the real concern, not the general participant base.",
+        "tags": [
+          "general-public",
+          "politically-engaged",
+          "adult-audience",
+          "self-disclosure-culture",
+          "large-anonymous-crowd"
+        ]
+      },
+      "stakes": {
+        "prose": "The community's actual moderation priorities \u2014 evidenced by what gets removed versus what thrives \u2014 center on format compliance (closed questions, yes/no questions, advice-seeking posts) and spam/bot activity, not on the edginess of content itself. Profanity-laden political rants ('NO Motherfucker...this is OUR money!!') and crude humor threads ('which lyric makes you tear up,' 'what sexually awakened you') earn thousands of upvotes and are clearly not moderated against \u2014 removing this content would gut the community's most valued posts. The genuinely enforced stakes are structural: question format violations, personal information exposure, harmful medical misinformation, and coordinated karma farming represent real moderation targets, while provocative political opinion and adult humor do not.",
+        "tags": [
+          "format-enforcement",
+          "misinformation-risk",
+          "spam-and-bot-prevention",
+          "low-content-harm-stakes",
+          "political-speech-tolerated"
+        ]
+      },
+      "tone": {
+        "prose": "The observed tone is casual, sardonic, and politically charged \u2014 top comments deploy profanity freely ('piece of shit,' 'I fucking love it,' 'Motherfucker'), use dry wit and irony as the dominant rhetorical mode, and treat blunt irreverence as a mark of credibility rather than incivility. The stated rule of 'be respectful' functions in practice as a bar against targeted personal attacks on fellow users, not against coarse language or contemptuous characterizations of public figures. Moderating against profanity, crude humor, or sharp political snark would directly contradict the community's most celebrated content and should not be the moderation baseline.",
+        "tags": [
+          "casual-language",
+          "profanity-normalized",
+          "sardonic-humor",
+          "political-snark",
+          "high-volume-low-friction"
+        ]
+      }
+    },
+    "all_rules": [
+      {
+        "title": "Rule 1 - Questions must be clear and direct and may not use the body textbox",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "posts",
+          "reasoning": "This rule defines specific, checkable content standards for post submissions \u2014 requiring a question mark, English language, no unnecessary context, no example answers in the title, and no text in the body box \u2014 all of which an automated system can evaluate by inspecting the post title and body."
+        }
+      },
+      {
+        "title": "Rule 2 - No personal or professional advice requests",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "posts",
+          "reasoning": "This rule sets specific, evaluable content standards for submissions \u2014 such as prohibiting personal/professional advice requests, banning first-person pronouns, and disallowing crowdsourced naming or purchasing decisions \u2014 all of which an automated system can check against a post's content."
+        }
+      },
+      {
+        "title": "Rule 3 - Open ended questions only",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "posts",
+          "reasoning": "This rule defines specific, evaluable content standards for post titles and questions (e.g., no yes/no answers, no polls, no either/or questions) that an automated system can check against a submission to determine compliance."
+        }
+      },
+      {
+        "title": "Rule 4 - No personal info",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "both",
+          "reasoning": "This rule sets specific, evaluable content standards \u2014 prohibiting personal information, targeted attacks via links, and questions aimed at specific users \u2014 that an automated system can check against both posts and comments to determine a violation."
+        }
+      },
+      {
+        "title": "Rule 5 - No loaded questions",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "posts",
+          "reasoning": "This rule sets a specific, evaluable content standard for post titles \u2014 prohibiting bias, leading language, or agenda-driven framing \u2014 which an automated or human moderator can assess by examining the submission's title and intent."
+        }
+      },
+      {
+        "title": "Rule 6 - [Serious] tagged posts are off-limits to jokes or irrelevant replies",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "both",
+          "reasoning": "This rule sets specific, evaluable content standards for both posts and comments: joke/irrelevant replies are prohibited on [Serious] posts, top-level comments must come from a specified group when required, and posts lacking relevant answers within an hour are removed \u2014 all of which can be assessed by examining the content itself."
+        }
+      },
+      {
+        "title": "Rule 7 - No begging for goods or services, or Reddit rewards",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "both",
+          "reasoning": "This rule defines specific prohibited content behaviors \u2014 begging for goods/services/rewards and brigading \u2014 that can be evaluated against any post or comment to determine a clear violation."
+        }
+      },
+      {
+        "title": "Rule 8 - Be respectful to other users at all times and conduct your behaviour in a civil manner",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "both",
+          "reasoning": "This rule defines specific, evaluable content standards (no personal attacks, no slurs, no bigotry, no baiting, no sexualization of minors, no encouraging suicide) that an automated system can check against any post or comment to determine a violation."
+        }
+      },
+      {
+        "title": "Rule 9 -  No image only replies or large ascii art",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "comments",
+          "reasoning": "This rule sets a specific, evaluable content standard for comment replies \u2014 prohibiting image-only or link-only replies and ASCII/emoji art exceeding one line \u2014 which an automated system can directly check against the content of a comment."
+        }
+      },
+      {
+        "title": "Rule 10 - Harmful Misinformation",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "both",
+          "reasoning": "This rule defines specific prohibited content standards (spreading medical misinformation, undermining vaccines, encouraging illegal activity or delayed treatment) that an automated system can evaluate against any post or comment to determine a violation."
+        }
+      },
+      {
+        "title": "Rule 11 - No spam, machine generated content or karma farming",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "both",
+          "reasoning": "This rule defines specific, evaluable content standards \u2014 prohibiting spam, misleading edits, karma farming, shotgun comments, and bots \u2014 that can be assessed against both posts and comments to determine a clear violation."
+        }
+      },
+      {
+        "title": "Rule 12 - All content must be written in English",
+        "triage": {
+          "rule_type": "actionable",
+          "applies_to": "both",
+          "reasoning": "This rule sets a specific, verifiable content standard (must be written in English) that an automated system can evaluate against both posts and comments, as it explicitly states it applies to all content including posts (which will be removed) and comments (which may be removed)."
+        }
+      }
+    ],
+    "compiled_rules": [
+      {
+        "rule_title": "Rule 1 - Questions must be clear and direct and may not use the body textbox",
+        "rule_text": "Rule 1 - Questions must be clear and direct and may not use the body textbox\n\n* All questions must be clear, written in English, and conclude with a question mark\n* All context in the title must be ***necessary to understanding the question***; do not give \u201cexample answers\u201d in the post title (i.e. \u201cOther than your mom, \\_\\_\\_\\_\\_\\_?\u201d)\n* No text in the text box - any additional info from you must be added as a comment to your post\n\n[The full rule can be viewed here](https://www.reddit.com/r/askreddit/wiki/index#wiki_-rule_1-)",
+        "no_context": {
+          "checklist": [
+            {
+              "id": "c713a293-3aff-4d7f-86d7-d9e81c598822",
+              "description": "Does the post title lack a question mark at the end?",
+              "rule_text_anchor": "conclude with a question mark",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\?\\s*$",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": true,
+                "field": "title"
+              },
+              "action": "remove",
+              "context_influenced": true,
+              "context_note": "AskReddit is purely a question-and-answer community \u2192 every post is definitionally a question, so a missing question mark is an unambiguous structural violation warranting removal rather than just a flag.",
+              "children": []
+            },
+            {
+              "id": "a3d65e9d-642a-410a-9742-f22a1b35f2bb",
+              "description": "Does the post body contain any text?",
+              "rule_text_anchor": "No text in the text box",
+              "item_type": "structural",
+              "logic": {
+                "type": "structural",
+                "checks": [
+                  {
+                    "field": "post_type",
+                    "operator": "==",
+                    "value": "self"
+                  }
+                ],
+                "match_mode": "all"
+              },
+              "action": "continue",
+              "context_influenced": false,
+              "context_note": null,
+              "children": [
+                {
+                  "id": "496a8121-9073-4111-bbc8-e683328c1214",
+                  "description": "Is the body non-empty (contains actual text content)?",
+                  "rule_text_anchor": "No text in the text box - any additional info from you must be added as a comment to your post",
+                  "item_type": "deterministic",
+                  "logic": {
+                    "type": "deterministic",
+                    "patterns": [
+                      {
+                        "regex": "\\S+",
+                        "case_sensitive": false
+                      }
+                    ],
+                    "match_mode": "any",
+                    "negate": false,
+                    "field": "body"
+                  },
+                  "action": "remove",
+                  "context_influenced": false,
+                  "context_note": null,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "305c04dd-f062-45fb-82f1-ae06de3746a0",
+              "description": "Does the title include unnecessary context, example answers, or non-essential framing that bloats the question?",
+              "rule_text_anchor": "All context in the title must be necessary to understanding the question; do not give \"example answers\" in the post title",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title includes unnecessary context, example answers, or extraneous framing beyond what is strictly needed to understand the question being asked.",
+                "rubric": "Score higher (more likely to violate) when: (1) The title contains a parenthetical or inline example answer (e.g. 'Other than pizza, what is your favorite food?'); (2) The title contains lengthy setup or backstory that is not required to understand what is being asked; (3) The title pre-loads the question with the poster's own opinion, anecdote, or qualifiers that could have been omitted without losing the question's meaning. Score lower (less likely to violate) when the additional context is minimal and genuinely necessary to disambiguate the question (e.g. a time reference or a key constraint that changes what would be a valid answer).",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "AskReddit titles are the sole vehicle for the question \u2192 any padding or example-seeding in the title directly shapes (and narrows) responses, making even mild violations meaningful enough to flag for human review.",
+              "children": []
+            },
+            {
+              "id": "141f88d6-41f8-43ee-afc8-6292e8199a61",
+              "description": "Is the title unclear, vague, or not phrased as a direct question?",
+              "rule_text_anchor": "All questions must be clear, written in English, and conclude with a question mark",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title is a clear and direct question. A clear question has an unambiguous subject, asks for a specific type of response, and does not require the reader to guess what is really being asked.",
+                "rubric": "Score higher (more likely to violate) when: (1) The title is so vague that respondents cannot determine what kind of answer is expected; (2) The title is a statement rather than a question even if a question mark is present; (3) The title uses pronouns or references with no clear antecedent (e.g. 'What do you think about it?'); (4) The question is indirect or buried in filler. Score lower when the question is immediately understandable and invites a clear type of response.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "AskReddit's entire premise is high-volume open discussion questions \u2192 clarity is foundational, but subjective edge cases warrant a flag rather than outright removal so human mods can assess intent.",
+              "children": []
+            }
+          ],
+          "examples": [
+            {
+              "label": "violating",
+              "content": {
+                "id": "ex-r1-v1",
+                "platform": "reddit",
+                "author": {
+                  "username": "throwaway_user99",
+                  "account_age_days": 45,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What is the best movie you've ever seen",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Title is a question but lacks a question mark at the end, directly violating the 'conclude with a question mark' requirement.",
+              "related_checklist_item_description": "Does the post title lack a question mark at the end?"
+            },
+            {
+              "label": "borderline",
+              "content": {
+                "id": "ex-r1-b1",
+                "platform": "reddit",
+                "author": {
+                  "username": "curious_redditor",
+                  "account_age_days": 210,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "Other than social media, what technological invention do you think has had the most negative impact on society?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "The 'Other than social media' framing is a constraining example that narrows the answer space \u2014 similar in structure to the prohibited 'Other than your mom, ___?' pattern \u2014 but one could argue it is a necessary constraint rather than an example answer. Reasonable mods might disagree.",
+              "related_checklist_item_description": "Does the title include unnecessary context, example answers, or non-essential framing that bloats the question?"
+            },
+            {
+              "label": "violating",
+              "content": {
+                "id": "ex-r1-v2",
+                "platform": "reddit",
+                "author": {
+                  "username": "firstpost_guy",
+                  "account_age_days": 12,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What skill do you wish you had learned earlier in life?",
+                  "body": "For me it would definitely be learning a second language. I tried to pick up Spanish in my 30s and it's been so much harder than I expected. What about you all?",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Post has text in the body textbox, which is explicitly prohibited. Any additional context must be posted as a comment, not in the body.",
+              "related_checklist_item_description": "Is the body non-empty (contains actual text content)?"
+            },
+            {
+              "label": "borderline",
+              "content": {
+                "id": "ex-r1-b2",
+                "platform": "reddit",
+                "author": {
+                  "username": "ponderer42",
+                  "account_age_days": 88,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What's your take on it?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Has a question mark and no body text, but the title is so vague ('it' has no referent) that it arguably fails the 'clear and direct' standard. Some mods might consider it an obvious removal; others might wonder if context was lost in posting.",
+              "related_checklist_item_description": "Is the title unclear, vague, or not phrased as a direct question?"
+            },
+            {
+              "label": "compliant",
+              "content": {
+                "id": "ex-r1-c1",
+                "platform": "reddit",
+                "author": {
+                  "username": "regularasker",
+                  "account_age_days": 400,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What is the most useful piece of advice you have ever received?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Title is clear, ends with a question mark, contains no body text, provides no example answers, and requires no extra context to understand \u2014 fully compliant with Rule 1.",
+              "related_checklist_item_description": null
+            }
+          ]
+        },
+        "two_pass": {
+          "base_checklist": [
+            {
+              "id": "c713a293-3aff-4d7f-86d7-d9e81c598822",
+              "description": "Does the post title lack a question mark at the end?",
+              "rule_text_anchor": "conclude with a question mark",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\?\\s*$",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": true,
+                "field": "title"
+              },
+              "action": "remove",
+              "context_influenced": true,
+              "context_note": "AskReddit is purely a question-and-answer community \u2192 every post is definitionally a question, so a missing question mark is an unambiguous structural violation warranting removal rather than just a flag.",
+              "children": []
+            },
+            {
+              "id": "a3d65e9d-642a-410a-9742-f22a1b35f2bb",
+              "description": "Does the post body contain any text?",
+              "rule_text_anchor": "No text in the text box",
+              "item_type": "structural",
+              "logic": {
+                "type": "structural",
+                "checks": [
+                  {
+                    "field": "post_type",
+                    "operator": "==",
+                    "value": "self"
+                  }
+                ],
+                "match_mode": "all"
+              },
+              "action": "continue",
+              "context_influenced": false,
+              "context_note": null,
+              "children": [
+                {
+                  "id": "496a8121-9073-4111-bbc8-e683328c1214",
+                  "description": "Is the body non-empty (contains actual text content)?",
+                  "rule_text_anchor": "No text in the text box - any additional info from you must be added as a comment to your post",
+                  "item_type": "deterministic",
+                  "logic": {
+                    "type": "deterministic",
+                    "patterns": [
+                      {
+                        "regex": "\\S+",
+                        "case_sensitive": false
+                      }
+                    ],
+                    "match_mode": "any",
+                    "negate": false,
+                    "field": "body"
+                  },
+                  "action": "remove",
+                  "context_influenced": false,
+                  "context_note": null,
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "305c04dd-f062-45fb-82f1-ae06de3746a0",
+              "description": "Does the title include unnecessary context, example answers, or non-essential framing that bloats the question?",
+              "rule_text_anchor": "All context in the title must be necessary to understanding the question; do not give \"example answers\" in the post title",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title includes unnecessary context, example answers, or extraneous framing beyond what is strictly needed to understand the question being asked.",
+                "rubric": "Score higher (more likely to violate) when: (1) The title contains a parenthetical or inline example answer (e.g. 'Other than pizza, what is your favorite food?'); (2) The title contains lengthy setup or backstory that is not required to understand what is being asked; (3) The title pre-loads the question with the poster's own opinion, anecdote, or qualifiers that could have been omitted without losing the question's meaning. Score lower (less likely to violate) when the additional context is minimal and genuinely necessary to disambiguate the question (e.g. a time reference or a key constraint that changes what would be a valid answer).",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "AskReddit titles are the sole vehicle for the question \u2192 any padding or example-seeding in the title directly shapes (and narrows) responses, making even mild violations meaningful enough to flag for human review.",
+              "children": []
+            },
+            {
+              "id": "141f88d6-41f8-43ee-afc8-6292e8199a61",
+              "description": "Is the title unclear, vague, or not phrased as a direct question?",
+              "rule_text_anchor": "All questions must be clear, written in English, and conclude with a question mark",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title is a clear and direct question. A clear question has an unambiguous subject, asks for a specific type of response, and does not require the reader to guess what is really being asked.",
+                "rubric": "Score higher (more likely to violate) when: (1) The title is so vague that respondents cannot determine what kind of answer is expected; (2) The title is a statement rather than a question even if a question mark is present; (3) The title uses pronouns or references with no clear antecedent (e.g. 'What do you think about it?'); (4) The question is indirect or buried in filler. Score lower when the question is immediately understandable and invites a clear type of response.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "AskReddit's entire premise is high-volume open discussion questions \u2192 clarity is foundational, but subjective edge cases warrant a flag rather than outright removal so human mods can assess intent.",
+              "children": []
+            }
+          ],
+          "adjusted_checklist": [
+            {
+              "description": "Does the post title lack a question mark at the end?",
+              "rule_text_anchor": "conclude with a question mark",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\?\\s*$",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": true,
+                "field": "title"
+              },
+              "action": "remove",
+              "context_influenced": true,
+              "context_note": "AskReddit is a pure question-and-answer community at massive scale \u2192 a missing question mark is an unambiguous, zero-ambiguity structural violation; auto-removal is appropriate and consistent with the community's format-first enforcement priorities. No human review needed.",
+              "children": []
+            },
+            {
+              "description": "Does the post body contain any text?",
+              "rule_text_anchor": "No text in the text box",
+              "item_type": "structural",
+              "logic": {
+                "type": "structural",
+                "checks": [
+                  {
+                    "field": "post_type",
+                    "operator": "==",
+                    "value": "self"
+                  }
+                ],
+                "match_mode": "all"
+              },
+              "action": "continue",
+              "context_influenced": true,
+              "context_note": "AskReddit's community context confirms that the body-text ban is one of the most consistently enforced structural rules \u2192 the parent gate (is it a self post?) is retained and its child check is sharpened to auto-remove rather than flag, since the rule admits no exceptions.",
+              "children": [
+                {
+                  "description": "Is the body non-empty (contains actual text content beyond whitespace)?",
+                  "rule_text_anchor": "No text in the text box - any additional info from you must be added as a comment to your post",
+                  "item_type": "deterministic",
+                  "logic": {
+                    "type": "deterministic",
+                    "patterns": [
+                      {
+                        "regex": "\\S+",
+                        "case_sensitive": false
+                      }
+                    ],
+                    "match_mode": "any",
+                    "negate": false,
+                    "field": "body"
+                  },
+                  "action": "remove",
+                  "context_influenced": true,
+                  "context_note": "Format compliance (no body text) is explicitly identified as a core enforced rule in this community \u2192 any non-whitespace body content is a clear violation warranting immediate removal; no subjective judgment is required here.",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "description": "Does the title include unnecessary context, example answers, or non-essential framing that bloats or pre-seeds the question?",
+              "rule_text_anchor": "All context in the title must be necessary to understanding the question; do not give \"example answers\" in the post title",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title includes unnecessary context, inline example answers, or extraneous framing beyond what is strictly needed to understand the question. Note: lightly loaded political framing (e.g. 'How do you feel about X policy?') is normal and acceptable in this community \u2014 do NOT score it as unnecessary context. Focus specifically on (a) parenthetical or inline example answers, (b) lengthy personal backstory or anecdote that is not required to understand the question, and (c) the poster pre-loading their own opinion or qualifier in a way that steers or narrows the range of valid responses.",
+                "rubric": "Score higher (more likely to violate) when: (1) The title contains a parenthetical or inline example answer (e.g. 'Other than pizza, what is your favorite food?' or 'What show, other than Breaking Bad, defined your teens?'); (2) The title contains a multi-clause setup or personal backstory that is not needed to understand what is being asked and could have been posted as a comment instead; (3) The poster pre-loads the question with their own strong opinion or qualifier in a way that meaningfully restricts what answers are acceptable. Score lower (less likely to violate) when: (1) The additional context is minimal and genuinely needed to disambiguate the question (e.g. a time reference, geographic constraint, or key qualifier that changes what a valid answer looks like); (2) The framing is a brief, politically charged setup (e.g. 'With the latest tariffs announced, what do you think will happen to your grocery bill?') \u2014 this is the community's native question format and is not a violation; (3) The question is open-ended and the framing does not meaningfully close off the space of valid answers.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "Community context shows that politically charged framing ('How do you feel about Trump's...') is AskReddit's most celebrated native format, not a violation \u2192 the rubric and prompt are updated to explicitly exempt brief political or opinion-seeding preambles from violation scoring. Threshold raised slightly from 0.65 to 0.70 to reduce false-positive flags on the community's dominant question style, while still catching genuine example-seeding and backstory bloat.",
+              "children": []
+            },
+            {
+              "description": "Is the title unclear, vague, or not phrased as a direct question?",
+              "rule_text_anchor": "All questions must be clear, written in English, and conclude with a question mark",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title is a clear and direct question that allows participants to know what kind of response is expected. A clear question has an unambiguous subject and invites a defined type of answer. Note: open-ended opinion prompts (e.g. 'What do you think about X?', 'How does Y make you feel?') are entirely valid in this community even if they are broad \u2014 do NOT penalize breadth or political sharpness. Focus only on whether a typical AskReddit participant would be genuinely confused about what is being asked.",
+                "rubric": "Score higher (more likely to violate) when: (1) The title is so vague that a reasonable participant genuinely cannot determine what kind of answer is expected (e.g. 'What about it?' with no referent); (2) The title is a statement or declaration rather than a question, even if a question mark has been appended (e.g. 'I think politicians are corrupt?'); (3) The title uses pronouns or references with no clear antecedent that leaves the subject of the question completely ambiguous; (4) The question is buried under filler or misdirection such that the actual ask is unclear on first reading. Score lower (less likely to violate) when: (1) The question is immediately understandable even if broad or politically opinionated (open-ended opinion questions are the community's core format); (2) The question uses casual, sardonic, or irreverent phrasing \u2014 informal or profane language does NOT make a question unclear; (3) The question is provocative or loaded but still unambiguously asks for participant opinions, experiences, or reactions.",
+                "threshold": 0.72,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "Community tone is casual, sardonic, and profanity-normalized \u2192 the rubric is updated to explicitly clarify that informal language, political sharpness, and broad opinion prompts do NOT constitute unclear questions. Threshold raised from 0.70 to 0.72 to reduce false positives on the community's characteristic blunt, irreverent question phrasing. Flag (not remove) is retained since genuine edge cases still warrant human review.",
+              "children": []
+            },
+            {
+              "description": "Is the post a closed-ended, yes/no, or advice-seeking question rather than an open-ended opinion or storytelling prompt?",
+              "rule_text_anchor": "All questions must be clear, written in English, and conclude with a question mark",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title is a closed-ended question (answerable with yes/no or a single factual answer), an advice-seeking post directed at a specific personal situation, or a poll-style binary question \u2014 as opposed to an open-ended prompt that invites mass participation through opinions, experiences, or stories.",
+                "rubric": "Score higher (more likely to violate) when: (1) The question is answerable with a simple yes or no and does not invite elaboration (e.g. 'Is pineapple on pizza good?'); (2) The post is directed at a specific personal situation seeking individual advice (e.g. 'My landlord did X, what should I do?') \u2014 this belongs in a more targeted subreddit; (3) The question asks for a single correct factual answer with no room for diverse personal responses (e.g. 'What year did WWII end?'). Score lower (less likely to violate) when: (1) The question is open-ended and invites diverse personal opinions, experiences, or stories even if phrased simply; (2) The question is politically framed and invites community reaction (e.g. 'What do you think about the new immigration bill?'); (3) The question has a yes/no surface form but is clearly intended to prompt elaboration and storytelling (e.g. 'Has a stranger ever saved your life?').",
+                "threshold": 0.68,
+                "examples_to_include": 4
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "Community context explicitly identifies closed-ended and advice-seeking posts as off-topic violations that moderators actively enforce \u2192 this is a real, recurring enforcement gap not covered by the base checklist's items. Adding a dedicated check surfaces this category for human review without auto-removing, since 'Has X ever happened to you?' style questions can appear closed-ended but are actually valid mass-participation prompts in this community.",
+              "children": []
+            },
+            {
+              "description": "Is the title not written in English?",
+              "rule_text_anchor": "All questions must be clear, written in English, and conclude with a question mark",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title is written primarily in English. Mixed-language titles where English is dominant are acceptable. Flag only posts where the primary language of the question is clearly not English.",
+                "rubric": "Score higher (more likely to violate) when the title is entirely or predominantly written in a language other than English such that an English-speaking audience would not be able to understand the question. Score lower when the title is primarily in English, even if it contains a non-English word, name, or phrase as part of the question's subject matter.",
+                "threshold": 0.85,
+                "examples_to_include": 3
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "The rule explicitly requires English and the community is a large English-speaking general audience \u2192 a non-English title is a clear format violation, but the high threshold (0.85) avoids flagging English titles that merely reference foreign words or names. Flagging (not auto-removing) is appropriate since language detection has edge cases.",
+              "children": []
+            }
+          ],
+          "adjustment_summary": "Six items returned in total: four carried over from the base checklist with targeted adjustments, and two new items added based on community context signals.\n\nKEY CHANGES:\n1. Question mark check (deterministic, remove): context_note sharpened to reflect AskReddit's format-first enforcement culture; action unchanged as auto-remove.\n2. Body text gate + child check (structural/deterministic, remove): context_note updated to reflect that the body-text ban is one of the most consistently enforced rules in this community; logic and action unchanged.\n3. Unnecessary context / example answers (subjective, flag): Rubric and prompt significantly updated to explicitly EXEMPT brief political framing (AskReddit's dominant native format) from violation scoring. Threshold raised from 0.65 \u2192 0.70 to reduce false positives on politically charged preambles.\n4. Unclear/vague question (subjective, flag): Rubric and prompt updated to clarify that casual language, profanity, political sharpness, and broad open-ended opinion prompts do NOT make a question unclear. Threshold raised from 0.70 \u2192 0.72 to reduce false positives on the community's characteristically blunt and irreverent phrasing.\n5. NEW \u2014 Closed-ended / advice-seeking question check (subjective, flag): Community context explicitly identifies closed questions and personal advice posts as the primary off-topic format violation actively enforced by moderators. This gap was absent from the base checklist and is added here.\n6. NEW \u2014 Non-English title check (subjective, flag): The rule explicitly requires English; the community is a large English-speaking audience. A dedicated lightweight check is added with a high threshold (0.85) to avoid false positives on titles that merely reference foreign words."
+        },
+        "single_pass_with_context": {
+          "checklist": [
+            {
+              "id": "61900735-1746-4981-b3f3-aa4a6734d903",
+              "description": "Does the post title lack a question mark at the end?",
+              "rule_text_anchor": "conclude with a question mark",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\?\\s*$",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": true,
+                "field": "title"
+              },
+              "action": "remove",
+              "context_influenced": false,
+              "context_note": null,
+              "children": []
+            },
+            {
+              "id": "8717fed0-a6ad-456d-b5ca-4cc12c8c05b4",
+              "description": "Does the post body contain text (i.e., is the text box being used)?",
+              "rule_text_anchor": "No text in the text box",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\S",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false,
+                "field": "body"
+              },
+              "action": "remove",
+              "context_influenced": false,
+              "context_note": null,
+              "children": []
+            },
+            {
+              "id": "269a9771-873a-4bc6-b613-7005222bf980",
+              "description": "Does the title include example answers or unnecessary context that is not required to understand the question?",
+              "rule_text_anchor": "All context in the title must be necessary to understanding the question; do not give \"example answers\" in the post title",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post title includes example answers or context that is not strictly necessary to understanding the question being asked.",
+                "rubric": "Score higher (more likely to violate) when: (1) The title includes a parenthetical or inline example answer such as '(e.g. pizza)' or 'Other than your mom, ___?' \u2014 these are explicit example answers and should score very high. (2) The title includes background context or setup that goes beyond what is needed to understand the question itself, e.g. 'I was watching TV last night and I started thinking \u2014 what is your favorite movie?' \u2014 the TV detail is not needed. (3) The question could be fully understood if the extra material were removed. Score lower (less likely to violate) when the context directly clarifies an otherwise ambiguous question \u2014 e.g. 'For those who have lived abroad, what surprised you most?' where the qualifier is necessary to define the target audience.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "flag",
+              "context_influenced": true,
+              "context_note": "Community's native format often uses light framing like 'How do you feel about X?' which is on-topic; threshold kept at 0.65 (not lowered) to avoid penalizing the community's normal lightly-framed political questions, and action set to 'flag' rather than 'remove' because borderline cases are common and human review is preferable.",
+              "children": []
+            }
+          ],
+          "examples": [
+            {
+              "label": "violating",
+              "content": {
+                "id": "example-r1-v1",
+                "platform": "reddit",
+                "author": {
+                  "username": "curious_user99",
+                  "account_age_days": 120,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What is the best vacation you have ever taken?",
+                  "body": "I am asking because I am planning a trip and looking for inspiration. Please share your experiences!",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Post uses the body text box to add context and a call to action, which is explicitly forbidden by Rule 1.",
+              "related_checklist_item_description": "Does the post body contain text (i.e., is the text box being used)?"
+            },
+            {
+              "label": "borderline",
+              "content": {
+                "id": "example-r1-b1",
+                "platform": "reddit",
+                "author": {
+                  "username": "thoughtful_asker",
+                  "account_age_days": 340,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "For those of you who grew up poor and are now financially comfortable, what is the biggest mindset shift you had to make?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "The qualifier 'who grew up poor and are now financially comfortable' could be seen as necessary audience scoping (compliant) or as unnecessary background context narrowing the question beyond what is required (violation) \u2014 reasonable moderators would genuinely disagree.",
+              "related_checklist_item_description": "Does the title include example answers or unnecessary context that is not required to understand the question?"
+            },
+            {
+              "label": "violating",
+              "content": {
+                "id": "example-r1-v2",
+                "platform": "reddit",
+                "author": {
+                  "username": "fun_poll_maker",
+                  "account_age_days": 55,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What is your all-time favorite comfort food (other than pizza or mac and cheese)",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Title includes parenthetical example answers ('other than pizza or mac and cheese') which is explicitly cited as a violation pattern in Rule 1, and also lacks a closing question mark.",
+              "related_checklist_item_description": "Does the title include example answers or unnecessary context that is not required to understand the question?"
+            },
+            {
+              "label": "borderline",
+              "content": {
+                "id": "example-r1-b2",
+                "platform": "reddit",
+                "author": {
+                  "username": "politicallycurious",
+                  "account_age_days": 200,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What do you think will happen to the US economy now that the new tariffs have gone into effect?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Title ends with a question mark and has no body text, so it passes the deterministic checks. Some moderators might flag 'now that the new tariffs have gone into effect' as unnecessary framing context; others would see it as essential context for understanding what is being asked.",
+              "related_checklist_item_description": "Does the title include example answers or unnecessary context that is not required to understand the question?"
+            },
+            {
+              "label": "compliant",
+              "content": {
+                "id": "example-r1-c1",
+                "platform": "reddit",
+                "author": {
+                  "username": "genuineasker",
+                  "account_age_days": 410,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What is a skill you wish you had learned earlier in life?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Title ends with a question mark, body is empty, and the title contains no example answers or unnecessary context \u2014 fully compliant with Rule 1.",
+              "related_checklist_item_description": null
+            }
+          ]
+        }
+      },
+      {
+        "rule_title": "Rule 2 - No personal or professional advice requests",
+        "rule_text": "Rule 2 - No personal or professional advice requests\n\n* Askreddit is NOT your personal or professional advice platform\n\n* Do not makes posts asking for professional advice - medical, legal, financial, or otherwise\n\n* All posts asking for advice must be generic and not specific to your situation alone\n\n* Do not use first person pronouns\n\n* No crowdsourcing naming or purchasing decisions\n\n[The full rule can be viewed here](https://www.reddit.com/r/askreddit/wiki/index#wiki_-rule_2-)",
+        "no_context": {
+          "checklist": [
+            {
+              "id": "15a23051-0d15-4a60-addf-5a797d17586d",
+              "description": "Does the post use first-person pronouns?",
+              "rule_text_anchor": "Do not use first person pronouns",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\b(I|me|my|mine|myself|we|us|our|ours|ourselves)\\b",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false,
+                "field": "title"
+              },
+              "action": "continue",
+              "context_influenced": true,
+              "context_note": "AskReddit titles routinely use first-person in hypotheticals \u2192 deterministic check used only as a fast gate, with a subjective child to confirm the pronoun signals a personal advice request rather than a general discussion question.",
+              "children": [
+                {
+                  "id": "d343a044-ff8a-42a0-b279-d65cf5dcfbb1",
+                  "description": "Is the use of first-person pronouns a signal that the post is asking for advice specific to the poster's personal situation?",
+                  "rule_text_anchor": "All posts asking for advice must be generic and not specific to your situation alone",
+                  "item_type": "subjective",
+                  "logic": {
+                    "type": "subjective",
+                    "prompt_template": "Evaluate whether this AskReddit post title uses first-person pronouns in a way that signals it is seeking advice or input specific to the poster's own personal situation, rather than posing a general open-ended question to the community.",
+                    "rubric": "Score higher (more likely to violate) when: (1) The title uses 'I', 'me', 'my', 'we', 'our', etc. to anchor the question to the poster's personal circumstances; (2) The question could only be meaningfully answered with knowledge of the poster's specific situation; (3) The question is asking what the poster should do, buy, name, or decide. Score lower when: (1) The first-person pronoun is used in a hypothetical or rhetorical frame ('If I were...', 'Would you tell me if I...'); (2) The question is clearly general and the pronoun is incidental.",
+                    "threshold": 0.65,
+                    "examples_to_include": 5
+                  },
+                  "action": "flag",
+                  "context_influenced": true,
+                  "context_note": "AskReddit is a large general-audience Q&A community where first-person pronouns appear frequently in hypothetical framings \u2192 threshold set at 0.65 and child subjective check added to avoid false-positiving rhetorical uses like 'If I could time travel...'.",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "28c0247d-b8b8-4651-9cbd-079e3f553d6c",
+              "description": "Does the post request professional advice (medical, legal, financial, or similar) or crowdsource a naming or purchasing decision?",
+              "rule_text_anchor": "Do not makes posts asking for professional advice - medical, legal, financial, or otherwise",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post is asking for professional advice (medical, legal, financial, psychological, or otherwise) or is crowdsourcing a personal naming or purchasing decision specific to the poster's own situation.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post solicits medical, legal, financial, mental-health, or other professional guidance; (2) The post asks the community to help decide a specific name (baby name, pet name, username) for the poster; (3) The post asks the community to help the poster choose between specific products, services, or purchases for their own use; (4) The question is fundamentally answerable only with knowledge of the poster's personal details. Score lower when: (1) The post asks a general 'what do people think about X type of product/decision' without tying it to the poster's specific situation; (2) The post is a broad hypothetical about professional scenarios rather than a request for personal guidance.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "context_influenced": true,
+              "context_note": "AskReddit explicitly lists medical/legal/financial advice and naming/purchasing crowdsourcing as banned categories \u2192 threshold set at 0.7 to be precise and avoid removing legitimate general questions about these topics.",
+              "children": []
+            }
+          ],
+          "examples": [
+            {
+              "label": "violating",
+              "content": {
+                "id": "example-rule2-v1",
+                "platform": "reddit",
+                "author": {
+                  "username": "throwaway_healthq",
+                  "account_age_days": 14,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "I've had chest pain and shortness of breath for 3 days, could it be anxiety or something more serious?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Clearly a personal medical advice request using first-person pronouns and specific personal symptoms, violating both the first-person pronoun rule and the professional advice prohibition.",
+              "related_checklist_item_description": "Does the post request professional advice (medical, legal, financial, or similar) or crowdsource a naming or purchasing decision?"
+            },
+            {
+              "label": "borderline",
+              "content": {
+                "id": "example-rule2-b1",
+                "platform": "reddit",
+                "author": {
+                  "username": "first_time_parent99",
+                  "account_age_days": 120,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What are some names that work well in both English and Spanish?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Asks about bilingual names without first-person pronouns or explicit personal context \u2014 could be a general curiosity question or could be covert crowdsourcing of a baby/pet name decision. Moderators might genuinely disagree on whether this counts as a prohibited naming decision.",
+              "related_checklist_item_description": "Does the post request professional advice (medical, legal, financial, or similar) or crowdsource a naming or purchasing decision?"
+            },
+            {
+              "label": "violating",
+              "content": {
+                "id": "example-rule2-v2",
+                "platform": "reddit",
+                "author": {
+                  "username": "legalworries22",
+                  "account_age_days": 60,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "My landlord hasn't returned my deposit after 45 days, what are my legal options?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Uses 'my' twice to anchor a specific personal legal situation and asks for legal advice \u2014 a direct violation of the first-person pronoun rule and the professional advice prohibition.",
+              "related_checklist_item_description": "Does the use of first-person pronouns signal that the post is asking for advice specific to the poster's personal situation?"
+            },
+            {
+              "label": "borderline",
+              "content": {
+                "id": "example-rule2-b2",
+                "platform": "reddit",
+                "author": {
+                  "username": "curious_saver",
+                  "account_age_days": 200,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "If I had $10,000 to invest right now, what would you do with it?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Uses first-person in a hypothetical framing ('If I had...') and frames the decision as 'what would YOU do', which could read as a general discussion prompt. However it may also be a thinly veiled personal financial advice request. Reasonable moderators might disagree.",
+              "related_checklist_item_description": "Does the use of first-person pronouns signal that the post is asking for advice specific to the poster's personal situation?"
+            },
+            {
+              "label": "compliant",
+              "content": {
+                "id": "example-rule2-c1",
+                "platform": "reddit",
+                "author": {
+                  "username": "regularredditor",
+                  "account_age_days": 500,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What's something a doctor told you that genuinely changed how you live your life?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Touches on medical topics but asks for open-ended personal anecdotes from the community rather than seeking professional advice for the poster's own situation. No first-person pronouns in the title.",
+              "related_checklist_item_description": null
+            }
+          ]
+        },
+        "two_pass": {
+          "base_checklist": [
+            {
+              "id": "15a23051-0d15-4a60-addf-5a797d17586d",
+              "description": "Does the post use first-person pronouns?",
+              "rule_text_anchor": "Do not use first person pronouns",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\b(I|me|my|mine|myself|we|us|our|ours|ourselves)\\b",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false,
+                "field": "title"
+              },
+              "action": "continue",
+              "context_influenced": true,
+              "context_note": "AskReddit titles routinely use first-person in hypotheticals \u2192 deterministic check used only as a fast gate, with a subjective child to confirm the pronoun signals a personal advice request rather than a general discussion question.",
+              "children": [
+                {
+                  "id": "d343a044-ff8a-42a0-b279-d65cf5dcfbb1",
+                  "description": "Is the use of first-person pronouns a signal that the post is asking for advice specific to the poster's personal situation?",
+                  "rule_text_anchor": "All posts asking for advice must be generic and not specific to your situation alone",
+                  "item_type": "subjective",
+                  "logic": {
+                    "type": "subjective",
+                    "prompt_template": "Evaluate whether this AskReddit post title uses first-person pronouns in a way that signals it is seeking advice or input specific to the poster's own personal situation, rather than posing a general open-ended question to the community.",
+                    "rubric": "Score higher (more likely to violate) when: (1) The title uses 'I', 'me', 'my', 'we', 'our', etc. to anchor the question to the poster's personal circumstances; (2) The question could only be meaningfully answered with knowledge of the poster's specific situation; (3) The question is asking what the poster should do, buy, name, or decide. Score lower when: (1) The first-person pronoun is used in a hypothetical or rhetorical frame ('If I were...', 'Would you tell me if I...'); (2) The question is clearly general and the pronoun is incidental.",
+                    "threshold": 0.65,
+                    "examples_to_include": 5
+                  },
+                  "action": "flag",
+                  "context_influenced": true,
+                  "context_note": "AskReddit is a large general-audience Q&A community where first-person pronouns appear frequently in hypothetical framings \u2192 threshold set at 0.65 and child subjective check added to avoid false-positiving rhetorical uses like 'If I could time travel...'.",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "28c0247d-b8b8-4651-9cbd-079e3f553d6c",
+              "description": "Does the post request professional advice (medical, legal, financial, or similar) or crowdsource a naming or purchasing decision?",
+              "rule_text_anchor": "Do not makes posts asking for professional advice - medical, legal, financial, or otherwise",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post is asking for professional advice (medical, legal, financial, psychological, or otherwise) or is crowdsourcing a personal naming or purchasing decision specific to the poster's own situation.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post solicits medical, legal, financial, mental-health, or other professional guidance; (2) The post asks the community to help decide a specific name (baby name, pet name, username) for the poster; (3) The post asks the community to help the poster choose between specific products, services, or purchases for their own use; (4) The question is fundamentally answerable only with knowledge of the poster's personal details. Score lower when: (1) The post asks a general 'what do people think about X type of product/decision' without tying it to the poster's specific situation; (2) The post is a broad hypothetical about professional scenarios rather than a request for personal guidance.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "context_influenced": true,
+              "context_note": "AskReddit explicitly lists medical/legal/financial advice and naming/purchasing crowdsourcing as banned categories \u2192 threshold set at 0.7 to be precise and avoid removing legitimate general questions about these topics.",
+              "children": []
+            }
+          ],
+          "adjusted_checklist": [
+            {
+              "description": "Does the post use first-person pronouns?",
+              "rule_text_anchor": "Do not use first person pronouns",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\b(I|me|my|mine|myself|we|us|our|ours|ourselves)\\b",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false,
+                "field": "title"
+              },
+              "action": "continue",
+              "context_influenced": true,
+              "context_note": "AskReddit's dominant question format is opinion/storytelling prompts that routinely embed first-person pronouns in hypothetical or rhetorical framing ('What would I do if...', 'What made me realize...') \u2014 this is the community's native voice, not a violation signal. The deterministic check is kept only as a fast gate to route into the subjective child; it must never flag on its own. The child threshold has been tightened relative to a generic community because false positives here would suppress core celebrated content.",
+              "children": [
+                {
+                  "description": "Is the use of first-person pronouns a signal that the post is asking for advice or input specific to the poster's own personal situation, rather than inviting general community opinion or storytelling?",
+                  "rule_text_anchor": "All posts asking for advice must be generic and not specific to your situation alone",
+                  "item_type": "subjective",
+                  "logic": {
+                    "type": "subjective",
+                    "prompt_template": "Evaluate whether this AskReddit post title uses first-person pronouns in a way that signals it is seeking advice or input specific to the poster's own personal situation, rather than posing a general open-ended question that invites broad community opinion, storytelling, or humor.",
+                    "rubric": "Score higher (more likely to violate) when: (1) The title anchors the question to the poster's concrete personal circumstances in a way that cannot be meaningfully answered without knowing those details (e.g., 'My landlord did X \u2014 what should I do?'); (2) The question explicitly asks what the poster should do, buy, name, or decide in their specific life situation; (3) The first-person framing is not rhetorical or hypothetical \u2014 it is describing the poster's real, current circumstances and requesting tailored guidance. Score lower (less likely to violate) when: (1) The first-person pronoun appears in a hypothetical or rhetorical frame commonly used in AskReddit prompts ('If I could go back in time...', 'What would you do if I told you...'); (2) The question is clearly an open invitation for the community to share opinions, experiences, or stories even if the poster uses 'I' or 'my' incidentally; (3) The question uses first-person to establish a relatable premise for a general discussion ('What song made me cry and why does it hit differently?' style prompts); (4) The post is a politically charged opinion question that uses first-person casually \u2014 this is core AskReddit format. Note: AskReddit participants self-disclose freely and candidly; the mere presence of personal disclosure or emotional language does NOT make a post a personal advice request.",
+                    "threshold": 0.75,
+                    "examples_to_include": 5
+                  },
+                  "action": "flag",
+                  "context_influenced": true,
+                  "context_note": "AskReddit's dominant top-content format uses first-person casually in hypotheticals, political prompts, and nostalgia threads \u2014 false positives would suppress the community's most valued posts. Threshold raised from 0.65 to 0.75 to reflect the very high bar needed before treating first-person usage as a personal-advice signal. Rubric expanded to explicitly protect rhetorical, political, and storytelling uses of 'I'/'my', and to clarify that candid personal disclosure (normalised here) does not equal an advice request.",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "description": "Does the post request professional advice (medical, legal, financial, or similar) or crowdsource a naming or purchasing decision specific to the poster's situation?",
+              "rule_text_anchor": "Do not makes posts asking for professional advice - medical, legal, financial, or otherwise",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post is asking for professional advice (medical, legal, financial, psychological, or otherwise) or is crowdsourcing a personal naming or purchasing decision specific to the poster's own situation. Be careful to distinguish posts that solicit genuinely personalised professional guidance from posts that ask the community to share general opinions, experiences, or commentary about medical/legal/financial/purchasing topics \u2014 the latter are common and legitimate on AskReddit.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post solicits tailored medical, legal, financial, mental-health, or other professional guidance that is specific to the poster's described personal circumstances (e.g., 'I have these symptoms \u2014 what's wrong with me?', 'Is my landlord's lease clause legal?'); (2) The post asks the community to help the poster choose a specific name (baby name, pet name, username) for their own use; (3) The post asks the community to choose between specific products or services for the poster's personal purchase decision, with the poster as the clear beneficiary of the answer; (4) The question is fundamentally only answerable with knowledge of the poster's personal details and is soliciting a decision, not an opinion. Score lower (less likely to violate) when: (1) The post asks a general 'what do people think about X' or 'what has your experience been with Y' question that touches on medical/legal/financial topics but invites broad community sharing rather than personalised guidance \u2014 these are common and valued on AskReddit; (2) The post is a politically charged opinion question about policy, government spending, healthcare systems, or legal frameworks \u2014 these are core on-topic content; (3) The post is a broad hypothetical or thought experiment involving professional scenarios ('If you were a doctor, what's the weirdest thing you've seen?'); (4) The post solicits general recommendations or crowd wisdom about a category of product without tying it to the poster's specific purchasing decision.",
+                "threshold": 0.75,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "context_influenced": true,
+              "context_note": "AskReddit's top content includes many politically charged threads about healthcare costs, legal systems, and financial grievances that nominally touch professional-advice categories but are clearly opinion/commentary prompts \u2014 these must not be caught by this check. Threshold raised from 0.70 to 0.75 and rubric substantially expanded to (a) sharply distinguish personalised-guidance requests from general opinion/experience threads, (b) explicitly protect political and policy commentary on medical/legal/financial topics, and (c) protect general 'what do people think about X' questions that happen to touch these domains. The rule targets genuine personal-advice solicitation, which is a narrow category in this community.",
+              "children": []
+            }
+          ],
+          "adjustment_summary": "Two items adjusted, zero items removed, zero items added. Both existing items were modified with tightened thresholds and expanded rubric language to match AskReddit's reality:\n\n1. FIRST-PERSON PRONOUN SUBJECTIVE CHILD: Threshold raised from 0.65 \u2192 0.75. AskReddit's native question format is hypothetical, rhetorical, and politically framed \u2014 first-person pronouns appear constantly in top-scoring posts ('If I could...', 'What made me realize...', casual political prompts). The rubric was expanded to explicitly protect rhetorical/hypothetical uses, political opinion prompts, and storytelling premises that use 'I'/'my' incidentally. A clarification was added that candid personal self-disclosure (normalised and celebrated in this community) does not constitute a personal advice request.\n\n2. PROFESSIONAL ADVICE / NAMING / PURCHASING SUBJECTIVE CHECK: Threshold raised from 0.70 \u2192 0.75. AskReddit's most celebrated content includes politically charged opinion threads about healthcare, legal systems, and government spending that could superficially resemble professional-advice requests. The rubric was substantially expanded to (a) explicitly protect political/policy commentary touching medical/legal/financial topics, (b) distinguish personalised-guidance requests from general opinion/experience-sharing threads, and (c) protect broad hypotheticals and 'what do people think about X' questions in these domains. The core violation target \u2014 genuinely personalised professional advice requests and specific naming/purchasing crowdsourcing \u2014 remains unchanged and still routes to removal."
+        },
+        "single_pass_with_context": {
+          "checklist": [
+            {
+              "id": "f062db81-47ee-48c9-aef4-ef8f56af61c7",
+              "description": "Does the post use first-person pronouns in the title?",
+              "rule_text_anchor": "Do not use first person pronouns",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\b(I|me|my|mine|myself|we|us|our|ours|ourselves)\\b",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false,
+                "field": "title"
+              },
+              "action": "continue",
+              "context_influenced": true,
+              "context_note": "Community's top posts frequently use first-person framing as a storytelling/opinion device \u2192 deterministic check is a fast gate only, with a subjective child required to confirm it is actually a personal advice request before actioning.",
+              "children": [
+                {
+                  "id": "0f810cca-a81f-4d83-a45e-b0ea0caac438",
+                  "description": "Does the use of first-person pronouns indicate a personal or situational advice request rather than a general open-ended question?",
+                  "rule_text_anchor": "All posts asking for advice must be generic and not specific to your situation alone",
+                  "item_type": "subjective",
+                  "logic": {
+                    "type": "subjective",
+                    "prompt_template": "Evaluate whether this AskReddit post title uses first-person pronouns in a way that makes it a personal or situational question rather than a general open-ended discussion prompt. The post title is: '{title}'",
+                    "rubric": "Score higher (more likely to violate) when: (1) The first-person pronoun anchors the question to the poster's specific personal situation (e.g. 'Should I quit my job?', 'My doctor said X, what should I do?'); (2) The question is seeking advice tailored to the poster's circumstances rather than inviting general discussion; (3) The question cannot be meaningfully answered without knowing the poster's specific details. Score lower (less likely to violate) when: (1) The first-person pronoun appears incidentally in a general question that invites community-wide participation (e.g. 'What was the moment you realized you were an adult?'); (2) The question is nostalgic, humorous, or opinion-seeking in a way that is clearly open to all participants; (3) The phrasing is a rhetorical device to invite shared experience ('What made me... what made you?').",
+                    "threshold": 0.65,
+                    "examples_to_include": 5
+                  },
+                  "action": "flag",
+                  "context_influenced": true,
+                  "context_note": "Community's celebrated posts routinely use 'you' and occasionally 'I' as rhetorical devices in opinion-sharing prompts \u2192 threshold set at 0.65 (not lower) to avoid flagging the community's native question format; only clear personal-situation anchoring should trigger.",
+                  "children": []
+                }
+              ]
+            },
+            {
+              "id": "4547d25c-e735-4da5-8a7d-a037089f0f15",
+              "description": "Does the post solicit professional advice (medical, legal, financial, or similar) or crowd-source a personal naming or purchasing decision?",
+              "rule_text_anchor": "Do not makes posts asking for professional advice - medical, legal, financial, or otherwise",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this AskReddit post is asking for professional advice (medical, legal, financial, psychological, or similar), or is crowd-sourcing a specific personal decision such as naming a baby/pet or choosing a product to buy. The post title is: '{title}' and the body is: '{body}'.",
+                "rubric": "Score higher (more likely to violate) when: (1) The post explicitly or implicitly requests medical, legal, financial, psychological, or other professional guidance for a specific personal situation; (2) The post asks the community to help name the poster's baby, pet, business, or make a purchasing decision for the poster; (3) The question is specific to the poster's circumstances and would require knowing their personal details to answer usefully; (4) The post reads as a substitute for consulting a professional (e.g. 'I have these symptoms, what could it be?', 'Can my landlord legally do this?'). Score lower (less likely to violate) when: (1) The question is a general opinion or discussion prompt about a professional topic (e.g. 'What's the most overrated financial advice?'); (2) The question invites shared personal anecdotes rather than actionable advice directed at the poster; (3) The question is politically or socially oriented rather than personally actionable.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "context_influenced": true,
+              "context_note": "Community regularly discusses medical, legal, and financial topics as political/opinion fodder \u2192 threshold raised to 0.7 to avoid removing general discussion questions about professional domains; only posts seeking actionable personal guidance should be removed.",
+              "children": []
+            }
+          ],
+          "examples": [
+            {
+              "label": "violating",
+              "content": {
+                "id": "example-r2-v1",
+                "platform": "reddit",
+                "author": {
+                  "username": "throwawayanxious99",
+                  "account_age_days": 14,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "I've been having chest pains for two weeks and my doctor won't see me for a month \u2014 what could it be and what should I do?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Clear personal medical advice request anchored to the poster's specific symptoms and situation, using first-person pronouns and seeking professional-level guidance from the crowd.",
+              "related_checklist_item_description": "Does the post solicit professional advice (medical, legal, financial, or similar) or crowd-source a personal naming or purchasing decision?"
+            },
+            {
+              "label": "borderline",
+              "content": {
+                "id": "example-r2-b1",
+                "platform": "reddit",
+                "author": {
+                  "username": "newdadof3",
+                  "account_age_days": 210,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "We're expecting a baby girl and can't decide between Elara and Juniper \u2014 which do you prefer and why?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Classic crowd-sourced naming decision for the poster's specific baby \u2014 prohibited under 'No crowdsourcing naming or purchasing decisions' \u2014 but framed as a preference poll that invites genuine opinion-sharing, so reasonable moderators might debate whether it crosses into disallowed personal crowdsourcing or is just a lightweight opinion thread.",
+              "related_checklist_item_description": "Does the post solicit professional advice (medical, legal, financial, or similar) or crowd-source a personal naming or purchasing decision?"
+            },
+            {
+              "label": "violating",
+              "content": {
+                "id": "example-r2-v2",
+                "platform": "reddit",
+                "author": {
+                  "username": "legalworries2024",
+                  "account_age_days": 45,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "My landlord entered my apartment without notice and I think it's illegal \u2014 what are my legal options?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Personal legal advice request tied to the poster's specific situation, using first-person possessive and seeking actionable legal guidance \u2014 violates both the first-person pronoun check and the professional advice ban.",
+              "related_checklist_item_description": "Does the use of first-person pronouns indicate a personal or situational advice request rather than a general open-ended question?"
+            },
+            {
+              "label": "borderline",
+              "content": {
+                "id": "example-r2-b2",
+                "platform": "reddit",
+                "author": {
+                  "username": "reflective_redditor",
+                  "account_age_days": 730,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What was the moment you realized I had been lied to my whole life about money?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Contains first-person pronouns ('I', 'my') but is framed as a nostalgic/political opinion prompt inviting shared experiences about financial disillusionment \u2014 in the community's native storytelling style. Moderators might disagree on whether 'I' in this rhetorical construction violates the pronoun rule or is simply colloquial phrasing.",
+              "related_checklist_item_description": "Does the use of first-person pronouns indicate a personal or situational advice request rather than a general open-ended question?"
+            },
+            {
+              "label": "compliant",
+              "content": {
+                "id": "example-r2-c1",
+                "platform": "reddit",
+                "author": {
+                  "username": "everydayredditor",
+                  "account_age_days": 500,
+                  "platform_metadata": {}
+                },
+                "content": {
+                  "title": "What's the worst financial advice that people still take seriously?",
+                  "body": "",
+                  "media": [],
+                  "links": []
+                },
+                "context": {
+                  "channel": "r/AskReddit",
+                  "thread_id": null,
+                  "parent_post_id": null,
+                  "post_type": "self",
+                  "flair": null,
+                  "platform_metadata": {}
+                },
+                "timestamp": "2026-01-01T00:00:00Z"
+              },
+              "relevance_note": "Open-ended opinion prompt about financial topics with no first-person pronouns and no request for personal actionable advice \u2014 invites community-wide discussion and storytelling, consistent with AskReddit's core format.",
+              "related_checklist_item_description": null
+            }
+          ]
+        }
+      }
+    ]
+  }
+]

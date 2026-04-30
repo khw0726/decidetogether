@@ -18,6 +18,7 @@ from ..compiler.compiler import RuleCompiler, _filter_context_by_relevant
 from ..db.database import get_db
 from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..embeddings import embed_text, unpack_vector, cosine
+from ..context_clusters import distinctive_clusters as _distinctive_clusters, shared_clusters as _shared_clusters
 from ..models.schemas import (
     CommunityContextNote,
     RuleBatchImportRequest,
@@ -31,6 +32,7 @@ from ..models.schemas import (
     RuleUpdate,
     RuleTextCitation,
     RuleTextClause,
+    DistinctiveCluster,
     PeerRuleOption,
     SuggestedContextBundle,
     SuggestRuleTextRequest,
@@ -267,6 +269,10 @@ async def _compile_rule_persist(result: dict) -> None:
         except Exception as e:
             logger.error(f"Compilation failed for rule {rule_id}: {e}")
             await db.rollback()
+            # Re-raise so the background-task wrapper can surface this on the rule
+            # via compile_status='failed'. Without this, a persist-time crash would
+            # silently look like a successful compile.
+            raise
 
 
 async def _compile_rule_background(
@@ -279,7 +285,11 @@ async def _compile_rule_background(
     of pending queue items so the moderation queue reflects the new logic. New
     rules (mode == "compile") have no prior pending decisions referencing them,
     so we skip the re-eval there.
+
+    Also writes compile_status / compile_error onto the rule so the admin UI
+    can surface failures (background tasks are otherwise invisible to users).
     """
+    await _set_compile_status(rule_id, "pending", None)
     try:
         result = await _compile_rule_read_and_llm(rule_id, community_id)
         if result:
@@ -287,8 +297,27 @@ async def _compile_rule_background(
             if result.get("mode") == "recompile":
                 from .checklist import spawn_pending_queue_reeval
                 spawn_pending_queue_reeval(rule_id)
+        await _set_compile_status(rule_id, "ok", None)
     except Exception as e:
         logger.error(f"Compilation failed for rule {rule_id}: {e}")
+        await _set_compile_status(rule_id, "failed", str(e))
+
+
+async def _set_compile_status(rule_id: str, status: str, error: str | None) -> None:
+    from ..db.database import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as db:
+            rule = (await db.execute(
+                select(Rule).where(Rule.id == rule_id)
+            )).scalar_one_or_none()
+            if not rule:
+                return
+            rule.compile_status = status
+            rule.compile_error = error
+            await db.commit()
+    except Exception as e:
+        # Status write is best-effort — never let it mask the original failure.
+        logger.warning(f"Failed to update compile_status for rule {rule_id}: {e}")
 
 
 async def _persist_new_items(db, checklist_items: list, rule_id: str) -> None:
@@ -509,7 +538,9 @@ async def _apply_diff_operations(
         elif kind == "add":
             parent_id = op.get("parent_id")
 
-            # If adding under a parent, ensure parent action is "continue"
+            # If adding under a parent, ensure parent action is "continue".
+            # The parent may be a pre-existing row OR another item added earlier
+            # in this same op batch (full-compile path emits a flat tree).
             if parent_id:
                 parent_item = existing_by_id.get(parent_id)
                 if parent_item and parent_item.action != "continue":
@@ -526,7 +557,9 @@ async def _apply_diff_operations(
                 if siblings:
                     order = max(s.order for s in siblings) + 1
 
-            new_item = ChecklistItem(
+            # Honor an explicit id when provided (full-compile add ops carry the
+            # synthesized uuid so subsequent ops in the batch can FK to it).
+            new_item_kwargs = dict(
                 rule_id=rule_id,
                 order=order,
                 parent_id=parent_id,
@@ -539,8 +572,12 @@ async def _apply_diff_operations(
                 context_note=op.get("context_note"),
                 context_change_types=op.get("context_change_types"),
             )
+            if op.get("id"):
+                new_item_kwargs["id"] = op["id"]
+            new_item = ChecklistItem(**new_item_kwargs)
             db.add(new_item)
             await db.flush()
+            existing_by_id[new_item.id] = new_item
             for i, child_data in enumerate(op.get("children", [])):
                 db.add(ChecklistItem(
                     rule_id=rule_id,
@@ -660,28 +697,30 @@ async def suggest_rule_text(
         score = cosine(query_vec, vec)
         candidates.append((rule, ref_comm, score))
 
-    # Top-20 by cosine, then re-rank by Jaccard tag overlap with target community
+    # Browse-for-inspiration framing: rank purely by purpose similarity (cosine
+    # over title embedding) and surface results regardless of context overlap.
+    # Contrast between source and target communities is shown in the UI via
+    # `distinctive_clusters` chips rather than baked into the score — the moderator
+    # decides whether a same-context or different-context peer is more useful.
     candidates.sort(key=lambda t: t[2], reverse=True)
-    top_n = candidates[:20]
+
+    # Niche queries (e.g. "no loaded questions") have no close-purpose peers in
+    # the corpus; rather than padding the carousel with weak matches that the
+    # moderator has to reject one by one, drop anything below a minimum cosine
+    # floor. 0.40 was chosen by inspecting query/score distributions: clearly
+    # related rules score 0.5-1.0, marginal-but-relevant cases sit around 0.4-0.5,
+    # and unrelated "No <noun>" pattern matches drop below 0.4.
+    MIN_PURPOSE_COSINE = 0.40
 
     rescored: list[tuple[Rule, Community, float, list[str]]] = []
-    for rule, ref_comm, cos_score in top_n:
+    for rule, ref_comm, cos_score in candidates[:40]:
+        if cos_score < MIN_PURPOSE_COSINE:
+            break  # candidates are sorted descending — anything below cuts out the rest too
         peer_tags = _community_tag_set(ref_comm.community_context)
         overlap = target_tags & peer_tags
-        # A peer rule must share AT LEAST ONE context tag to surface as a suggestion —
-        # the whole point of this list is "rules from communities that share your context".
-        # When the target itself has no context tags yet, fall back to cosine-only ranking
-        # so suggestions still appear during onboarding.
-        if target_tags and not overlap:
-            continue
-        union = target_tags | peer_tags
-        jaccard = (len(overlap) / len(union)) if union else 0.0
-        # Combined score: 0.6·cosine + 0.4·jaccard
-        combined = 0.6 * cos_score + 0.4 * jaccard
         shared = sorted({t for (_, t) in overlap})
-        rescored.append((rule, ref_comm, combined, shared))
+        rescored.append((rule, ref_comm, cos_score, shared))
 
-    rescored.sort(key=lambda t: t[2], reverse=True)
     # Deduplicate to one rule per community (highest-scored), then cap.
     seen_communities: set[str] = set()
     distinct_peers: list[tuple] = []
@@ -706,11 +745,23 @@ async def suggest_rule_text(
         })
 
     # Build the user-facing peer_options list (used by the multi-option suggestion UI).
-    # Each option carries the source community's full context tags + the shared subset.
+    # Each option carries the source community's full context tags + the shared subset
+    # + per-dimension distinctive clusters (one chip per dim) for at-a-glance contrast.
     peer_options: list[PeerRuleOption] = []
+    target_shared_clusters = _shared_clusters  # alias for readability below
     for rule, ref_comm, _score, shared in top_peers:
         peer_pairs = _community_tag_set(ref_comm.community_context)
         shared_pairs = sorted(target_tags & peer_pairs)
+        shared_dim_cluster = target_shared_clusters(full_target_context, ref_comm.community_context)
+        distinctive = []
+        for entry in _distinctive_clusters(ref_comm.community_context):
+            key = (entry["dimension"], entry["cluster"])
+            distinctive.append(DistinctiveCluster(
+                dimension=entry["dimension"],
+                cluster=entry["cluster"],
+                label=entry["label"],
+                is_shared=key in shared_dim_cluster,
+            ))
         peer_options.append(PeerRuleOption(
             community_id=ref_comm.id,
             community_name=ref_comm.name,
@@ -724,6 +775,7 @@ async def suggest_rule_text(
                 SuggestedContextBundle(dimension=d, tag=t)
                 for (d, t) in shared_pairs
             ],
+            distinctive_clusters=distinctive,
         ))
 
     compiler = get_compiler()
@@ -918,6 +970,8 @@ async def batch_import_rules(
         results.append(RuleBatchImportResult(rule=RuleRead.model_validate(rule), triage_error=triage_error))
 
     async def _compile_batch() -> None:
+        for rid in actionable_ids:
+            await _set_compile_status(rid, "pending", None)
         # Phase 1: Run all LLM compilations in parallel
         llm_results = await asyncio.gather(
             *[_compile_rule_read_and_llm(rid, community_id) for rid in actionable_ids],
@@ -927,10 +981,16 @@ async def batch_import_rules(
         for rid, result in zip(actionable_ids, llm_results):
             if isinstance(result, Exception):
                 logger.error(f"Compilation LLM phase failed for rule {rid}: {result}")
+                await _set_compile_status(rid, "failed", str(result))
                 continue
             if result is None:
+                await _set_compile_status(rid, "ok", None)
                 continue
-            await _compile_rule_persist(result)
+            try:
+                await _compile_rule_persist(result)
+                await _set_compile_status(rid, "ok", None)
+            except Exception as e:
+                await _set_compile_status(rid, "failed", str(e))
 
     if actionable_ids:
         background_tasks.add_task(_compile_batch)

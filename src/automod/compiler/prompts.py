@@ -114,6 +114,13 @@ Tree evaluation semantics:
 - At every level, the worst action (REMOVE > FLAG > approve) wins across all siblings.
 - Frame every question so YES = violation. Avoid "Does the post have X?" (where having X is good).
   Instead write "Does the post lack X?" or restructure using children.
+- For "must be X" / "X is required" / "not X is removed" rules, the violation is the ABSENCE of X
+  (or PRESENCE of NOT-X). Do not "tidy up" the phrasing into "Is it X?" with action=remove —
+  that inverts the rule and removes the compliant content. Either keep the question as
+  "Is it not-X?" (YES = violation) or, for deterministic checks, set negate=true so the item
+  triggers when X is NOT detected. Worked example: "Posts not in English will be removed" →
+  description "Is the post in a non-English language?" with action=remove. NEVER
+  "Is the post in English?" with action=remove.
 - Use children to refine broad checks: e.g. a deterministic parent (fast gate) with a subjective child
   (confirms it's a real violation, not a false positive). Parent action = "continue" always.
 
@@ -327,6 +334,61 @@ Output:
         "timestamp": "2026-01-01T00:00:00Z"
       },
       "relevance_note": "Although it mentions the White House, the post does not discuss any political agenda.",
+      "related_checklist_item_description": null
+    }
+  ]
+}
+
+EXAMPLE 3 (NEGATION / "MUST BE X" rule — frame YES = violation, do NOT invert the meaning):
+Rule: "Posts not in English will be removed. Comments not in English may be removed."
+The rule says non-English content is the violation. The checklist question must therefore be "is the content non-English?" (YES = violation = remove).
+A common failure mode is to "tidy up" the double negative into "Is the content in English?" and then keep action=remove — that inverts the rule and removes English content. DO NOT do that. Either keep the YES = non-English framing (preferred), or — if you really must phrase it positively — use negate=true on the deterministic check so it triggers when English is NOT detected.
+
+Output:
+{
+  "checklist_tree": [
+    {
+      "description": "Is the post body written in a non-English language?",
+      "rule_text_anchor": "Posts not in English will be removed",
+      "item_type": "subjective",
+      "logic": {
+        "type": "subjective",
+        "prompt_template": "Is the primary written language of this post something other than English?",
+        "rubric": "Score high when most of the prose is in a non-English language. Code, proper nouns, brand names, and isolated foreign words inside an otherwise English post do not count.",
+        "threshold": 0.7,
+        "examples_to_include": 5
+      },
+      "action": "remove",
+      "children": [],
+      "context_influenced": false,
+      "context_note": null
+    }
+  ],
+  "examples": [
+    {
+      "label": "violating",
+      "content": {
+        "id": "example-3a",
+        "platform": "reddit",
+        "author": {"username": "user_es", "account_age_days": 200, "platform_metadata": {}},
+        "content": {"title": "¿Alguien tiene experiencia con esto?", "body": "Estoy buscando recomendaciones sobre el mejor enfoque para resolver este problema. Cualquier consejo sería muy apreciado.", "media": [], "links": []},
+        "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      "relevance_note": "Entirely in Spanish — clearly violates the English-only rule.",
+      "related_checklist_item_description": "Is the post body written in a non-English language?"
+    },
+    {
+      "label": "compliant",
+      "content": {
+        "id": "example-3c",
+        "platform": "reddit",
+        "author": {"username": "english_user", "account_age_days": 400, "platform_metadata": {}},
+        "content": {"title": "Question about my setup", "body": "I've been running into issues with this configuration. Has anyone seen similar behavior?", "media": [], "links": []},
+        "context": {"channel": "r/community", "thread_id": null, "parent_post_id": null, "post_type": "self", "flair": null, "platform_metadata": {}},
+        "timestamp": "2026-01-01T00:00:00Z"
+      },
+      "relevance_note": "Plain English post — clearly compliant.",
       "related_checklist_item_description": null
     }
   ]

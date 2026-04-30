@@ -980,6 +980,11 @@ class RuleCompiler:
 
         result: list[ChecklistItem] = []
         order_counter = [0]
+        # Tracks every existing item id consumed by an op anywhere in the tree.
+        # The fallback paths (unreferenced top-level / unreferenced children) consult
+        # this so an item that an op moved under a new parent isn't *also* re-emitted
+        # in its original position — which would produce a duplicate primary key.
+        consumed_ids: set[str] = set()
 
         def clone_item(
             src: ChecklistItem,
@@ -1027,6 +1032,9 @@ class RuleCompiler:
             return new
 
         def append_subtree_unchanged(item: ChecklistItem, parent_id: Optional[str]) -> None:
+            if item.id in consumed_ids:
+                return
+            consumed_ids.add(item.id)
             cloned = clone_item(item, parent_id)
             result.append(cloned)
             for child in children_of.get(item.id, []):
@@ -1047,6 +1055,12 @@ class RuleCompiler:
                 if not eid or eid not in items_by_id:
                     continue
                 referenced.add(eid)
+                # An LLM op may reference the same existing id twice (e.g. moves it
+                # somewhere new and a later op re-references it). Take the first claim
+                # and skip the rest so we never emit two rows with the same PK.
+                if eid in consumed_ids:
+                    continue
+                consumed_ids.add(eid)
                 src = items_by_id[eid]
 
                 if kind == "delete":

@@ -1,0 +1,268 @@
+{
+  "books": [
+    {
+      "rule_text": "Discussion is the goal\n\nDo not post shallow content. All posts must be directly book related, informative, and discussion focused.",
+      "checklist": [
+        {
+          "description": "Is the post shallow, not directly book related, or not meaningfully discussion focused?",
+          "rule_text_anchor": "Do not post shallow content. All posts must be directly book related, informative, and discussion focused.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A low-effort reaction post about books that does not provide information or create meaningful discussion.",
+          "related_checklist_item_description": "Is the post shallow, not directly book related, or not meaningfully discussion focused?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A simple preference question about books that is book-related but may be seen as too shallow depending on moderation strictness.",
+          "related_checklist_item_description": "Is the post shallow, not directly book related, or not meaningfully discussion focused?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Personal conduct\n\nPlease use a civil tone and assume good faith when entering a conversation.",
+      "checklist": [
+        {
+          "description": "Does the post or comment use an uncivil tone or attack another person instead of discussing books in good faith?",
+          "rule_text_anchor": "Please use a civil tone and assume good faith when entering a conversation.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Direct insult and bad-faith accusation toward another user violates both civility and assuming good faith.",
+          "related_checklist_item_description": "Does the post or comment use an uncivil tone or attack another person instead of discussing books in good faith?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Harsh and dismissive wording may be seen as uncivil or ungenerous, but some moderators might view it as pointed criticism rather than a personal attack.",
+          "related_checklist_item_description": "Does the post or comment use an uncivil tone or attack another person instead of discussing books in good faith?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Prohibited\n\nSelf-promotion and promotional posts, comments & flairs, memes, image-only, video-only, personal recommendation requests, 'what's that book' and 'should I read?' requests, sales links, piracy, plagiarism, low quality book lists, spoilers without warning, sensationalist headlines. Please see extended rules for appropriate subreddits or use the multireddit buttons.",
+      "checklist": [
+        {
+          "description": "Is the submission primarily self-promotion or otherwise promotional, including promotional flairs or sales links?",
+          "rule_text_anchor": "Self-promotion and promotional posts, comments & flairs,",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Is the submission a disallowed format such as a meme, image-only post, or video-only post?",
+          "rule_text_anchor": "memes, image-only, video-only,",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Is the submission a personal recommendation request, a 'what's that book' request, or a 'should I read?' request?",
+          "rule_text_anchor": "personal recommendation requests, 'what's that book' and 'should I read?' requests,",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the submission promote or facilitate piracy, plagiarism, or unauthorized copying?",
+          "rule_text_anchor": "piracy, plagiarism,",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Is the submission a low quality book list, contains spoilers without warning, or uses a sensationalist headline?",
+          "rule_text_anchor": "low quality book lists, spoilers without warning, sensationalist headlines.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "Promotes the author's own book and includes a purchase link, which is disallowed promotion.",
+          "related_checklist_item_description": "Is the submission primarily self-promotion or otherwise promotional, including promotional flairs or sales links?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "An author shares their newly published book in a discussion-oriented way without hard sales language; moderators could disagree on whether it is still self-promotion.",
+          "related_checklist_item_description": "Is the submission primarily self-promotion or otherwise promotional, including promotional flairs or sales links?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "A reaction image macro about reading is a meme/image-only post rather than a discussion post.",
+          "related_checklist_item_description": "Is the submission a disallowed format such as a meme, image-only post, or video-only post?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A cover image with a short discussion prompt may be seen either as image-only or as enough context to permit.",
+          "related_checklist_item_description": "Is the submission a disallowed format such as a meme, image-only post, or video-only post?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "Directly asks for a personal recommendation, which the rule explicitly prohibits.",
+          "related_checklist_item_description": "Is the submission a personal recommendation request, a 'what's that book' request, or a 'should I read?' request?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Asks whether a specific book is worth reading after describing interests; this sits near discussion but still resembles a prohibited request.",
+          "related_checklist_item_description": "Is the submission a personal recommendation request, a 'what's that book' request, or a 'should I read?' request?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "Requests a free pirated copy of a copyrighted book, which clearly violates the piracy prohibition.",
+          "related_checklist_item_description": "Does the submission promote or facilitate piracy, plagiarism, or unauthorized copying?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Discusses where to find an out-of-print text online and could be interpreted as facilitating unauthorized copying.",
+          "related_checklist_item_description": "Does the submission promote or facilitate piracy, plagiarism, or unauthorized copying?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "Uses a clickbait headline and reveals a major ending without any spoiler warning.",
+          "related_checklist_item_description": "Is the submission a low quality book list, contains spoilers without warning, or uses a sensationalist headline?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Posts a short ranked list with little explanation and a dramatic title; moderators could disagree on whether it is low quality or merely casual.",
+          "related_checklist_item_description": "Is the submission a low quality book list, contains spoilers without warning, or uses a sensationalist headline?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Encouraged\n\nWe love original content and self-posts! Thoughts, discussion questions, epiphanies and interesting links about authors and their work. We also encourage discussion about developments in the book world and we have a flair system.",
+      "checklist": [
+        {
+          "description": "Is the post unrelated to books, authors, their work, or developments in the book world?",
+          "rule_text_anchor": "Thoughts, discussion questions, epiphanies and interesting links about authors and their work. We also encourage discussion about developments in the book world",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A post about movies rather than books or authors would conflict with the encouraged subject matter described in the rule.",
+          "related_checklist_item_description": "Is the post unrelated to books, authors, their work, or developments in the book world?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "A post about a film adaptation or a celebrity loosely connected to a book could plausibly be seen as book-related by some moderators and off-topic by others.",
+          "related_checklist_item_description": "Is the post unrelated to books, authors, their work, or developments in the book world?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Important\n\nWe don't allow personal recommendation posts. You can ask in our Weekly Recommendation Thread, consult our Suggested Reading or What to Read page, or post in /r/suggestmeabook.",
+      "checklist": [
+        {
+          "description": "Is this a standalone personal recommendation request rather than discussion, review, or analysis?",
+          "rule_text_anchor": "We don't allow personal recommendation posts.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A direct request for personalized book recommendations, which the rule disallows as a standalone post.",
+          "related_checklist_item_description": "Is this a standalone personal recommendation request rather than discussion, review, or analysis?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "Asks for suggestions based on personal preferences but also invites broader discussion, making it a gray-area recommendation post.",
+          "related_checklist_item_description": "Is this a standalone personal recommendation request rather than discussion, review, or analysis?"
+        }
+      ],
+      "subreddit": "books"
+    },
+    {
+      "rule_text": "Spoiler Policy\n\nAny post with a spoiler in the title will be removed. Any comment with a spoiler that doesn't use the spoiler code will be removed. Any user with an extensive history of spoiling books will be banned. Spoiler tags are: #s for example: Spoilers about XYZ is done with: [Spoilers about XYZ](#s \"Spoiler content here\").",
+      "checklist": [
+        {
+          "description": "Does the post title contain a spoiler for a book's plot, ending, twist, death, identity reveal, or similarly major story outcome?",
+          "rule_text_anchor": "Any post with a spoiler in the title will be removed.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does a comment reveal spoiler content without using the required spoiler code format?",
+          "rule_text_anchor": "Any comment with a spoiler that doesn't use the spoiler code will be removed.",
+          "item_type": "subjective",
+          "action": "remove",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the author have an extensive history of posting book spoilers?",
+          "rule_text_anchor": "Any user with an extensive history of spoiling books will be banned.",
+          "item_type": "subjective",
+          "action": "flag",
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "relevance_note": "A post title directly reveals the ending of a book, which the rule says must be removed.",
+          "related_checklist_item_description": "Does the post title contain a spoiler for a book's plot, ending, twist, death, identity reveal, or similarly major story outcome?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The title hints strongly at a major outcome without stating every detail outright, so moderators could disagree about whether it is a spoiler.",
+          "related_checklist_item_description": "Does the post title contain a spoiler for a book's plot, ending, twist, death, identity reveal, or similarly major story outcome?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "A comment includes a major spoiler in plain text rather than using the spoiler code format described by the rule.",
+          "related_checklist_item_description": "Does a comment reveal spoiler content without using the required spoiler code format?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The comment alludes to a major reveal but in a vague way, so moderators might disagree on whether it counts as an untagged spoiler.",
+          "related_checklist_item_description": "Does a comment reveal spoiler content without using the required spoiler code format?"
+        },
+        {
+          "label": "violating",
+          "relevance_note": "The user has repeatedly posted spoilers across multiple contributions, matching the rule's 'extensive history' language.",
+          "related_checklist_item_description": "Does the author have an extensive history of posting book spoilers?"
+        },
+        {
+          "label": "borderline",
+          "relevance_note": "The user has a few prior spoiler removals, but it is debatable whether that rises to an extensive history.",
+          "related_checklist_item_description": "Does the author have an extensive history of posting book spoilers?"
+        }
+      ],
+      "subreddit": "books"
+    }
+  ]
+}

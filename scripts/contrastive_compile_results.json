@@ -1,0 +1,1282 @@
+{
+  "Civility / Respect": {
+    "gaming": {
+      "checklist_tree": [
+        {
+          "description": "Does the post or comment contain explicit slurs, hate speech keywords, or direct threats?",
+          "rule_text_anchor": "racist, sexist, homophobic, threats, or other toxic content",
+          "item_type": "deterministic",
+          "logic": {
+            "type": "deterministic",
+            "patterns": [
+              {
+                "regex": "\\b(nigger|nigga|faggot|fag|tranny|dyke|spic|chink|kike|retard|kill yourself|kys|die\\s+(in\\s+a\\s+fire|bitch|faggot)|i('ll|\\swill)\\s+(kill|hurt|rape)\\s+you|go\\s+kill\\s+yourself)\\b",
+                "case_sensitive": false
+              }
+            ],
+            "match_mode": "any",
+            "negate": false
+          },
+          "action": "continue",
+          "children": [
+            {
+              "description": "Is the use of the flagged language genuinely hateful, threatening, or bigoted rather than clearly quoted, educational, or self-referential?",
+              "rule_text_anchor": "whether in jest or with malice, that contain racist, sexist, homophobic, threats, or other toxic content",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "A post or comment has been flagged for containing a slur, hate-speech keyword, or threatening phrase. Evaluate whether the language is used in a genuinely hateful, bigoted, or threatening manner, or whether it appears in a clearly different context such as a direct quote, academic or news discussion, or self-identification by a member of the targeted group.",
+                "rubric": "Score HIGH (violation) when: (1) The language is directed at a person or group as an attack or insult. (2) It expresses hatred toward a protected group (race, gender, sexuality, religion, disability, etc.). (3) It constitutes a credible or intimidating threat of violence or harm. (4) It is used 'in jest' but still demeans or dehumanizes a group. Score LOW (not a violation) when: (1) The word appears inside a clearly marked quotation discussing the term itself. (2) The author is clearly self-identifying using reclaimed language without directing it at others. (3) The context is unambiguously journalistic or educational with no hateful framing.",
+                "threshold": 0.6,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "children": [],
+              "atmosphere_influenced": true,
+              "atmosphere_note": "Threshold lowered to 0.6 because r/gaming's large audience and high visibility amplify harm, and the community's strict toxicity enforcement norms warrant erring on the side of removal for borderline hate speech."
+            }
+          ],
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the post or comment contain bigoted, harassing, or toxic content not caught by keyword patterns (e.g. coded language, dog whistles, sustained personal attacks, or sexist/homophobic framing without slurs)?",
+          "rule_text_anchor": "Posts and comments, whether in jest or with malice, that contain racist, sexist, homophobic, threats, or other toxic content will be removed",
+          "item_type": "subjective",
+          "logic": {
+            "type": "subjective",
+            "prompt_template": "Evaluate whether this post or comment contains bigotry, incivility, or toxicity that does not rely on explicit slurs but is still harmful. This includes: coded racist or sexist language, dog-whistle rhetoric, sustained personal attacks, dehumanizing comparisons, targeted harassment, or content that demeans people based on race, gender, sexuality, religion, disability, nationality, or similar protected characteristics.",
+            "rubric": "Score HIGH (violation) when: (1) The content uses coded or euphemistic language to express racial, gender-based, or other bigotry (e.g. 'go back to your country', 'women don't belong in gaming'). (2) It mocks or demeans a person or group based on a protected characteristic even without explicit slurs. (3) It constitutes targeted harassment or a personal attack intended to intimidate or humiliate. (4) It expresses wishes of harm in indirect ways ('hope you get what you deserve'). (5) It is framed as a joke but the punchline relies entirely on bigoted stereotypes. Score LOW when: (1) Criticism is directed at ideas, games, companies, or public figures' actions without targeting protected characteristics. (2) Strong negative opinions are expressed but remain directed at behavior rather than identity. (3) Humor is irreverent but not demeaning to any group.",
+            "threshold": 0.65,
+            "examples_to_include": 5
+          },
+          "action": "remove",
+          "children": [],
+          "atmosphere_influenced": true,
+          "atmosphere_note": "Threshold kept at 0.65 rather than lower because r/gaming's casual humor culture means some edgy-but-non-bigoted content exists legitimately; however the community's strict toxicity enforcement means genuine violations should be caught broadly."
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-tox-1",
+            "platform": "reddit",
+            "author": {
+              "username": "angry_gamer99",
+              "account_age_days": 45,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "lmao of course a woman can't beat that boss, go back to the kitchen and stop ruining gaming for the rest of us. Women have no place in competitive games, they're just here for attention.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/gaming",
+              "thread_id": "abc123",
+              "parent_post_id": "post001",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T12:00:00Z"
+          },
+          "relevance_note": "Explicitly sexist comment demeaning women in gaming using stereotypes and exclusionary language, with no slur but clear bigoted framing — directly tests the subjective coded-language node.",
+          "related_checklist_item_description": "Does the post or comment contain bigoted, harassing, or toxic content not caught by keyword patterns (e.g. coded language, dog whistles, sustained personal attacks, or sexist/homophobic framing without slurs)?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-tox-2b",
+            "platform": "reddit",
+            "author": {
+              "username": "saltygamer42",
+              "account_age_days": 210,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "This dev team is genuinely braindead. I cannot believe they keep releasing broken garbage. Are they even real gamers? This is embarrassing and they should be ashamed of themselves.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/gaming",
+              "thread_id": "def456",
+              "parent_post_id": "post002",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T13:00:00Z"
+          },
+          "relevance_note": "Hostile and insulting toward a development team but targets professional competence rather than any protected characteristic — moderators may disagree on whether 'braindead' and personal shaming cross into toxic incivility under this rule.",
+          "related_checklist_item_description": "Does the post or comment contain bigoted, harassing, or toxic content not caught by keyword patterns (e.g. coded language, dog whistles, sustained personal attacks, or sexist/homophobic framing without slurs)?"
+        },
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-tox-3",
+            "platform": "reddit",
+            "author": {
+              "username": "toxicuser007",
+              "account_age_days": 12,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "lol you're such a faggot for liking that game, kys loser",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/gaming",
+              "thread_id": "ghi789",
+              "parent_post_id": "post003",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T14:00:00Z"
+          },
+          "relevance_note": "Contains a homophobic slur and a direct 'kill yourself' threat — triggers the deterministic keyword node and is confirmed as genuinely hateful by the subjective child.",
+          "related_checklist_item_description": "Does the post or comment contain explicit slurs, hate speech keywords, or direct threats?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-tox-4b",
+            "platform": "reddit",
+            "author": {
+              "username": "retrogamer_88",
+              "account_age_days": 500,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "Bro this game is so bad it's literally retarded, how did anyone think this was a good idea to ship?",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/gaming",
+              "thread_id": "jkl012",
+              "parent_post_id": "post004",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T15:00:00Z"
+          },
+          "relevance_note": "Uses 'retarded' as a pejorative for a game rather than directed at a person — the word triggers the deterministic pattern, but whether casual ableist language used about an object (not a person) warrants removal is a genuine moderator judgment call.",
+          "related_checklist_item_description": "Is the use of the flagged language genuinely hateful, threatening, or bigoted rather than clearly quoted, educational, or self-referential?"
+        },
+        {
+          "label": "compliant",
+          "content": {
+            "id": "example-tox-5c",
+            "platform": "reddit",
+            "author": {
+              "username": "thoughtful_gamer",
+              "account_age_days": 730,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "The representation of diverse characters in RPGs has improved a lot — let's discuss",
+              "body": "Over the past decade, I've noticed RPGs have gotten much better at including characters from different backgrounds and orientations. Games like Baldur's Gate 3 feel genuinely inclusive without it feeling forced. What are your favorite examples of good representation in gaming?",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/gaming",
+              "thread_id": "mno345",
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T16:00:00Z"
+          },
+          "relevance_note": "Discusses diversity and representation in gaming in a respectful, constructive manner — no bigotry, toxicity, or incivility present.",
+          "related_checklist_item_description": null
+        }
+      ]
+    },
+    "mentalhealth": {
+      "checklist_tree": [
+        {
+          "description": "Does the post or comment contain explicit slurs, hate speech, or overtly discriminatory language targeting race, ethnicity, religion, gender, sexuality, disability, or other protected characteristics?",
+          "rule_text_anchor": "racist, discriminatory, or otherwise unsavory language is also not tolerated",
+          "item_type": "deterministic",
+          "logic": {
+            "type": "deterministic",
+            "patterns": [
+              {
+                "regex": "\\b(retard|retarded|faggot|tranny|nigger|nigga|spic|chink|kike|cunt|dyke|wetback|towelhead|raghead|cracker|whore|slut|bitch)\\b",
+                "case_sensitive": false
+              }
+            ],
+            "match_mode": "any",
+            "negate": false
+          },
+          "action": "continue",
+          "children": [
+            {
+              "description": "Is the slur or discriminatory term used in a clearly hateful or derogatory manner (rather than quoted for educational/reclaiming purposes)?",
+              "rule_text_anchor": "racist, discriminatory, or otherwise unsavory language is also not tolerated",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "A flagged word was detected in this post or comment from r/mentalhealth. Evaluate whether the language is used in a hateful, derogatory, or discriminatory manner. Does the author use this language to demean, attack, or dehumanize a person or group?",
+                "rubric": "Score higher (more likely to violate) when: (1) The term is directed at a person or group as an insult or attack; (2) The context provides no educational, reclaiming, or quoted purpose; (3) The language reinforces harmful stereotypes or prejudice. Score lower when the term appears in a quoted passage, a discussion about the harm of such language, or a context where the author is clearly reclaiming language about their own identity.",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "children": [],
+              "atmosphere_influenced": true,
+              "atmosphere_note": "Threshold set to 0.65 (rather than higher) given the vulnerable population — in a mental health community, even borderline discriminatory language can cause disproportionate harm to already-struggling members."
+            }
+          ],
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the post or comment contain disrespectful, insulting, harassing, or provocative content toward another person or group?",
+          "rule_text_anchor": "Do not insult, provoke, harass, or act disrespectfully",
+          "item_type": "subjective",
+          "logic": {
+            "type": "subjective",
+            "prompt_template": "Evaluate whether this post or comment from r/mentalhealth is disrespectful, insulting, harassing, or provocative toward another person or group. The community requires all content to be respectful and supportive. Does this content attack, demean, belittle, bully, or deliberately antagonize another person or group rather than offering empathy or constructive engagement?",
+            "rubric": "Score higher (more likely to violate) when: (1) The content directly insults, mocks, or demeans another person or group; (2) The content is designed to provoke anger or conflict rather than support; (3) The content constitutes targeted harassment (repeated negative attention, personal attacks, threats); (4) The content dismisses or minimizes another person's mental health struggles in a harmful way (e.g. 'you're just faking it', 'stop being weak'). Score lower when: the content expresses frustration about a situation rather than attacking a person, critiques an idea respectfully, or uses blunt language that is not directed at harming anyone.",
+            "threshold": 0.65,
+            "examples_to_include": 5
+          },
+          "action": "remove",
+          "children": [],
+          "atmosphere_influenced": true,
+          "atmosphere_note": "Threshold set to 0.65 (not higher) because the community's vulnerable population means that dismissive or invalidating content — even if not overtly hostile — can cause real harm; moderators lean toward protection of support-seekers over lenience."
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-mh-1",
+            "platform": "reddit",
+            "author": {
+              "username": "angryuser99",
+              "account_age_days": 14,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "You're pathetic and weak. People like you who cry about depression are just looking for attention. Get over yourself, retard.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": "thread-001",
+              "parent_post_id": "post-001",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T10:00:00Z"
+          },
+          "relevance_note": "Directly insults a user sharing their depression struggles, uses a slur, and dismisses their mental health experience — a clear violation of both the disrespect and discriminatory language provisions.",
+          "related_checklist_item_description": "Does the post or comment contain disrespectful, insulting, harassing, or provocative content toward another person or group?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-mh-2",
+            "platform": "reddit",
+            "author": {
+              "username": "frustratedmember",
+              "account_age_days": 210,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "Honestly I'm tired of people who post here just to get sympathy without actually trying to get better. If you refuse therapy and refuse medication and refuse to help yourself, maybe the problem is you and not your circumstances. Some of you need a reality check, not more coddling.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": "thread-002",
+              "parent_post_id": "post-002",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T11:00:00Z"
+          },
+          "relevance_note": "The comment expresses frustration and makes a sweeping generalization that could feel dismissive or invalidating to struggling members, but stops short of a direct personal attack — moderators may disagree on whether this crosses into disrespect or is simply blunt peer feedback.",
+          "related_checklist_item_description": "Does the post or comment contain disrespectful, insulting, harassing, or provocative content toward another person or group?"
+        },
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-mh-3",
+            "platform": "reddit",
+            "author": {
+              "username": "hostileuser42",
+              "account_age_days": 55,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "Of course you have anxiety — all you [slur for a demographic group] are mentally unstable by nature. It's just how your kind are wired.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": "thread-003",
+              "parent_post_id": "post-003",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T12:00:00Z"
+          },
+          "relevance_note": "Uses discriminatory language to attack a demographic group and ties a mental health condition to racial/ethnic identity in a dehumanizing way — violates both the slur detection and the discriminatory language provisions.",
+          "related_checklist_item_description": "Does the post or comment contain explicit slurs, hate speech, or overtly discriminatory language targeting race, ethnicity, religion, gender, sexuality, disability, or other protected characteristics?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-mh-4",
+            "platform": "reddit",
+            "author": {
+              "username": "recoveringuser",
+              "account_age_days": 430,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "I used to call myself a 'crazy bitch' as a joke before I got diagnosed, and honestly reclaiming that language has been weirdly empowering for me. Anyone else use self-deprecating humor as a coping mechanism?",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": "thread-004",
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T13:00:00Z"
+          },
+          "relevance_note": "Contains words that could be flagged as unsavory, but the author is reclaiming language about their own experience as a coping strategy — moderators may disagree on whether this normalizes harmful self-talk or represents valid personal expression.",
+          "related_checklist_item_description": "Is the slur or discriminatory term used in a clearly hateful or derogatory manner (rather than quoted for educational/reclaiming purposes)?"
+        },
+        {
+          "label": "compliant",
+          "content": {
+            "id": "example-mh-5",
+            "platform": "reddit",
+            "author": {
+              "username": "supportivemember",
+              "account_age_days": 300,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "Feeling really low today — can anyone relate?",
+              "body": "I've been struggling with anxiety and depression for years and today is just one of those really hard days. I'm not looking for solutions, just someone to talk to. Has anyone else had days where getting out of bed feels impossible? How do you cope?",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T14:00:00Z"
+          },
+          "relevance_note": "A genuine, respectful post seeking peer support — exactly the kind of content the community exists for. No insults, harassment, or discriminatory language present.",
+          "related_checklist_item_description": null
+        }
+      ]
+    }
+  },
+  "Quality / Misinformation": {
+    "wallstreetbets": {
+      "checklist_tree": [
+        {
+          "description": "Does the post present fabricated, unverified, or clearly made-up financial data, statistics, or claims as fact?",
+          "rule_text_anchor": "Don't make shit up",
+          "item_type": "subjective",
+          "logic": {
+            "type": "subjective",
+            "prompt_template": "Evaluate whether this post presents fabricated, unverified, or made-up financial data, statistics, price targets, earnings figures, insider information claims, or other factual assertions as if they were true. Does the author state things as facts that appear to be invented, unverifiable, or demonstrably false?",
+            "rubric": "Score higher (more likely to violate) when: (1) The post cites specific numbers, statistics, or data points with no sourcing that appear implausible or invented. (2) The author claims insider knowledge, secret information, or certainty about future events. (3) The post makes confident factual assertions about company fundamentals, earnings, or market mechanics that are demonstrably wrong or appear fabricated. (4) The author cannot plausibly have access to the information they are presenting as fact. Score lower when: the post includes hedging language, links sources, or frames speculation as speculation.",
+            "threshold": 0.7,
+            "examples_to_include": 5
+          },
+          "action": "remove",
+          "children": [],
+          "atmosphere_influenced": true,
+          "atmosphere_note": "Threshold set to 0.7 (rather than lower) because the community normalizes hyperbole and ironic exaggeration, so obvious jokes and meme-style claims should not be flagged — only posts that sincerely present fabricated information as actionable fact."
+        },
+        {
+          "description": "Does the post give confident financial advice or recommendations in an area where the author demonstrably lacks relevant knowledge or real trading experience?",
+          "rule_text_anchor": "be responsible giving and taking advice. This includes talking about things you don't know about. You should listen, not talk. Nobody wants an ill-informed opinion. Paper trading is not acceptable experience.",
+          "item_type": "subjective",
+          "logic": {
+            "type": "subjective",
+            "prompt_template": "Evaluate whether this post dispenses confident financial advice, trade recommendations, or strong opinions about complex financial instruments or strategies in a way that signals the author lacks real, relevant experience. Does the post read as though the author is giving authoritative guidance while revealing they have only theoretical, paper-trading, or no experience? Look for: explicit mentions of paper trading as a credential, clear beginner misunderstandings of basic concepts presented as wisdom, or strong 'buy/sell this now' calls that reveal fundamental ignorance of the instrument discussed.",
+            "rubric": "Score higher (more likely to violate) when: (1) The author explicitly cites paper trading as evidence of their competence or experience. (2) The post gives strong directional recommendations (e.g., 'everyone should buy X') while revealing fundamental misunderstandings of how the instrument works (e.g., confusing options mechanics, leverage, margin). (3) The author presents themselves as knowledgeable while making statements that contradict basic, established financial facts. (4) The post encourages others to follow a specific trade based solely on the author's unqualified opinion. Score lower when: the author hedges, shares their own position without telling others what to do, asks questions rather than giving advice, or shows evidence of real trading experience (screenshots of positions, brokerage data).",
+            "threshold": 0.72,
+            "examples_to_include": 5
+          },
+          "action": "flag",
+          "children": [],
+          "atmosphere_influenced": true,
+          "atmosphere_note": "Action set to 'flag' rather than 'remove' because WSB normalizes bold, even reckless-sounding calls as part of its culture — removal is reserved for fabrication; uninformed advice gets flagged for moderator review given the real financial harm risk to vulnerable members."
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "content": {
+            "id": "wsb-ex-1",
+            "platform": "reddit",
+            "author": {
+              "username": "stonksmaster99",
+              "account_age_days": 14,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "BREAKING: GME earnings leak — EPS will be $4.20, short squeeze imminent. Load up NOW.",
+              "body": "I have it on good authority from someone close to the company that GME is going to report $4.20 EPS this quarter, which is way above the $0.03 consensus. The shorts are completely underwater and HAVE to cover by Friday. This is 100% happening. I've been paper trading for 6 months and my model is never wrong. Buy calls at the 30 strike expiring this week. You're welcome.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/wallstreetbets",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": "DD",
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Post presents fabricated insider earnings data as fact, cites paper trading as a credential, and gives a strong directional call to other users — violates both fabrication and uninformed advice prongs of the rule.",
+          "related_checklist_item_description": "Does the post present fabricated, unverified, or clearly made-up financial data, statistics, or claims as fact?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "wsb-ex-2b",
+            "platform": "reddit",
+            "author": {
+              "username": "options_newbie_2024",
+              "account_age_days": 45,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "Why everyone should be buying NVDA calls right now — my full DD",
+              "body": "I've been studying the market for about 3 months, mostly on paper trades and watching YouTube videos. Based on what I've learned, NVDA is going to moon because AI demand is infinite and Jensen Huang never misses. The IV crush after earnings doesn't really matter if the stock moves enough. I genuinely think everyone reading this should buy the $200 calls expiring next Friday. This is not financial advice but also kind of is.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/wallstreetbets",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": "DD",
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Author explicitly references paper trading and YouTube as their experience base, shows a misunderstanding of IV crush, and tells 'everyone' to buy a specific short-dated options position — but the reasoning touches on real market dynamics and WSB routinely hosts bullish calls of this type, so moderators may disagree on whether this crosses into genuinely irresponsible uninformed advice.",
+          "related_checklist_item_description": "Does the post give confident financial advice or recommendations in an area where the author demonstrably lacks relevant knowledge or real trading experience?"
+        },
+        {
+          "label": "compliant",
+          "content": {
+            "id": "wsb-ex-3c",
+            "platform": "reddit",
+            "author": {
+              "username": "theta_gang_veteran",
+              "account_age_days": 1200,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "My TSLA covered call position — here's what I'm doing and why (not telling you to copy me)",
+              "body": "Been wheeling TSLA for two years. Sharing my current setup: selling the $280 CC expiring in 3 weeks for ~$4.50 premium. My thesis is that IV is elevated post-earnings and I want to harvest theta. I could be completely wrong — if it rips past $280 I miss out on upside. Here's my brokerage screenshot. Do your own research, this is just what I'm doing with my own money.",
+              "media": [
+                "screenshot_of_brokerage_position.png"
+              ],
+              "links": []
+            },
+            "context": {
+              "channel": "r/wallstreetbets",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": "YOLO",
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Author shares their own real position with evidence, explains their reasoning transparently, acknowledges downside risk, and explicitly declines to tell others to copy them — fully compliant with both prongs of the rule.",
+          "related_checklist_item_description": null
+        },
+        {
+          "label": "violating",
+          "content": {
+            "id": "wsb-ex-4",
+            "platform": "reddit",
+            "author": {
+              "username": "paperhands_prophet",
+              "account_age_days": 22,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "Trust me, I've paper traded options for a year — here's why SPY is going to 600 by March",
+              "body": "After a full year of paper trading options on thinkorswim with a 94% win rate, I know exactly how this market works. SPY is going to 600 by March because the Fed will cut rates three times and buybacks will accelerate. I've modeled this out perfectly. Everyone new to options should just buy ATM calls 30 days out — it's basically free money if you know what you're doing like I do. Happy to answer questions.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/wallstreetbets",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": "DD",
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Author explicitly uses a paper trading win rate as their primary credential while giving confident, directive advice to beginners — a clear violation of the paper trading and uninformed advice prongs of the rule.",
+          "related_checklist_item_description": "Does the post give confident financial advice or recommendations in an area where the author demonstrably lacks relevant knowledge or real trading experience?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "wsb-ex-5b",
+            "platform": "reddit",
+            "author": {
+              "username": "macro_guesser",
+              "account_age_days": 300,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "CPI will come in hot on Thursday — here's my read",
+              "body": "My gut says CPI is going to surprise to the upside Thursday based on the shelter and energy components. I'm not citing a specific source but this is just my read from following the data for a while. If I'm right, bonds sell off and rates spike. Buying TLT puts as a hedge. Not telling you what to do.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/wallstreetbets",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": "Macro",
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Author makes a confident macroeconomic prediction without sourcing, citing only 'gut' and vague experience — could be seen as making things up or talking about things they don't know about, but the reasoning is coherent, hedged, and they only describe their own trade rather than directing others, putting this in genuine gray area.",
+          "related_checklist_item_description": "Does the post present fabricated, unverified, or clearly made-up financial data, statistics, or claims as fact?"
+        }
+      ]
+    },
+    "science": {
+      "checklist_tree": [
+        {
+          "description": "Does the comment dispute a well-established scientific concept without providing peer-reviewed evidence?",
+          "rule_text_anchor": "Comments that dispute well-established scientific concepts (e.g. gravity, vaccination, anthropogenic climate change, etc.) must be supported with appropriate peer-reviewed evidence.",
+          "item_type": "subjective",
+          "logic": {
+            "type": "subjective",
+            "prompt_template": "Evaluate whether this comment disputes a well-established scientific concept (such as vaccine safety/efficacy, anthropogenic climate change, evolution, germ theory, gravity, the age of the universe, etc.) AND fails to support that dispute with appropriate peer-reviewed scientific evidence. A comment violates this rule if it: (1) challenges or dismisses a consensus scientific finding, AND (2) does not cite peer-reviewed research to back that challenge.",
+            "rubric": "Score HIGH (violation likely) when: (1) The comment explicitly or implicitly rejects, downplays, or casts doubt on a well-established scientific consensus (e.g. 'vaccines cause autism', 'climate change is natural', 'evolution is just a theory'); AND (2) No peer-reviewed journal articles or credible scientific sources are cited to support the challenge. Score MEDIUM when: the comment questions methodology or interpretation of a specific study without denying consensus outright, but still provides no evidence. Score LOW (not a violation) when: (1) The comment accepts or is neutral toward established science, OR (2) The comment disputes a claim but cites appropriate peer-reviewed literature. Note: links to personal blogs, YouTube videos, opinion pieces, or non-peer-reviewed sources do NOT count as sufficient evidence and should be treated as no evidence.",
+            "threshold": 0.6,
+            "examples_to_include": 5
+          },
+          "action": "continue",
+          "children": [
+            {
+              "description": "Does the comment link only to non-peer-reviewed sources (e.g. personal blogs, YouTube) rather than scientific literature?",
+              "rule_text_anchor": "Links to personal blogs or YouTube are not sufficient.",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "\\b(youtube\\.com|youtu\\.be|blogspot\\.com|wordpress\\.com|medium\\.com|substack\\.com|tumblr\\.com|rumble\\.com|bitchute\\.com|odysee\\.com)\\b",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": false
+              },
+              "action": "flag",
+              "children": [],
+              "atmosphere_influenced": false,
+              "atmosphere_note": null
+            },
+            {
+              "description": "Does the comment lack any link or citation at all when disputing established science?",
+              "rule_text_anchor": "must be supported with appropriate peer-reviewed evidence",
+              "item_type": "deterministic",
+              "logic": {
+                "type": "deterministic",
+                "patterns": [
+                  {
+                    "regex": "https?://\\S+",
+                    "case_sensitive": false
+                  }
+                ],
+                "match_mode": "any",
+                "negate": true
+              },
+              "action": "remove",
+              "children": [],
+              "atmosphere_influenced": true,
+              "atmosphere_note": "Given the community's strict evidence-mandatory tone and the high stakes of health misinformation reaching 34M+ subscribers, a complete absence of any citation when disputing consensus warrants removal rather than just flagging."
+            }
+          ],
+          "atmosphere_influenced": true,
+          "atmosphere_note": "Threshold lowered to 0.6 (from a typical 0.7) because the community's formal, evidence-mandatory atmosphere and the high misinformation stakes justify stricter enforcement of the evidence requirement."
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-sci-1",
+            "platform": "reddit",
+            "author": {
+              "username": "TruthSeeker99",
+              "account_age_days": 210,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "This study is just more propaganda. Everyone knows vaccines are linked to developmental delays and autism. The ingredients alone are toxic — aluminum, formaldehyde — these are poisons injected into children. Watch this video by Dr. Mercola where he explains the real data the CDC is hiding: https://www.youtube.com/watch?v=example123",
+              "media": [],
+              "links": [
+                "https://www.youtube.com/watch?v=example123"
+              ]
+            },
+            "context": {
+              "channel": "r/science",
+              "thread_id": "thread-vax-study",
+              "parent_post_id": "post-vax-study",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T10:00:00Z"
+          },
+          "relevance_note": "Comment dismisses vaccine safety consensus without peer-reviewed evidence and links only to a YouTube video, which explicitly fails the rule's evidentiary standard.",
+          "related_checklist_item_description": "Does the comment dispute a well-established scientific concept without providing peer-reviewed evidence?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-sci-2b",
+            "platform": "reddit",
+            "author": {
+              "username": "SkepticalReader42",
+              "account_age_days": 540,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "I think the scientific consensus on dietary saturated fat and cardiovascular disease is much weaker than this article implies. The original Keys studies had serious methodological flaws — cherry-picked countries, ignored confounders. A lot of the guidelines were built on shaky foundations. I'm not saying fat is good, just that 'settled science' here is overstated. Here's a blog post from a cardiologist that summarizes the literature: https://drfattyblog.wordpress.com/saturated-fat-myth",
+              "media": [],
+              "links": [
+                "https://drfattyblog.wordpress.com/saturated-fat-myth"
+              ]
+            },
+            "context": {
+              "channel": "r/science",
+              "thread_id": "thread-diet-study",
+              "parent_post_id": "post-diet-study",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T11:30:00Z"
+          },
+          "relevance_note": "The comment raises a methodological critique that has some legitimate scientific debate behind it (saturated fat guidelines are genuinely contested in nutrition science), but only cites a personal blog rather than peer-reviewed literature. Moderators may disagree on whether this constitutes dismissing 'well-established' consensus versus engaging in legitimate scientific skepticism of a genuinely contested area.",
+          "related_checklist_item_description": "Does the comment dispute a well-established scientific concept without providing peer-reviewed evidence?"
+        },
+        {
+          "label": "compliant",
+          "content": {
+            "id": "example-sci-3c",
+            "platform": "reddit",
+            "author": {
+              "username": "ResearcherMD",
+              "account_age_days": 1200,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "The effect size reported here seems surprisingly large compared to prior literature. For context, a 2021 meta-analysis in Nature Medicine (doi:10.1038/s41591-021-01234-5) found an effect roughly half this magnitude across a much larger cohort. It's worth considering whether this study's sample was representative. I'm not disputing the underlying mechanism — just flagging that replication will be important before drawing strong conclusions.",
+              "media": [],
+              "links": [
+                "https://doi.org/10.1038/s41591-021-01234-5"
+              ]
+            },
+            "context": {
+              "channel": "r/science",
+              "thread_id": "thread-new-study",
+              "parent_post_id": "post-new-study",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T12:00:00Z"
+          },
+          "relevance_note": "Comment critiques a specific study's methodology and cites a peer-reviewed meta-analysis to support its point. It does not dismiss scientific consensus and meets the evidentiary standard.",
+          "related_checklist_item_description": null
+        }
+      ]
+    }
+  },
+  "No NSFW / Inappropriate Content": {
+    "facepalm": {
+      "checklist_tree": [
+        {
+          "description": "Does the content contain hate speech, slurs, or explicit bigotry targeting a group?",
+          "rule_text_anchor": "Hate-speech and bigotry will result in permanent bans",
+          "item_type": "deterministic",
+          "logic": {
+            "type": "deterministic",
+            "patterns": [
+              {
+                "regex": "\\b(nigger|nigga|faggot|tranny|chink|spic|kike|wetback|raghead|retard|cunt|dyke|gook|cracker|sandnigger|zipperhead)\\b",
+                "case_sensitive": false
+              }
+            ],
+            "match_mode": "any",
+            "negate": false
+          },
+          "action": "continue",
+          "children": [
+            {
+              "description": "Is the slur or hate-speech term used in a hateful or derogatory context (vs. quoting, reporting, or criticizing the slur itself)?",
+              "rule_text_anchor": "Hate-speech and bigotry will result in permanent bans",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "A slur or hate-speech term was detected in this post or comment. Determine whether the term is being used in a genuinely hateful or derogatory manner, or whether it is being quoted, reported, or criticized (e.g. the post is calling out someone else's bigotry). Content that uses the slur to attack or demean a group should score high. Content that references the slur in order to criticize it or document it as part of a facepalm moment should score low.",
+                "rubric": "Score HIGH (violation) when: (1) The author themselves deploys the slur as an insult or attack; (2) The slur is used to demean a racial, ethnic, gender, religious, or other protected group; (3) The content promotes hatred or discrimination. Score LOW (not a violation) when: (1) The slur appears inside a screenshot or quote being mocked/criticized; (2) The author is clearly condemning the language; (3) The slur is used clinically or educationally.",
+                "threshold": 0.7,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "children": [],
+              "atmosphere_influenced": false,
+              "atmosphere_note": null
+            }
+          ],
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the content contain bigotry or hate speech that doesn't rely on explicit slurs (e.g. dehumanizing rhetoric, calls for discrimination, or stereotyping attacks on a protected group)?",
+          "rule_text_anchor": "Hate-speech and bigotry will result in permanent bans",
+          "item_type": "subjective",
+          "logic": {
+            "type": "subjective",
+            "prompt_template": "Evaluate whether this post or comment contains bigotry or hate speech that does not rely on explicit slurs. Look for dehumanizing rhetoric, calls for discrimination, or hostile stereotyping that targets people based on race, ethnicity, religion, gender, sexual orientation, disability, nationality, or other protected characteristics.",
+            "rubric": "Score HIGH (violation) when: (1) The content portrays a group as subhuman, dangerous, or inherently inferior; (2) The content calls for discriminatory treatment of a group; (3) The content promotes conspiracy theories that scapegoat a protected group; (4) The content mocks or degrades a group's identity rather than mocking a specific foolish behavior. Score LOW when the content mocks a specific individual's foolish action or statement without targeting a broader group identity.",
+            "threshold": 0.7,
+            "examples_to_include": 5
+          },
+          "action": "remove",
+          "children": [],
+          "atmosphere_influenced": true,
+          "atmosphere_note": "Threshold kept at 0.7 rather than lowered because the community's mockery-based tone means some harsh generalizations are normal; only clear group-targeted hatred should be removed to avoid over-moderating legitimate social commentary."
+        },
+        {
+          "description": "Does the content present false information as fact (misinformation or disinformation)?",
+          "rule_text_anchor": "instances of misinformation disinformation",
+          "item_type": "subjective",
+          "logic": {
+            "type": "subjective",
+            "prompt_template": "Evaluate whether this post or comment presents demonstrably false claims as factual truth (misinformation or disinformation). This includes debunked medical claims, fabricated statistics, false historical revisionism, or fabricated news presented without irony or criticism.",
+            "rubric": "Score HIGH (violation) when: (1) The author asserts as true something that is widely known to be false or debunked (e.g. vaccines cause autism, the earth is flat presented earnestly); (2) The post shares a fake news story or fabricated image as if it were real; (3) The author is spreading the false claim rather than mocking it as a facepalm moment. Score LOW when: (1) The misinformation is clearly the subject of mockery (i.e. OP is sharing it as the facepalm); (2) The author signals awareness that the claim is false.",
+            "threshold": 0.75,
+            "examples_to_include": 5
+          },
+          "action": "remove",
+          "children": [],
+          "atmosphere_influenced": true,
+          "atmosphere_note": "Threshold raised slightly to 0.75 because many legitimate facepalm posts contain misinformation as the subject being mocked; the community expects OP to be criticizing the foolishness, not spreading it, so the bar for removal is higher to protect genuine facepalm content."
+        },
+        {
+          "description": "Does the content contain a personal attack or name-calling directed at another user or an identified real person?",
+          "rule_text_anchor": "personal attacks or name calling",
+          "item_type": "subjective",
+          "logic": {
+            "type": "subjective",
+            "prompt_template": "Evaluate whether this post or comment contains a personal attack or name-calling targeting a specific individual — either another Reddit user in the thread or an identifiable real person. General mockery of behavior can be acceptable on this subreddit; the question is whether the content crosses into direct personal attacks, insults aimed at a person's inherent character, or name-calling.",
+            "rubric": "Score HIGH (violation) when: (1) The author directly insults or attacks another commenter or user; (2) The author calls an identified individual a deeply degrading name (e.g. 'idiot', 'moron', 'piece of trash') in a hostile, targeted manner rather than casual exasperation; (3) The content incites others to harass a specific person. Score LOW when: (1) The mockery is directed at the absurd behavior depicted rather than the person's identity; (2) The language is exasperated but not a targeted personal attack; (3) The subject is a public figure and the comment is critical of their public actions.",
+            "threshold": 0.72,
+            "examples_to_include": 5
+          },
+          "action": "remove",
+          "children": [],
+          "atmosphere_influenced": true,
+          "atmosphere_note": "Threshold calibrated to 0.72 (slightly permissive) because the community's mockery-based tone normalizes casual exasperation and mild name-calling as part of reacting to facepalm content; only targeted hostile attacks should trigger removal."
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-bigotry-1",
+            "platform": "reddit",
+            "author": {
+              "username": "throwaway_ranter",
+              "account_age_days": 14,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "Can't believe people still think like this",
+              "body": "Honestly all [ethnic slur]s are the same, they're just born criminals. This is why nothing ever changes. Facepalm at society for tolerating this.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/facepalm",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Author uses a racial slur and attributes criminality to an entire ethnic group — clear hate speech and bigotry deployed by the author rather than being mocked as a facepalm subject.",
+          "related_checklist_item_description": "Does the content contain hate speech, slurs, or explicit bigotry targeting a group?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-bigotry-2b",
+            "platform": "reddit",
+            "author": {
+              "username": "frustrated_observer",
+              "account_age_days": 300,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "This guy actually said this out loud",
+              "body": "[Screenshot of a Facebook post where a commenter uses a racial slur while arguing about immigration policy] Absolute facepalm, I can't believe people like this exist.",
+              "media": [
+                "screenshot_facebook.jpg"
+              ],
+              "links": []
+            },
+            "context": {
+              "channel": "r/facepalm",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "link",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "The slur appears in a screenshot being mocked as a facepalm moment — OP is criticizing the bigotry, not endorsing it — but the slur is still visible in the post. Moderators may disagree on whether amplifying the content constitutes a violation.",
+          "related_checklist_item_description": "Is the slur or hate-speech term used in a hateful or derogatory context (vs. quoting, reporting, or criticizing the slur itself)?"
+        },
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-misinfo-1",
+            "platform": "reddit",
+            "author": {
+              "username": "truthseeker99",
+              "account_age_days": 120,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "People need to wake up",
+              "body": "The COVID vaccines have been proven to alter your DNA and have already killed over 500,000 people in the US. The government is hiding this. Share this before it gets deleted. This is not a facepalm, this is reality.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/facepalm",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Author earnestly spreads debunked vaccine misinformation and explicitly signals they are not sharing it as a facepalm — they are propagating the false claim as truth.",
+          "related_checklist_item_description": "Does the content present false information as fact (misinformation or disinformation)?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-misinfo-2b",
+            "platform": "reddit",
+            "author": {
+              "username": "redditor_x",
+              "account_age_days": 600,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "Found this on my uncle's Facebook",
+              "body": "[Screenshot of a post claiming 5G towers spread COVID-19, with dozens of supportive comments] The fact that this has 2,000 likes is the facepalm.",
+              "media": [
+                "uncle_facebook_screenshot.jpg"
+              ],
+              "links": []
+            },
+            "context": {
+              "channel": "r/facepalm",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "link",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "The misinformation is the subject being mocked, which is on-topic for r/facepalm, but sharing the screenshot also amplifies the false claim to millions of subscribers — moderators may disagree on whether this crosses the line.",
+          "related_checklist_item_description": "Does the content present false information as fact (misinformation or disinformation)?"
+        },
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-attack-1",
+            "platform": "reddit",
+            "author": {
+              "username": "angrycommenter",
+              "account_age_days": 45,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "You are genuinely the dumbest piece of garbage I've ever seen on this site. Go back to whatever rock you crawled out from under, you absolute waste of oxygen. I hope you get banned permanently.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/facepalm",
+              "thread_id": "abc123",
+              "parent_post_id": "comment_xyz",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Direct personal attack on another community member with hostile name-calling ('dumbest piece of garbage', 'waste of oxygen') — clearly targeting a specific user rather than reacting to content.",
+          "related_checklist_item_description": "Does the content contain a personal attack or name-calling directed at another user or an identified real person?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-attack-2b",
+            "platform": "reddit",
+            "author": {
+              "username": "casual_mocker",
+              "account_age_days": 220,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": null,
+              "body": "What an idiot. I genuinely cannot understand how someone can be this stupid and still function in society. Peak facepalm content right here.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/facepalm",
+              "thread_id": "def456",
+              "parent_post_id": "post_abc",
+              "post_type": "comment",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Comment calls the subject of a facepalm post an 'idiot' and 'stupid' — this is typical community behavior (reacting with exasperation to foolishness) but could also be considered name-calling depending on how strictly the rule is enforced.",
+          "related_checklist_item_description": "Does the content contain a personal attack or name-calling directed at another user or an identified real person?"
+        },
+        {
+          "label": "compliant",
+          "content": {
+            "id": "example-compliant-1",
+            "platform": "reddit",
+            "author": {
+              "username": "everydayuser",
+              "account_age_days": 730,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "My neighbor genuinely thinks the moon is a giant lamp put there by the government",
+              "body": "[Photo of a handwritten note from a neighbor explaining their moon conspiracy theory in detail] I don't even know how to respond to this. The facepalm is real.",
+              "media": [
+                "neighbor_note.jpg"
+              ],
+              "links": []
+            },
+            "context": {
+              "channel": "r/facepalm",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "link",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Classic on-topic facepalm content mocking an absurd belief — no hate speech, no misinformation spread by OP, no personal attacks on other users, and no targeted harassment of an identifiable individual.",
+          "related_checklist_item_description": null
+        }
+      ]
+    },
+    "mentalhealth": {
+      "checklist_tree": [
+        {
+          "description": "Does the post or comment contain explicit NSFW content unsuitable for users aged 13+?",
+          "rule_text_anchor": "posts and comments on r/mentalhealth are reasonably appropriate for anyone 13 or older",
+          "item_type": "deterministic",
+          "logic": {
+            "type": "deterministic",
+            "patterns": [
+              {
+                "regex": "\\b(porn|pornography|nude|nudity|explicit sex|nsfw|18\\+|onlyfans|masturbat|genitals?|penis|vagina|cum\\b|orgasm|erotic|hentai|xxx)\\b",
+                "case_sensitive": false
+              }
+            ],
+            "match_mode": "any",
+            "negate": false
+          },
+          "action": "continue",
+          "children": [
+            {
+              "description": "Does the explicit content serve no legitimate mental health discussion purpose and is gratuitous or sexualized?",
+              "rule_text_anchor": "posts and comments on r/mentalhealth are reasonably appropriate for anyone 13 or older",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post or comment contains explicit sexual or NSFW content that is gratuitous and serves no legitimate mental health discussion purpose. Does it include sexualized language, imagery descriptions, or adult content inappropriate for a general audience including minors?",
+                "rubric": "Score higher (more likely to violate) when: (1) The content includes graphic sexual descriptions or language with no therapeutic or informational framing; (2) The content appears designed to titillate rather than support or inform; (3) The content would be inappropriate in a clinical or peer-support mental health setting for a general audience. Score lower when sexual content is mentioned only incidentally in a mental health context (e.g. discussing trauma, sexual abuse recovery, or intimacy concerns in a clinical, non-graphic way).",
+                "threshold": 0.65,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "children": [],
+              "atmosphere_influenced": false,
+              "atmosphere_note": null
+            }
+          ],
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        },
+        {
+          "description": "Does the post or comment provide excessive graphic detail about violence, abuse, or self-harm?",
+          "rule_text_anchor": "provide too much detail about things like violence, abuse, or self-harm",
+          "item_type": "deterministic",
+          "logic": {
+            "type": "deterministic",
+            "patterns": [
+              {
+                "regex": "\\b(cut(ting)? myself|slit(ting)?\\s+(my\\s+)?wrists?|blade|razor\\s+blade|burn(ing)?\\s+myself|self[- ]harm(ing)?|overdos(e|ing)|hanging|noose|suicide\\s+method|how\\s+to\\s+(kill|hurt|harm)\\s+(myself|yourself)|blood\\s+(everywhere|dripping|gushing)|stab(bing)?|gore|mutilat(e|ion|ing))\\b",
+                "case_sensitive": false
+              }
+            ],
+            "match_mode": "any",
+            "negate": false
+          },
+          "action": "continue",
+          "children": [
+            {
+              "description": "Does the matched content go beyond brief mention and provide gratuitous, instructional, or triggering graphic detail about the method, act, or imagery of violence, abuse, or self-harm?",
+              "rule_text_anchor": "provide too much detail about things like violence, abuse, or self-harm",
+              "item_type": "subjective",
+              "logic": {
+                "type": "subjective",
+                "prompt_template": "Evaluate whether this post or comment provides excessive or gratuitous graphic detail about violence, abuse, or self-harm. The post may legitimately mention these topics in a peer-support or recovery context — the key question is whether it crosses into graphic description, step-by-step method sharing, or vivid imagery that could traumatize or trigger vulnerable readers, or that could function as instruction.",
+                "rubric": "Score higher (more likely to violate) when: (1) The content describes specific methods, tools, or steps for self-harm, suicide, or violence in detail; (2) The content includes graphic, visceral descriptions of physical injury, blood, or pain that go well beyond what is needed to seek or offer support; (3) The content could reasonably function as a 'how-to' or trigger detailed ideation in vulnerable readers; (4) The level of detail is gratuitous rather than incidental to a support-seeking or recovery narrative. Score lower when: the topic is mentioned in passing, in a clinical framing, or as part of a clearly supportive, recovery-focused, or help-seeking narrative without graphic elaboration.",
+                "threshold": 0.6,
+                "examples_to_include": 5
+              },
+              "action": "remove",
+              "children": [],
+              "atmosphere_influenced": true,
+              "atmosphere_note": "Threshold lowered to 0.6 because the community serves a vulnerable, crisis-prone population where even moderately graphic detail poses serious triggering risk; the community's stakes around suicide risk and triggering content warrant stricter calibration than a general forum."
+            }
+          ],
+          "atmosphere_influenced": false,
+          "atmosphere_note": null
+        }
+      ],
+      "examples": [
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-mh-v1",
+            "platform": "reddit",
+            "author": {
+              "username": "throwaway_pain99",
+              "account_age_days": 14,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "I did it again last night",
+              "body": "I couldn't stop myself. I used a razor blade and went deep on my thigh — like 2 inches, had to press a towel on it for an hour because the blood wouldn't stop. I've been doing this for months and I know exactly where to cut so it doesn't show. Here's what I've learned about which spots bleed the most vs least...",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Provides highly specific, graphic, and instructional detail about self-harm methods, locations, and blood loss — well beyond what is needed for peer support and potentially functioning as a how-to for vulnerable readers.",
+          "related_checklist_item_description": "Does the post or comment provide excessive graphic detail about violence, abuse, or self-harm?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-mh-b1",
+            "platform": "reddit",
+            "author": {
+              "username": "recoveryjourney_22",
+              "account_age_days": 210,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "3 years clean from self-harm — here's what my recovery looked like",
+              "body": "Three years ago I was cutting myself almost every day. The scars on my arms are still there and I won't pretend it wasn't bad — there was a lot of blood and a lot of hiding it from my family. But I found a therapist who specialised in DBT and slowly things got better. I want to share my story so others know recovery is possible.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Clearly recovery-focused and supportive in intent, but includes references to cutting, blood, and daily self-harm that could trigger vulnerable readers. Reasonable moderators may disagree on whether the brief graphic references constitute 'too much detail' given the otherwise constructive framing.",
+          "related_checklist_item_description": "Does the matched content go beyond brief mention and provide gratuitous, instructional, or triggering graphic detail about the method, act, or imagery of violence, abuse, or self-harm?"
+        },
+        {
+          "label": "violating",
+          "content": {
+            "id": "example-mh-v2",
+            "platform": "reddit",
+            "author": {
+              "username": "anon_user_xyz",
+              "account_age_days": 3,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "Feeling disconnected from my body",
+              "body": "Does anyone else struggle with intimacy? I've been watching a lot of porn lately — like hardcore stuff — and now real connection feels impossible. I keep thinking about explicit scenes and it's messing with my relationships.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "While framed around a mental health concern (dissociation, intimacy issues), the explicit reference to 'hardcore' pornography and sexual content is inappropriate for a 13+ audience and constitutes NSFW content under the rule.",
+          "related_checklist_item_description": "Does the post or comment contain explicit NSFW content unsuitable for users aged 13+?"
+        },
+        {
+          "label": "borderline",
+          "content": {
+            "id": "example-mh-b2",
+            "platform": "reddit",
+            "author": {
+              "username": "survivor_speaking",
+              "account_age_days": 450,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "Sharing my experience with childhood sexual abuse and how it affected my mental health",
+              "body": "This is hard to write. I was abused as a child and I've spent years in therapy trying to process it. The abuse involved inappropriate touching and escalated over time. I'm not going to go into full detail but I want people who've been through similar things to know they're not alone. It's taken me so long to even be able to type those words.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Discusses childhood sexual abuse in a recovery and support context with minimal graphic detail, but the subject matter involves sexual abuse of a minor which some moderators may flag as inappropriate for a 13+ audience even when not explicitly described.",
+          "related_checklist_item_description": "Does the explicit content serve no legitimate mental health discussion purpose and is gratuitous or sexualized?"
+        },
+        {
+          "label": "compliant",
+          "content": {
+            "id": "example-mh-c1",
+            "platform": "reddit",
+            "author": {
+              "username": "quietstruggler",
+              "account_age_days": 120,
+              "platform_metadata": {}
+            },
+            "content": {
+              "title": "Having a really dark day — does anyone have coping strategies?",
+              "body": "I've been struggling a lot lately with dark thoughts and just feeling like I can't go on. I don't want to act on anything, I just feel really low and would appreciate any advice or just someone to talk to. Things that have helped me before: journaling, going for walks, calling a friend. But today nothing is working.",
+              "media": [],
+              "links": []
+            },
+            "context": {
+              "channel": "r/mentalhealth",
+              "thread_id": null,
+              "parent_post_id": null,
+              "post_type": "self",
+              "flair": null,
+              "platform_metadata": {}
+            },
+            "timestamp": "2026-01-01T00:00:00Z"
+          },
+          "relevance_note": "Expresses emotional distress and mentions dark thoughts without providing any graphic detail about violence, self-harm, or NSFW content. Appropriate peer-support post entirely within the spirit of the community and the rule.",
+          "related_checklist_item_description": null
+        }
+      ]
+    }
+  }
+}

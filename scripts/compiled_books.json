@@ -1,0 +1,1243 @@
+[
+  {
+    "subreddit": "books",
+    "title": "Discussion is the goal",
+    "description": "Do not post shallow content. All posts must be directly book related, informative, and discussion focused.",
+    "rule_text": "Discussion is the goal\n\nDo not post shallow content. All posts must be directly book related, informative, and discussion focused.",
+    "triage": {
+      "rule_type": "actionable",
+      "reasoning": "This rule sets clear content standards that can be evaluated against a specific post \u2014 it must be book-related, informative, and discussion-focused, and must not be shallow \u2014 allowing a moderator to judge whether any given post is in violation."
+    },
+    "checklist": [
+      {
+        "id": null,
+        "description": "Is the post not directly related to books?",
+        "rule_text_anchor": "All posts must be directly book related",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post is directly related to books. Does the post center on a book, author, reading experience, literary topic, or book culture? Or does it use books only as a superficial hook while actually being about something else (e.g. a personal life event, a movie, a meme format, a non-literary topic)?",
+          "rubric": "Score higher (more likely to violate) when: (1) The post's primary subject is not a book, author, or literary topic; (2) A book is mentioned only incidentally or as a thin pretext; (3) The post is about a film, TV show, or other adaptation without substantive connection back to the source book. Score lower when the post is clearly and centrally about reading, a specific book or series, an author, publishing, or literary discussion.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "remove",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Is the post not directly related to books?",
+        "rule_text_anchor": "All posts must be directly book related",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post is directly related to books. Does the post center on a book, author, reading experience, literary topic, or book culture? Or does it use books only as a superficial hook while actually being about something else (e.g. a personal life event, a movie, a meme format, a non-literary topic)?",
+          "rubric": "Score higher (more likely to violate) when: (1) The post's primary subject is not a book, author, or literary topic; (2) A book is mentioned only incidentally or as a thin pretext; (3) The post is about a film, TV show, or other adaptation without substantive connection back to the source book. Score lower when the post is clearly and centrally about reading, a specific book or series, an author, publishing, or literary discussion.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "remove",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      }
+    ],
+    "examples": [
+      {
+        "label": "violating",
+        "content": {
+          "id": "example-books-v1",
+          "platform": "reddit",
+          "author": {
+            "username": "quickposter99",
+            "account_age_days": 45,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Just finished a book and it made me cry \ud83d\ude2d",
+            "body": "That's it. That's the post.",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Extremely shallow post with no book title, no informative content, and nothing to spark discussion \u2014 a textbook example of low-effort content.",
+        "related_checklist_item_description": "Is the post shallow, lacking informative or discussion-focused content?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "example-books-b1",
+          "platform": "reddit",
+          "author": {
+            "username": "avid_reader_42",
+            "account_age_days": 210,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Cormac McCarthy's prose style is genuinely unlike anything else",
+            "body": "No punctuation, brutal sentences, almost biblical in rhythm. Anyone else find it impossible to read anything else after a McCarthy novel?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Book-related and names a specific author with a brief observation, but the body is quite short and the 'discussion question' at the end is more of a vibe check than a substantive prompt \u2014 moderators could reasonably disagree on whether this clears the depth bar.",
+        "related_checklist_item_description": "Is the post shallow, lacking informative or discussion-focused content?"
+      },
+      {
+        "label": "violating",
+        "content": {
+          "id": "example-books-v2",
+          "platform": "reddit",
+          "author": {
+            "username": "moviebuff_dan",
+            "account_age_days": 88,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Dune Part Two was absolutely incredible \u2014 best sci-fi film in years",
+            "body": "Villeneuve really nailed the visuals and the cast was perfect. The sandworm scenes were breathtaking. Zendaya was amazing. Highly recommend if you haven't seen it yet.",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Post is entirely about the film adaptation with no reference to the source novel or any literary discussion \u2014 not directly book related.",
+        "related_checklist_item_description": "Is the post not directly related to books?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "example-books-b2",
+          "platform": "reddit",
+          "author": {
+            "username": "scifi_fan_77",
+            "account_age_days": 310,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "The Dune Part Two film made me appreciate Herbert's worldbuilding even more",
+            "body": "Watching the movie and then going back to re-read the Dune novel back to back made me notice how much religious and political subtext Villeneuve had to compress or cut. The Bene Gesserit's long game feels so much richer on the page. Anyone else go back to the book after watching?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Uses the film as a jumping-off point but genuinely engages with the source novel's themes and invites literary discussion \u2014 some moderators may see it as film-adjacent while others see it as clearly book-focused.",
+        "related_checklist_item_description": "Is the post not directly related to books?"
+      },
+      {
+        "label": "compliant",
+        "content": {
+          "id": "example-books-c1",
+          "platform": "reddit",
+          "author": {
+            "username": "literary_thinker",
+            "account_age_days": 520,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "How does Dostoevsky use the 'double' motif across his novels to explore identity?",
+            "body": "I've been working through Dostoevsky's major works this year and I keep noticing how the concept of the 'double' \u2014 a character who mirrors or distorts the protagonist \u2014 recurs in different forms. In 'The Double' it's literal, in 'The Brothers Karamazov' it's split across siblings, and in 'Crime and Punishment' Svidrigailov functions as Raskolnikov's dark reflection. I'm curious whether others see this as a coherent philosophical thread about selfhood and moral responsibility, or whether it's more stylistic than thematic. What other authors do you think engage with this motif as effectively?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Directly book-related, substantively informative, and poses a genuine literary discussion question with clear context and analysis \u2014 fully compliant.",
+        "related_checklist_item_description": null
+      }
+    ]
+  },
+  {
+    "subreddit": "books",
+    "title": "Personal conduct",
+    "description": "Please use a civil tone and assume good faith when entering a conversation.",
+    "rule_text": "Personal conduct\n\nPlease use a civil tone and assume good faith when entering a conversation.",
+    "triage": {
+      "rule_type": "actionable",
+      "reasoning": "This rule sets a clear content standard for how users must behave in posts and comments (civil tone, good faith), which can be evaluated against specific interactions to determine if a violation has occurred."
+    },
+    "checklist": [
+      {
+        "id": null,
+        "description": "Does the post or comment use uncivil, hostile, or bad-faith language toward other users?",
+        "rule_text_anchor": "Please use a civil tone and assume good faith when entering a conversation.",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post or comment violates civility standards or assumes bad faith. Does it attack, demean, or disrespect another user, or does it assume malicious or dishonest intent on their part rather than engaging charitably with their point?",
+          "rubric": "Score higher (more likely to violate) when: (1) The post or comment uses insults, slurs, or personal attacks directed at another user; (2) The post or comment is dismissive, condescending, or mocking toward another user's perspective; (3) The post or comment explicitly or implicitly accuses another user of bad faith, lying, or trolling without clear evidence; (4) The tone is aggressive, threatening, or inflammatory rather than constructive. Score lower when disagreement is expressed firmly but respectfully, or when frustration is directed at a book/idea rather than a person.",
+          "threshold": 0.65,
+          "examples_to_include": 5
+        },
+        "action": "flag",
+        "atmosphere_influenced": true,
+        "atmosphere_note": "The r/books community context emphasizes discussion and original thought, so the rubric is calibrated to flag even subtly condescending tones that would chill good-faith literary conversation, not just overt insults.",
+        "children": []
+      }
+    ],
+    "examples": [
+      {
+        "label": "violating",
+        "content": {
+          "id": "example-conduct-1",
+          "platform": "reddit",
+          "author": {
+            "username": "angryredditor99",
+            "account_age_days": 210,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": null,
+            "body": "You clearly haven't actually read the book if you think the ending was satisfying. This is such a brainless take. People like you are why literary discourse is dead.",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": "abc123",
+            "parent_post_id": "xyz789",
+            "post_type": "comment",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T10:00:00Z"
+        },
+        "relevance_note": "Directly insults the other user's intelligence ('brainless take'), questions their honesty ('clearly haven't actually read'), and attacks them personally rather than engaging with their argument.",
+        "related_checklist_item_description": "Does the post or comment use uncivil, hostile, or bad-faith language toward other users?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "example-conduct-2",
+          "platform": "reddit",
+          "author": {
+            "username": "bookworm_critic",
+            "account_age_days": 540,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": null,
+            "body": "I honestly can't tell if you've read the same book or if you're just saying this to be contrarian. The themes you're describing are not in the text at all \u2014 I'm not sure how you're arriving at this interpretation.",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": "abc123",
+            "parent_post_id": "xyz789",
+            "post_type": "comment",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T11:00:00Z"
+        },
+        "relevance_note": "The comment stops short of an outright insult but implies the other user may be acting in bad faith ('just saying this to be contrarian') \u2014 moderators may disagree on whether this crosses the line into incivility or is simply pointed disagreement.",
+        "related_checklist_item_description": "Does the post or comment use uncivil, hostile, or bad-faith language toward other users?"
+      },
+      {
+        "label": "compliant",
+        "content": {
+          "id": "example-conduct-3",
+          "platform": "reddit",
+          "author": {
+            "username": "thoughtfulreader",
+            "account_age_days": 730,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": null,
+            "body": "I see where you're coming from, but I'd push back a little \u2014 I think the ending actually fits the thematic arc really well. The ambiguity felt intentional to me rather than unresolved. What made it feel unsatisfying for you?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": "abc123",
+            "parent_post_id": "xyz789",
+            "post_type": "comment",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T12:00:00Z"
+        },
+        "relevance_note": "Disagrees with the other user's view but does so respectfully, acknowledges their perspective, and invites further discussion \u2014 a model of civil, good-faith engagement.",
+        "related_checklist_item_description": null
+      }
+    ]
+  },
+  {
+    "subreddit": "books",
+    "title": "Prohibited",
+    "description": "Self-promotion and promotional posts, comments & flairs, memes, image-only, video-only, personal recommendation requests, 'what's that book' and 'should I read?' requests, sales links, piracy, plagiarism, low quality book lists, spoilers without warning, sensationalist headlines. Please see extended rules for appropriate subreddits or use the multireddit buttons.",
+    "rule_text": "Prohibited\n\nSelf-promotion and promotional posts, comments & flairs, memes, image-only, video-only, personal recommendation requests, 'what's that book' and 'should I read?' requests, sales links, piracy, plagiarism, low quality book lists, spoilers without warning, sensationalist headlines. Please see extended rules for appropriate subreddits or use the multireddit buttons.",
+    "triage": {
+      "rule_type": "actionable",
+      "reasoning": "This rule explicitly lists prohibited content types (e.g., self-promotion, memes, piracy, spoilers without warning) that can be directly evaluated against any specific post or comment to determine a violation."
+    },
+    "checklist": [
+      {
+        "id": null,
+        "description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?",
+        "rule_text_anchor": "sensationalist headlines",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post uses a sensationalist or clickbait headline. Does the title exaggerate, mislead, or use manipulative framing designed to provoke an emotional reaction rather than accurately represent the content of the post?",
+          "rubric": "Score higher (more likely to violate) when: (1) The title uses hyperbolic language such as 'SHOCKING', 'You won't believe', 'This DESTROYED me', 'The most important book ever written' without substantiation (2) The title makes a provocative or extreme claim that the body does not support (3) The headline is designed to bait clicks or outrage rather than invite genuine discussion (4) The title misrepresents the content of the linked article or post. Score lower when the enthusiasm in the title is matched by substantive discussion in the body, or when strong language is clearly personal and subjective rather than designed to manipulate.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?",
+        "rule_text_anchor": "sensationalist headlines",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post uses a sensationalist or clickbait headline. Does the title exaggerate, mislead, or use manipulative framing designed to provoke an emotional reaction rather than accurately represent the content of the post?",
+          "rubric": "Score higher (more likely to violate) when: (1) The title uses hyperbolic language such as 'SHOCKING', 'You won't believe', 'This DESTROYED me', 'The most important book ever written' without substantiation (2) The title makes a provocative or extreme claim that the body does not support (3) The headline is designed to bait clicks or outrage rather than invite genuine discussion (4) The title misrepresents the content of the linked article or post. Score lower when the enthusiasm in the title is matched by substantive discussion in the body, or when strong language is clearly personal and subjective rather than designed to manipulate.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?",
+        "rule_text_anchor": "sensationalist headlines",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post uses a sensationalist or clickbait headline. Does the title exaggerate, mislead, or use manipulative framing designed to provoke an emotional reaction rather than accurately represent the content of the post?",
+          "rubric": "Score higher (more likely to violate) when: (1) The title uses hyperbolic language such as 'SHOCKING', 'You won't believe', 'This DESTROYED me', 'The most important book ever written' without substantiation (2) The title makes a provocative or extreme claim that the body does not support (3) The headline is designed to bait clicks or outrage rather than invite genuine discussion (4) The title misrepresents the content of the linked article or post. Score lower when the enthusiasm in the title is matched by substantive discussion in the body, or when strong language is clearly personal and subjective rather than designed to manipulate.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?",
+        "rule_text_anchor": "sensationalist headlines",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post uses a sensationalist or clickbait headline. Does the title exaggerate, mislead, or use manipulative framing designed to provoke an emotional reaction rather than accurately represent the content of the post?",
+          "rubric": "Score higher (more likely to violate) when: (1) The title uses hyperbolic language such as 'SHOCKING', 'You won't believe', 'This DESTROYED me', 'The most important book ever written' without substantiation (2) The title makes a provocative or extreme claim that the body does not support (3) The headline is designed to bait clicks or outrage rather than invite genuine discussion (4) The title misrepresents the content of the linked article or post. Score lower when the enthusiasm in the title is matched by substantive discussion in the body, or when strong language is clearly personal and subjective rather than designed to manipulate.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?",
+        "rule_text_anchor": "sensationalist headlines",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post uses a sensationalist or clickbait headline. Does the title exaggerate, mislead, or use manipulative framing designed to provoke an emotional reaction rather than accurately represent the content of the post?",
+          "rubric": "Score higher (more likely to violate) when: (1) The title uses hyperbolic language such as 'SHOCKING', 'You won't believe', 'This DESTROYED me', 'The most important book ever written' without substantiation (2) The title makes a provocative or extreme claim that the body does not support (3) The headline is designed to bait clicks or outrage rather than invite genuine discussion (4) The title misrepresents the content of the linked article or post. Score lower when the enthusiasm in the title is matched by substantive discussion in the body, or when strong language is clearly personal and subjective rather than designed to manipulate.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?",
+        "rule_text_anchor": "sensationalist headlines",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post uses a sensationalist or clickbait headline. Does the title exaggerate, mislead, or use manipulative framing designed to provoke an emotional reaction rather than accurately represent the content of the post?",
+          "rubric": "Score higher (more likely to violate) when: (1) The title uses hyperbolic language such as 'SHOCKING', 'You won't believe', 'This DESTROYED me', 'The most important book ever written' without substantiation (2) The title makes a provocative or extreme claim that the body does not support (3) The headline is designed to bait clicks or outrage rather than invite genuine discussion (4) The title misrepresents the content of the linked article or post. Score lower when the enthusiasm in the title is matched by substantive discussion in the body, or when strong language is clearly personal and subjective rather than designed to manipulate.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?",
+        "rule_text_anchor": "sensationalist headlines",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post uses a sensationalist or clickbait headline. Does the title exaggerate, mislead, or use manipulative framing designed to provoke an emotional reaction rather than accurately represent the content of the post?",
+          "rubric": "Score higher (more likely to violate) when: (1) The title uses hyperbolic language such as 'SHOCKING', 'You won't believe', 'This DESTROYED me', 'The most important book ever written' without substantiation (2) The title makes a provocative or extreme claim that the body does not support (3) The headline is designed to bait clicks or outrage rather than invite genuine discussion (4) The title misrepresents the content of the linked article or post. Score lower when the enthusiasm in the title is matched by substantive discussion in the body, or when strong language is clearly personal and subjective rather than designed to manipulate.",
+          "threshold": 0.7,
+          "examples_to_include": 5
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      }
+    ],
+    "examples": [
+      {
+        "label": "violating",
+        "content": {
+          "id": "ex-promo-1",
+          "platform": "reddit",
+          "author": {
+            "username": "authorjane2024",
+            "account_age_days": 12,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "I just published my debut novel \u2014 check it out on Amazon!",
+            "body": "Hey r/books! After years of work, my debut fantasy novel is finally out. You can grab it on Amazon here: amzn.to/xyz123. Use code REDDIT10 for a discount. Would love your support!",
+            "media": [],
+            "links": [
+              "https://amzn.to/xyz123"
+            ]
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Direct self-promotion of the author's own book with a sales link and discount code \u2014 a clear violation of the self-promotion and sales links prohibition.",
+        "related_checklist_item_description": "Does the post primarily serve to promote the author's own work, brand, or product rather than contribute genuine book discussion?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "ex-promo-2b",
+          "platform": "reddit",
+          "author": {
+            "username": "writingblogger",
+            "account_age_days": 310,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "I analyzed the narrative structure of every Booker Prize winner since 2000 \u2014 here's what I found",
+            "body": "I spent three months reading and charting every Booker Prize winner since 2000. Full analysis below. I also wrote a longer version on my blog [link] if you want the detailed charts, but everything essential is in this post.",
+            "media": [],
+            "links": [
+              "https://writingblogger.com/booker-analysis"
+            ]
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Substantive book analysis that adds genuine value, but includes a link to the author's own blog \u2014 moderators might disagree on whether the blog link tips it into self-promotion.",
+        "related_checklist_item_description": "Does the post primarily serve to promote the author's own work, brand, or product rather than contribute genuine book discussion?"
+      },
+      {
+        "label": "violating",
+        "content": {
+          "id": "ex-meme-1",
+          "platform": "reddit",
+          "author": {
+            "username": "bookhumor99",
+            "account_age_days": 45,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Me at 2am vs me at 6am after finishing a book",
+            "body": "",
+            "media": [
+              "image: two-panel reaction meme showing a person awake vs exhausted"
+            ],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "image",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Classic meme format with no written discussion \u2014 image-only and meme content is explicitly prohibited.",
+        "related_checklist_item_description": "Is the post a meme, image-only, or video-only submission with no substantive book-related text discussion?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "ex-meme-2b",
+          "platform": "reddit",
+          "author": {
+            "username": "readerlife",
+            "account_age_days": 200,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "My reading nook setup \u2014 does anyone else find that environment affects how much you enjoy a book?",
+            "body": "I've noticed I get much more absorbed in literary fiction when I read in a quiet, cozy space versus on a commute. Curious if others have found this. Here's my setup for reference.",
+            "media": [
+              "image: photo of a cozy reading chair with bookshelves"
+            ],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Includes an image and raises a discussion question about reading experience \u2014 moderators might disagree on whether the image element makes this image-driven rather than discussion-driven.",
+        "related_checklist_item_description": "Is the post a meme, image-only, or video-only submission with no substantive book-related text discussion?"
+      },
+      {
+        "label": "violating",
+        "content": {
+          "id": "ex-rec-1",
+          "platform": "reddit",
+          "author": {
+            "username": "newreader22",
+            "account_age_days": 60,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Looking for book recommendations similar to The Night Circus",
+            "body": "I absolutely loved The Night Circus by Erin Morgenstern \u2014 the magical atmosphere and romance were perfect. Can anyone recommend books with a similar vibe? I like slow-burn romance and lush description. Thanks!",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "A direct personal recommendation request based on individual taste \u2014 explicitly prohibited by the rule.",
+        "related_checklist_item_description": "Is the primary purpose of the post to solicit personal book recommendations, identify an unknown book, or ask whether a specific book is worth reading?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "ex-rec-2b",
+          "platform": "reddit",
+          "author": {
+            "username": "litficfan",
+            "account_age_days": 150,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "What books do you think best capture the feeling of dread without relying on horror tropes?",
+            "body": "I've been thinking about how literary fiction sometimes creates a more unsettling atmosphere than horror. Books like Kazuo Ishiguro's Never Let Me Go come to mind. What do others think captures this best?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Framed as a discussion question about a literary theme, but effectively invites book recommendations \u2014 moderators might disagree on whether this is genuine discussion or a veiled recommendation request.",
+        "related_checklist_item_description": "Is the primary purpose of the post to solicit personal book recommendations, identify an unknown book, or ask whether a specific book is worth reading?"
+      },
+      {
+        "label": "violating",
+        "content": {
+          "id": "ex-piracy-1",
+          "platform": "reddit",
+          "author": {
+            "username": "frugalreader",
+            "account_age_days": 30,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Where to find free ebook downloads?",
+            "body": "Does anyone know good sites for free epub downloads? I've been using libgen but it's been down lately. Any alternatives?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Explicitly references libgen and asks for piracy alternatives \u2014 a clear violation of the piracy prohibition.",
+        "related_checklist_item_description": "Does the post contain piracy links, plagiarised content, or links to illegal book downloads?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "ex-piracy-2b",
+          "platform": "reddit",
+          "author": {
+            "username": "openaccess_fan",
+            "account_age_days": 400,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Discussion: Should out-of-print books be freely available online?",
+            "body": "Many important books are simply unavailable to buy and are sitting inaccessible in publisher vaults. I think there's a genuine ethical argument for sharing them. What does r/books think about the ethics of accessing out-of-print works online?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Discusses the ethics of piracy without providing links \u2014 could be seen as advocating for piracy or as a legitimate ethical discussion depending on interpretation.",
+        "related_checklist_item_description": "Does the post contain piracy links, plagiarised content, or links to illegal book downloads?"
+      },
+      {
+        "label": "violating",
+        "content": {
+          "id": "ex-list-1",
+          "platform": "reddit",
+          "author": {
+            "username": "listmaker",
+            "account_age_days": 25,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Top 50 Books Everyone Should Read",
+            "body": "1. To Kill a Mockingbird\n2. 1984\n3. The Great Gatsby\n4. Brave New World\n5. The Catcher in the Rye\n...[45 more titles]",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "A bare list of 50 book titles with zero commentary, context, or discussion \u2014 a textbook low-quality book list.",
+        "related_checklist_item_description": "Is the post a low-quality book list with little to no discussion, context, or original commentary?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "ex-list-2b",
+          "platform": "reddit",
+          "author": {
+            "username": "yearsreader",
+            "account_age_days": 500,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Every book I read in 2024 \u2014 52 books, one sentence each",
+            "body": "1. Middlemarch \u2014 Eliot's prose is dense but the payoff is immense.\n2. All Quiet on the Western Front \u2014 Brutal and necessary.\n3. Piranesi \u2014 Genuinely unlike anything I've read.\n...[49 more entries, each with a one-sentence reaction]",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "A year-in-review list with minimal one-sentence reactions per book \u2014 some moderators might accept this as a valid personal reflection while others find the commentary too thin to escape the low-quality list rule.",
+        "related_checklist_item_description": "Is the post a low-quality book list with little to no discussion, context, or original commentary?"
+      },
+      {
+        "label": "violating",
+        "content": {
+          "id": "ex-spoiler-1",
+          "platform": "reddit",
+          "author": {
+            "username": "spoileruser",
+            "account_age_days": 80,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "I can't believe Dumbledore dies at the end of Half-Blood Prince \u2014 did anyone else cry?",
+            "body": "Just finished the book. Snape kills Dumbledore and I'm devastated. Wasn't expecting it at all.",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Major plot spoiler revealed directly in the post title with no warning \u2014 a clear violation of the spoilers without warning rule.",
+        "related_checklist_item_description": "Does the post contain an untagged spoiler in the title, or an unwarned spoiler in the body/comment?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "ex-spoiler-2b",
+          "platform": "reddit",
+          "author": {
+            "username": "bookreader55",
+            "account_age_days": 220,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "The ending of Crime and Punishment \u2014 does Raskolnikov deserve redemption?",
+            "body": "I just finished Crime and Punishment and want to discuss the ending. [Spoiler in body] Raskolnikov confesses and is sent to Siberia, where he begins to find spiritual redemption. Do you think Dostoevsky earns this conclusion?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "The title signals the ending is discussed and the body includes an informal spoiler label, but there is no formal spoiler tag \u2014 moderators might disagree on whether the informal warning is sufficient.",
+        "related_checklist_item_description": "Does the post contain an untagged spoiler in the title, or an unwarned spoiler in the body/comment?"
+      },
+      {
+        "label": "violating",
+        "content": {
+          "id": "ex-sensational-1",
+          "platform": "reddit",
+          "author": {
+            "username": "clickbaiter",
+            "account_age_days": 95,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "This BANNED book is so dangerous publishers are TERRIFIED to print it \u2014 and now it's destroying lives",
+            "body": "Article link about a controversial self-help book.",
+            "media": [],
+            "links": [
+              "https://clickbaitsite.com/dangerous-book"
+            ]
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "link",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Hyperbolic, fear-mongering headline with all-caps emphasis and extreme claims \u2014 a clear sensationalist headline violating the rule.",
+        "related_checklist_item_description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "ex-sensational-2b",
+          "platform": "reddit",
+          "author": {
+            "username": "enthusiastreader",
+            "account_age_days": 340,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "This might be the most important novel written in the last decade \u2014 and almost no one has read it",
+            "body": "I just finished 'The Passenger' by Cormac McCarthy and I think it's criminally underappreciated. The themes of grief, quantum physics, and identity are handled unlike anything I've encountered. Here's why I think it deserves more attention...[substantive analysis follows]",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "The title uses superlative language ('most important novel') which could be seen as sensationalist, but the body provides substantive analysis \u2014 moderators might disagree on whether enthusiastic framing crosses into sensationalism.",
+        "related_checklist_item_description": "Does the post use a sensationalist, clickbait, or misleading headline that misrepresents the content?"
+      },
+      {
+        "label": "compliant",
+        "content": {
+          "id": "ex-compliant-1",
+          "platform": "reddit",
+          "author": {
+            "username": "deepreader",
+            "account_age_days": 600,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "How Tolstoy uses time in Anna Karenina to mirror his characters' inner states",
+            "body": "I've been rereading Anna Karenina and became fascinated by how Tolstoy manipulates the pacing of time. The scenes with Anna feel rushed and fragmented as her mental state deteriorates, while the agricultural chapters with Levin move slowly and deliberately. Has anyone else noticed this? I'd love to discuss whether this is intentional or a product of the serial publication format.",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Original literary analysis with a clear discussion prompt, no promotion, no spoilers in the title, no lists, no piracy \u2014 a model r/books post.",
+        "related_checklist_item_description": null
+      }
+    ]
+  },
+  {
+    "subreddit": "books",
+    "title": "Encouraged",
+    "description": "We love original content and self-posts! Thoughts, discussion questions, epiphanies and interesting links about authors and their work. We also encourage discussion about developments in the book world and we have a flair system.",
+    "rule_text": "Encouraged\n\nWe love original content and self-posts! Thoughts, discussion questions, epiphanies and interesting links about authors and their work. We also encourage discussion about developments in the book world and we have a flair system.",
+    "triage": {
+      "rule_type": "informational",
+      "reasoning": "This rule describes the types of content the community welcomes and encourages, providing context about the community's focus, but does not set an enforceable standard that can be evaluated against a specific post."
+    },
+    "checklist": [],
+    "examples": []
+  },
+  {
+    "subreddit": "books",
+    "title": "Important",
+    "description": "We don't allow personal recommendation posts. You can ask in our Weekly Recommendation Thread, consult our Suggested Reading or What to Read page, or post in /r/suggestmeabook.",
+    "rule_text": "Important\n\nWe don't allow personal recommendation posts. You can ask in our Weekly Recommendation Thread, consult our Suggested Reading or What to Read page, or post in /r/suggestmeabook.",
+    "triage": {
+      "rule_type": "actionable",
+      "reasoning": "This rule defines a specific type of prohibited content (personal recommendation posts) that can be directly evaluated against any given post to determine if it violates the rule, while also providing alternative channels for such requests."
+    },
+    "checklist": [
+      {
+        "id": null,
+        "description": "Is the post a personal book recommendation request?",
+        "rule_text_anchor": "We don't allow personal recommendation posts.",
+        "item_type": "subjective",
+        "logic": {
+          "type": "subjective",
+          "prompt_template": "Evaluate whether this post is a personal book recommendation request. Is the post primarily asking other users to suggest books for the poster to read, based on their personal tastes, mood, reading history, or situation?",
+          "rubric": "Score higher (more likely to violate) when: (1) The post explicitly asks for book recommendations or suggestions (e.g. 'what should I read next?', 'recommend me a book', 'looking for something like X'); (2) The request is personalized to the poster's preferences, situation, or prior reading history; (3) The post lacks broader discussion value beyond serving the individual poster's reading needs. Score lower when: (1) The post is a general discussion about book genres or themes without soliciting personal suggestions; (2) The post asks about books in the context of a broader literary discussion rather than a personal reading list request.",
+          "threshold": 0.65,
+          "examples_to_include": 5
+        },
+        "action": "remove",
+        "atmosphere_influenced": true,
+        "atmosphere_note": "Threshold kept at 0.65 but framing tightened around 'personal' requests, consistent with the community's emphasis on discussion-oriented posts over individual recommendation-seeking, as reflected in the 'Discussion is the goal' community rule.",
+        "children": []
+      }
+    ],
+    "examples": [
+      {
+        "label": "violating",
+        "content": {
+          "id": "example-rec-1",
+          "platform": "reddit",
+          "author": {
+            "username": "booklover42",
+            "account_age_days": 120,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Looking for books similar to The Name of the Wind",
+            "body": "I just finished The Name of the Wind and absolutely loved it. I'm really into epic fantasy with a strong magic system and a coming-of-age story. Can anyone recommend something similar? Preferably a completed series since I hate waiting for new books. Thanks!",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Explicit personal recommendation request tailored to the poster's taste and reading history, with no broader discussion value for the community.",
+        "related_checklist_item_description": "Is the post a personal book recommendation request?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "example-rec-2b",
+          "platform": "reddit",
+          "author": {
+            "username": "readingmood",
+            "account_age_days": 250,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "What are some underrated classics everyone should read?",
+            "body": "I've been going through the usual canon \u2014 Tolstoy, Dickens, Austen \u2014 and I'm curious what hidden gems people think are overlooked. I'd love to discover something I'd never have picked up on my own. What books do you think deserve more attention?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "Framed as a general discussion about underrated classics but also doubles as a personal reading list request \u2014 moderators might genuinely disagree on whether this constitutes a prohibited recommendation post or a valid community discussion prompt.",
+        "related_checklist_item_description": "Is the post a personal book recommendation request?"
+      },
+      {
+        "label": "compliant",
+        "content": {
+          "id": "example-rec-3c",
+          "platform": "reddit",
+          "author": {
+            "username": "literary_thinker",
+            "account_age_days": 400,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "The way Dostoevsky uses doubles as a literary device across his novels is fascinating",
+            "body": "I just finished The Double and it got me thinking about how Dostoevsky returns to this motif in Crime and Punishment, The Brothers Karamazov, and others. The psychological tension between a character and their double seems to mirror his broader themes of guilt and identity. Has anyone else noticed this thread running through his work?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "A genuine literary discussion post about a thematic device across multiple books \u2014 no personal recommendation request is made.",
+        "related_checklist_item_description": null
+      }
+    ]
+  },
+  {
+    "subreddit": "books",
+    "title": "Spoiler Policy",
+    "description": "Any post with a spoiler in the title will be removed. Any comment with a spoiler that doesn't use the spoiler code will be removed. Any user with an extensive history of spoiling books will be banned. Spoiler tags are: #s for example: Spoilers about XYZ is done with: [Spoilers about XYZ](#s \"Spoiler content here\").",
+    "rule_text": "Spoiler Policy\n\nAny post with a spoiler in the title will be removed. Any comment with a spoiler that doesn't use the spoiler code will be removed. Any user with an extensive history of spoiling books will be banned. Spoiler tags are: #s for example: Spoilers about XYZ is done with: [Spoilers about XYZ](#s \"Spoiler content here\").",
+    "triage": {
+      "rule_type": "actionable",
+      "reasoning": "This rule sets clear, evaluable content standards for posts and comments \u2014 spoilers must not appear in titles and must use spoiler tags in comments \u2014 allowing a moderator to assess any given post or comment for a direct violation."
+    },
+    "checklist": [
+      {
+        "id": null,
+        "description": "Does the author have an extensive history of posting untagged spoilers?",
+        "rule_text_anchor": "Any user with an extensive history of spoiling books will be banned.",
+        "item_type": "structural",
+        "logic": {
+          "type": "structural",
+          "checks": [
+            {
+              "field": "karma",
+              "operator": "<",
+              "value": -10
+            }
+          ],
+          "match_mode": "all"
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Does the author have an extensive history of posting untagged spoilers?",
+        "rule_text_anchor": "Any user with an extensive history of spoiling books will be banned.",
+        "item_type": "structural",
+        "logic": {
+          "type": "structural",
+          "checks": [
+            {
+              "field": "karma",
+              "operator": "<",
+              "value": -10
+            }
+          ],
+          "match_mode": "all"
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      },
+      {
+        "id": null,
+        "description": "Does the author have an extensive history of posting untagged spoilers?",
+        "rule_text_anchor": "Any user with an extensive history of spoiling books will be banned.",
+        "item_type": "structural",
+        "logic": {
+          "type": "structural",
+          "checks": [
+            {
+              "field": "karma",
+              "operator": "<",
+              "value": -10
+            }
+          ],
+          "match_mode": "all"
+        },
+        "action": "flag",
+        "atmosphere_influenced": false,
+        "atmosphere_note": null,
+        "children": []
+      }
+    ],
+    "examples": [
+      {
+        "label": "violating",
+        "content": {
+          "id": "example-spoiler-title-1",
+          "platform": "reddit",
+          "author": {
+            "username": "bookfan99",
+            "account_age_days": 210,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "I can't believe Dumbledore dies at the end of Half-Blood Prince \u2014 did anyone else see it coming?",
+            "body": "Just finished the book and I'm still in shock. What did everyone think?",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "The post title directly reveals a major character death, which is a clear spoiler in the title and must be removed.",
+        "related_checklist_item_description": "Does the post title contain a spoiler (i.e., reveal plot details, character deaths, twists, or endings)?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "example-spoiler-title-2",
+          "platform": "reddit",
+          "author": {
+            "username": "literarygeek",
+            "account_age_days": 450,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "The ending of 'Gone Girl' completely changed how I think about unreliable narrators",
+            "body": "I've been recommending this to everyone. The way Flynn constructs the twist is masterful. Happy to discuss in the comments!",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "The title alludes to a twist ending without explicitly describing it \u2014 moderators might disagree on whether 'the ending changed how I think' constitutes a spoiler in the title or is vague enough to be acceptable.",
+        "related_checklist_item_description": "Does the post title contain a spoiler (i.e., reveal plot details, character deaths, twists, or endings)?"
+      },
+      {
+        "label": "violating",
+        "content": {
+          "id": "example-spoiler-comment-1",
+          "platform": "reddit",
+          "author": {
+            "username": "readingaddict",
+            "account_age_days": 90,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": null,
+            "body": "The most shocking part of Blood Meridian for me was when the Judge kills the Kid at the very end \u2014 McCarthy doesn't even describe it directly, which makes it worse.",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": "thread-bloodmeridian",
+            "parent_post_id": "post-abc123",
+            "post_type": "comment",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "The comment reveals the fate of the main character at the end of the novel in plain text with no spoiler tag applied, which directly violates the spoiler code requirement.",
+        "related_checklist_item_description": "Does the comment contain spoiler-level narrative details (plot twists, deaths, endings, reveals) without any spoiler tag?"
+      },
+      {
+        "label": "borderline",
+        "content": {
+          "id": "example-spoiler-comment-2",
+          "platform": "reddit",
+          "author": {
+            "username": "classics_reader",
+            "account_age_days": 700,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": null,
+            "body": "Anna Karenina's fate is really the only logical conclusion to her arc \u2014 Tolstoy couldn't have ended it any other way.",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": "thread-tolstoy",
+            "parent_post_id": "post-xyz789",
+            "post_type": "comment",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "The comment strongly implies Anna's death without stating it explicitly \u2014 it's a 150-year-old classic whose ending is widely known, so moderators might disagree on whether this requires a spoiler tag.",
+        "related_checklist_item_description": "Does the comment contain spoiler-level narrative details (plot twists, deaths, endings, reveals) without any spoiler tag?"
+      },
+      {
+        "label": "compliant",
+        "content": {
+          "id": "example-compliant-1",
+          "platform": "reddit",
+          "author": {
+            "username": "avid_reader_2025",
+            "account_age_days": 320,
+            "platform_metadata": {}
+          },
+          "content": {
+            "title": "Just finished 'The Road' by Cormac McCarthy \u2014 what a haunting read",
+            "body": "I won't say anything specific for those who haven't read it, but the themes of hope and survival have been rattling around in my head all week. Has anyone else found it hard to shake? [Spoilers about the ending](#s \"The final scene with the boy and the family was both devastating and quietly hopeful.\")",
+            "media": [],
+            "links": []
+          },
+          "context": {
+            "channel": "r/books",
+            "thread_id": null,
+            "parent_post_id": null,
+            "post_type": "self",
+            "flair": null,
+            "platform_metadata": {}
+          },
+          "timestamp": "2026-01-01T00:00:00Z"
+        },
+        "relevance_note": "The post title contains no spoilers, and the one spoiler detail in the comment body is correctly wrapped in the required spoiler tag format.",
+        "related_checklist_item_description": null
+      }
+    ]
+  }
+]

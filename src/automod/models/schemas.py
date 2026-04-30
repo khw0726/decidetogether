@@ -165,6 +165,8 @@ class RuleRead(BaseModel):
     pending_relevant_context: Optional[dict[str, Any]] = None
     pending_custom_context_notes: Optional[list[CommunityContextNote]] = None
     pending_generated_at: Optional[datetime] = None
+    compile_status: str = "idle"  # idle | pending | ok | failed
+    compile_error: Optional[str] = None
     context_load: float = 0.0  # derived: sum(|weight|) across relevant_context tags
     created_at: datetime
     updated_at: datetime
@@ -541,12 +543,27 @@ class SuggestedContextBundle(BaseModel):
     tag: str
 
 
+class DistinctiveCluster(BaseModel):
+    """A community's most-distinctive cluster within a single context dimension.
+
+    Distinctiveness = highest IDF among the community's clusters in that dimension.
+    `is_shared` = true if the target community also has this cluster in this dimension
+    (so the UI can mute shared chips and highlight divergent ones).
+    """
+    dimension: str
+    cluster: str
+    label: str
+    is_shared: bool = False
+
+
 class PeerRuleOption(BaseModel):
     """One peer-community rule offered as a starting point.
 
     The user picks an option to compare how different community contexts produced
     different rule texts. `peer_context_tags` is the source community's tags;
     `shared_tags` are the (dimension, tag) pairs the source AND target both have.
+    `distinctive_clusters` is the source community's most-distinctive cluster per
+    dimension — the chips shown next to the peer rule for at-a-glance contrast.
     """
     community_id: str
     community_name: str
@@ -554,6 +571,7 @@ class PeerRuleOption(BaseModel):
     rule_text: str
     peer_context_tags: list[SuggestedContextBundle]
     shared_tags: list[SuggestedContextBundle]
+    distinctive_clusters: list[DistinctiveCluster] = []
 
 
 class SuggestRuleTextResponse(BaseModel):

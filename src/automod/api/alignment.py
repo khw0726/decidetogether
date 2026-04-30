@@ -451,8 +451,14 @@ def _compute_ops_diff(
                     "context_change_types": fitem.context_change_types,
                 })
         else:
+            # Carry id/parent_id/order so multi-level trees survive the round-trip
+            # through commit-recompile (otherwise a 2-level compile would land as
+            # a flat list of orphaned roots).
             ops.append({
                 "op": "add",
+                "id": fitem.id,
+                "parent_id": fitem.parent_id,
+                "order": fitem.order,
                 "description": fitem.description,
                 "rule_text_anchor": fitem.rule_text_anchor,
                 "item_type": fitem.item_type,
@@ -603,7 +609,24 @@ async def preview_recompile(
     final_items: list[ChecklistItem] = list(all_existing)
     adjustment_summary: str = ""
 
-    if text_changed:
+    # Empty checklist (e.g. a never-compiled rule whose moderator is editing the
+    # text in the fluid editor) → there's nothing for the diff prompt to work
+    # against, and recompile_with_diff against [] gives a degraded "add-only"
+    # response that bypasses the compile few-shots and Pass 2 context calibration.
+    # Route through the proper full compile in that case and convert the result
+    # into a flat list of "add" ops the rest of the editor flow already handles.
+    if (text_changed or context_changed) and not all_existing:
+        adjusted_items, _examples, _base_dicts, summary = await compiler.compile_rule_two_pass(
+            rule=draft_rule,
+            community=community,
+            other_rules=other_rules,
+            community_context=community.community_context,
+            relevant_context=draft_relevant if body.context is not None else rule.relevant_context,
+            custom_context_notes=draft_notes if body.context is not None else (rule.custom_context_notes or []),
+        )
+        final_items = adjusted_items
+        adjustment_summary = summary
+    elif text_changed:
         text_ops = await compiler.recompile_with_diff(
             rule=draft_rule,
             community=community,
@@ -612,7 +635,7 @@ async def preview_recompile(
         )
         final_items = _apply_diff_to_checklist(all_existing, text_ops, rule_id)
 
-    if context_changed and community.community_context:
+    if context_changed and community.community_context and all_existing:
         pinned_ids = [it.id for it in final_items if it.context_pinned] or None
         adjusted_items, summary, _ctx_ops = await compiler.adjust_for_context(
             rule=draft_rule,

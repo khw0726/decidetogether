@@ -1,0 +1,193 @@
+{
+  "claude-sonnet-bedrock": {
+    "claude-sonnet-bedrock_vs_gemini-pro": {
+      "aggregate": {
+        "coverage": {
+          "claude-sonnet-bedrock": 27,
+          "gemini-pro": 0,
+          "tie": 0,
+          "position_bias_tie": 10,
+          "total": 37,
+          "position_bias_rate": 0.27
+        },
+        "logical_correctness": {
+          "claude-sonnet-bedrock": 33,
+          "gemini-pro": 0,
+          "tie": 0,
+          "position_bias_tie": 4,
+          "total": 37,
+          "position_bias_rate": 0.108
+        },
+        "minimality": {
+          "claude-sonnet-bedrock": 5,
+          "gemini-pro": 3,
+          "tie": 20,
+          "position_bias_tie": 9,
+          "total": 37,
+          "position_bias_rate": 0.243
+        },
+        "clarity": {
+          "claude-sonnet-bedrock": 34,
+          "gemini-pro": 0,
+          "tie": 0,
+          "position_bias_tie": 3,
+          "total": 37,
+          "position_bias_rate": 0.081
+        },
+        "anchor_accuracy": {
+          "claude-sonnet-bedrock": 15,
+          "gemini-pro": 0,
+          "tie": 18,
+          "position_bias_tie": 4,
+          "total": 37,
+          "position_bias_rate": 0.108
+        },
+        "example_quality": {
+          "claude-sonnet-bedrock": 37,
+          "gemini-pro": 0,
+          "tie": 0,
+          "position_bias_tie": 0,
+          "total": 37,
+          "position_bias_rate": 0.0
+        },
+        "overall": {
+          "claude-sonnet-bedrock": 35,
+          "gemini-pro": 0,
+          "tie": 0,
+          "position_bias_tie": 2,
+          "total": 37,
+          "position_bias_rate": 0.054
+        }
+      },
+      "label_a": "claude-sonnet-bedrock",
+      "label_b": "gemini-pro",
+      "n_rules": 37
+    },
+    "claude-sonnet-bedrock_vs_gpt-5.4": {
+      "aggregate": {
+        "coverage": {
+          "claude-sonnet-bedrock": 30,
+          "gpt-5.4": 0,
+          "tie": 1,
+          "position_bias_tie": 7,
+          "total": 38,
+          "position_bias_rate": 0.184
+        },
+        "logical_correctness": {
+          "claude-sonnet-bedrock": 24,
+          "gpt-5.4": 1,
+          "tie": 0,
+          "position_bias_tie": 13,
+          "total": 38,
+          "position_bias_rate": 0.342
+        },
+        "minimality": {
+          "claude-sonnet-bedrock": 0,
+          "gpt-5.4": 8,
+          "tie": 15,
+          "position_bias_tie": 15,
+          "total": 38,
+          "position_bias_rate": 0.395
+        },
+        "clarity": {
+          "claude-sonnet-bedrock": 30,
+          "gpt-5.4": 0,
+          "tie": 0,
+          "position_bias_tie": 8,
+          "total": 38,
+          "position_bias_rate": 0.211
+        },
+        "anchor_accuracy": {
+          "claude-sonnet-bedrock": 2,
+          "gpt-5.4": 0,
+          "tie": 29,
+          "position_bias_tie": 7,
+          "total": 38,
+          "position_bias_rate": 0.184
+        },
+        "example_quality": {
+          "claude-sonnet-bedrock": 38,
+          "gpt-5.4": 0,
+          "tie": 0,
+          "position_bias_tie": 0,
+          "total": 38,
+          "position_bias_rate": 0.0
+        },
+        "overall": {
+          "claude-sonnet-bedrock": 35,
+          "gpt-5.4": 0,
+          "tie": 0,
+          "position_bias_tie": 3,
+          "total": 38,
+          "position_bias_rate": 0.079
+        }
+      },
+      "label_a": "claude-sonnet-bedrock",
+      "label_b": "gpt-5.4",
+      "n_rules": 38
+    },
+    "gemini-pro_vs_gpt-5.4": {
+      "aggregate": {
+        "coverage": {
+          "gemini-pro": 6,
+          "gpt-5.4": 9,
+          "tie": 11,
+          "position_bias_tie": 11,
+          "total": 37,
+          "position_bias_rate": 0.297
+        },
+        "logical_correctness": {
+          "gemini-pro": 7,
+          "gpt-5.4": 11,
+          "tie": 4,
+          "position_bias_tie": 15,
+          "total": 37,
+          "position_bias_rate": 0.405
+        },
+        "minimality": {
+          "gemini-pro": 0,
+          "gpt-5.4": 10,
+          "tie": 16,
+          "position_bias_tie": 11,
+          "total": 37,
+          "position_bias_rate": 0.297
+        },
+        "clarity": {
+          "gemini-pro": 7,
+          "gpt-5.4": 21,
+          "tie": 0,
+          "position_bias_tie": 9,
+          "total": 37,
+          "position_bias_rate": 0.243
+        },
+        "anchor_accuracy": {
+          "gemini-pro": 0,
+          "gpt-5.4": 11,
+          "tie": 21,
+          "position_bias_tie": 5,
+          "total": 37,
+          "position_bias_rate": 0.135
+        },
+        "example_quality": {
+          "gemini-pro": 14,
+          "gpt-5.4": 21,
+          "tie": 0,
+          "position_bias_tie": 2,
+          "total": 37,
+          "position_bias_rate": 0.054
+        },
+        "overall": {
+          "gemini-pro": 8,
+          "gpt-5.4": 24,
+          "tie": 0,
+          "position_bias_tie": 5,
+          "total": 37,
+          "position_bias_rate": 0.135
+        }
+      },
+      "label_a": "gemini-pro",
+      "label_b": "gpt-5.4",
+      "n_rules": 37
+    }
+  }
+}

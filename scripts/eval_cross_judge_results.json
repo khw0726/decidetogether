@@ -1,0 +1,93 @@
+{
+  "scores": {
+    "claude-sonnet": {
+      "claude-sonnet": {
+        "coverage": 3.33,
+        "logic_specificity": 3.17,
+        "item_type_fit": 4.17,
+        "example_quality": 3.67,
+        "anchor_accuracy": 4.83,
+        "mean": 3.83
+      },
+      "gemini-pro": {
+        "coverage": 4.67,
+        "logic_specificity": 4.5,
+        "item_type_fit": 4.67,
+        "example_quality": 4.83,
+        "anchor_accuracy": 5.0,
+        "mean": 4.73
+      },
+      "gpt-5.4": {
+        "coverage": 3.17,
+        "logic_specificity": 3.33,
+        "item_type_fit": 4.0,
+        "example_quality": 4.0,
+        "anchor_accuracy": 4.67,
+        "mean": 3.83
+      }
+    },
+    "gemini-pro": {
+      "claude-sonnet": {
+        "coverage": 2.83,
+        "logic_specificity": 2.17,
+        "item_type_fit": 3.5,
+        "example_quality": 1.67,
+        "anchor_accuracy": 4.17,
+        "mean": 2.87
+      },
+      "gemini-pro": {
+        "coverage": 4.17,
+        "logic_specificity": 1.67,
+        "item_type_fit": 4.33,
+        "example_quality": 1.0,
+        "anchor_accuracy": 5.0,
+        "mean": 3.23
+      },
+      "gpt-5.4": {
+        "coverage": 3.0,
+        "logic_specificity": 2.5,
+        "item_type_fit": 3.33,
+        "example_quality": 1.5,
+        "anchor_accuracy": 4.5,
+        "mean": 2.97
+      }
+    },
+    "gpt-5.4": {
+      "claude-sonnet": {
+        "coverage": 3.17,
+        "logic_specificity": 2.5,
+        "item_type_fit": 3.67,
+        "example_quality": 2.5,
+        "anchor_accuracy": 4.67,
+        "mean": 3.3
+      },
+      "gemini-pro": {
+        "coverage": 4.5,
+        "logic_specificity": 3.67,
+        "item_type_fit": 4.5,
+        "example_quality": 1.67,
+        "anchor_accuracy": 5.0,
+        "mean": 3.87
+      },
+      "gpt-5.4": {
+        "coverage": 3.5,
+        "logic_specificity": 2.67,
+        "item_type_fit": 4.0,
+        "example_quality": 2.33,
+        "anchor_accuracy": 4.83,
+        "mean": 3.47
+      }
+    }
+  },
+  "compilers": [
+    "claude-sonnet",
+    "gemini-pro",
+    "gpt-5.4"
+  ],
+  "judges": [
+    "claude-sonnet",
+    "gemini-pro",
+    "gpt-5.4"
+  ],
+  "temperature": 0
+}

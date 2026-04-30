@@ -90,6 +90,8 @@ export interface Rule {
   pending_relevant_context: { value: RuleContextTag[] | null } | null
   pending_custom_context_notes: CommunityContextNote[] | null
   pending_generated_at: string | null
+  compile_status: 'idle' | 'pending' | 'ok' | 'failed'
+  compile_error: string | null
   context_load: number  // derived: sum(|weight|) across relevant_context
   created_at: string
   updated_at: string
@@ -409,6 +411,13 @@ export type RuleTextClause = {
   citations: RuleTextCitation[]
 }
 
+export type DistinctiveCluster = {
+  dimension: string
+  cluster: string
+  label: string
+  is_shared: boolean
+}
+
 export type PeerRuleOption = {
   community_id: string
   community_name: string
@@ -416,6 +425,7 @@ export type PeerRuleOption = {
   rule_text: string
   peer_context_tags: { dimension: string; tag: string }[]
   shared_tags: { dimension: string; tag: string }[]
+  distinctive_clusters: DistinctiveCluster[]
 }
 
 export type SuggestRuleTextResponse = {

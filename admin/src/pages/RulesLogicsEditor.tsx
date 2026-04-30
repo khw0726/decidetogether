@@ -9,6 +9,7 @@ import {
   Loader2,
   Play,
   Plus,
+  Trash2,
   X,
 } from 'lucide-react'
 import {
@@ -23,6 +24,7 @@ import {
   Suggestion,
   commitRecompile,
   createRule,
+  deactivateRule,
   getChecklist,
   getCommunity,
   getRuleHealth,
@@ -202,6 +204,11 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     queryKey: ['rules', communityId],
     queryFn: () => listRules(communityId),
     enabled: !!communityId,
+    // Poll while any rule is mid-compile so status badges update without a manual refresh.
+    refetchInterval: (query) => {
+      const items = query.state.data
+      return items?.some(r => r.compile_status === 'pending') ? 3000 : false
+    },
   })
 
   const { data: community } = useQuery({
@@ -258,6 +265,28 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       setShowNewRule(false)
     },
   })
+
+  const deleteRuleMutation = useMutation({
+    mutationFn: (ruleId: string) => deactivateRule(ruleId),
+    onSuccess: (_data, ruleId) => {
+      queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+      if (selectedRuleId === ruleId) {
+        setSelectedRuleId(null)
+        setEditingText('')
+        setEditingTitle('')
+        setPreviewResult(null)
+        setActiveSuggestion(null)
+      }
+    },
+    onError: err => showErrorToast(extractErrorMessage(err)),
+  })
+
+  const handleDeleteRule = (rule: Rule) => {
+    if (!window.confirm(`Delete rule "${rule.title}"? This will deactivate it and hide it from the queue.`)) {
+      return
+    }
+    deleteRuleMutation.mutate(rule.id)
+  }
 
   const handleSelectRule = (rule: Rule) => {
     setSelectedRuleId(rule.id)
@@ -562,6 +591,22 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                         ctx-heavy
                       </span>
                     )}
+                    {rule.compile_status === 'pending' && (
+                      <span
+                        className="badge bg-blue-50 text-blue-700 border border-blue-200"
+                        title="Compiling…"
+                      >
+                        compiling…
+                      </span>
+                    )}
+                    {rule.compile_status === 'failed' && (
+                      <span
+                        className="badge bg-red-50 text-red-700 border border-red-200"
+                        title={rule.compile_error || 'Compilation failed'}
+                      >
+                        compile failed
+                      </span>
+                    )}
                     {errorPct !== null && (
                       <span
                         className={`text-[10px] ml-auto font-semibold ${errorPct >= 30 ? 'text-red-600' : errorPct >= 15 ? 'text-amber-600' : 'text-gray-500'}`}
@@ -605,6 +650,15 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
               >
                 <Play size={12} />
                 Test Rule with a Post
+              </button>
+              <button
+                className="btn-secondary text-xs text-red-600 hover:bg-red-50"
+                onClick={() => selectedRule && handleDeleteRule(selectedRule)}
+                disabled={deleteRuleMutation.isPending}
+                title="Delete this rule"
+              >
+                <Trash2 size={12} />
+                Delete
               </button>
             </div>
 

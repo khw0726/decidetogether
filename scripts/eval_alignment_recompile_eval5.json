@@ -1,0 +1,1224 @@
+{
+  "recompile-diff": {
+    "mode": "recompile-diff",
+    "config": {
+      "modbench": "scripts/modbench_eval5.json",
+      "n_scenarios": 10,
+      "n_errors": 0
+    },
+    "summary": {
+      "mean_diff_accuracy": 0.61,
+      "mean_fresh_accuracy": 0.59,
+      "mean_accuracy_delta": 0.02,
+      "mean_agreement_rate": 0.8867
+    },
+    "by_edit_type": {
+      "minor_rewording": {
+        "n": 5,
+        "diff_accuracy": 0.6233,
+        "fresh_accuracy": 0.5967,
+        "agreement_rate": 0.8667
+      },
+      "add_clause": {
+        "n": 5,
+        "diff_accuracy": 0.5967,
+        "fresh_accuracy": 0.5833,
+        "agreement_rate": 0.9067
+      }
+    },
+    "results": [
+      {
+        "subreddit": "relationships",
+        "edit_type": "minor_rewording",
+        "rule_text_short": "This sub is about helping people in need\n\nf you are not providing such help (i.e",
+        "n_entries": 15,
+        "op_counts": {
+          "keep": 1
+        },
+        "diff_accuracy": 0.6667,
+        "fresh_accuracy": 0.7333,
+        "accuracy_delta": -0.0666,
+        "agreement_rate": 0.9333,
+        "diff_metrics": {
+          "n_total": 15,
+          "n_errors": 0,
+          "accuracy": 0.6667,
+          "approve_precision": 0.7778,
+          "approve_recall": 0.7,
+          "approve_f1": 0.7368,
+          "approve_fpr": 0.4,
+          "remove_precision": 0.5,
+          "remove_recall": 0.6,
+          "remove_f1": 0.5455,
+          "remove_fpr": 0.3,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6667,
+          "n_unknown": 15,
+          "per_subreddit": {
+            "relationships": {
+              "n": 15,
+              "accuracy": 0.6667
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6667,
+          "per_source": {
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.6
+            },
+            "pushshift_random": {
+              "n": 10,
+              "accuracy": 0.7
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 7,
+              "remove": 3,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 3,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 15,
+          "n_errors": 0,
+          "accuracy": 0.7333,
+          "approve_precision": 0.8,
+          "approve_recall": 0.8,
+          "approve_f1": 0.8,
+          "approve_fpr": 0.4,
+          "remove_precision": 0.6,
+          "remove_recall": 0.6,
+          "remove_f1": 0.6,
+          "remove_fpr": 0.2,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.7333,
+          "n_unknown": 15,
+          "per_subreddit": {
+            "relationships": {
+              "n": 15,
+              "accuracy": 0.7333
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.7333,
+          "per_source": {
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.6
+            },
+            "pushshift_random": {
+              "n": 10,
+              "accuracy": 0.8
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 8,
+              "remove": 2,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 3,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "relationships",
+        "edit_type": "add_clause",
+        "rule_text_short": "This sub is about helping people in need\n\nf you are not providing such help (i.e",
+        "n_entries": 15,
+        "op_counts": {
+          "keep": 1
+        },
+        "diff_accuracy": 0.7333,
+        "fresh_accuracy": 0.6667,
+        "accuracy_delta": 0.0666,
+        "agreement_rate": 0.9333,
+        "diff_metrics": {
+          "n_total": 15,
+          "n_errors": 0,
+          "accuracy": 0.7333,
+          "approve_precision": 0.8,
+          "approve_recall": 0.8,
+          "approve_f1": 0.8,
+          "approve_fpr": 0.4,
+          "remove_precision": 0.6,
+          "remove_recall": 0.6,
+          "remove_f1": 0.6,
+          "remove_fpr": 0.2,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.7333,
+          "n_unknown": 15,
+          "per_subreddit": {
+            "relationships": {
+              "n": 15,
+              "accuracy": 0.7333
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.7333,
+          "per_source": {
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.6
+            },
+            "pushshift_random": {
+              "n": 10,
+              "accuracy": 0.8
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 8,
+              "remove": 2,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 3,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 15,
+          "n_errors": 0,
+          "accuracy": 0.6667,
+          "approve_precision": 0.7778,
+          "approve_recall": 0.7,
+          "approve_f1": 0.7368,
+          "approve_fpr": 0.4,
+          "remove_precision": 0.5,
+          "remove_recall": 0.6,
+          "remove_f1": 0.5455,
+          "remove_fpr": 0.3,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6667,
+          "n_unknown": 15,
+          "per_subreddit": {
+            "relationships": {
+              "n": 15,
+              "accuracy": 0.6667
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6667,
+          "per_source": {
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.6
+            },
+            "pushshift_random": {
+              "n": 10,
+              "accuracy": 0.7
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 7,
+              "remove": 3,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 3,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "hiphopheads",
+        "edit_type": "minor_rewording",
+        "rule_text_short": "No Social Media Requests for Upvotes\n\nPosts linked by a Social Media post asking",
+        "n_entries": 5,
+        "op_counts": {
+          "update": 1
+        },
+        "diff_accuracy": 0.6,
+        "fresh_accuracy": 0.6,
+        "accuracy_delta": 0.0,
+        "agreement_rate": 1.0,
+        "diff_metrics": {
+          "n_total": 5,
+          "n_errors": 0,
+          "accuracy": 0.6,
+          "approve_precision": 0.6,
+          "approve_recall": 1.0,
+          "approve_f1": 0.75,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6,
+          "n_unknown": 5,
+          "per_subreddit": {
+            "hiphopheads": {
+              "n": 5,
+              "accuracy": 0.6
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6,
+          "per_source": {
+            "pushshift_random": {
+              "n": 3,
+              "accuracy": 1.0
+            },
+            "removal_log": {
+              "n": 2,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 3,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 5,
+          "n_errors": 0,
+          "accuracy": 0.6,
+          "approve_precision": 0.6,
+          "approve_recall": 1.0,
+          "approve_f1": 0.75,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6,
+          "n_unknown": 5,
+          "per_subreddit": {
+            "hiphopheads": {
+              "n": 5,
+              "accuracy": 0.6
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6,
+          "per_source": {
+            "pushshift_random": {
+              "n": 3,
+              "accuracy": 1.0
+            },
+            "removal_log": {
+              "n": 2,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 3,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "hiphopheads",
+        "edit_type": "add_clause",
+        "rule_text_short": "No Social Media Requests for Upvotes\n\nPosts linked by a Social Media post asking",
+        "n_entries": 5,
+        "op_counts": {
+          "update": 1
+        },
+        "diff_accuracy": 0.6,
+        "fresh_accuracy": 0.6,
+        "accuracy_delta": 0.0,
+        "agreement_rate": 1.0,
+        "diff_metrics": {
+          "n_total": 5,
+          "n_errors": 0,
+          "accuracy": 0.6,
+          "approve_precision": 0.6,
+          "approve_recall": 1.0,
+          "approve_f1": 0.75,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6,
+          "n_unknown": 5,
+          "per_subreddit": {
+            "hiphopheads": {
+              "n": 5,
+              "accuracy": 0.6
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6,
+          "per_source": {
+            "pushshift_random": {
+              "n": 3,
+              "accuracy": 1.0
+            },
+            "removal_log": {
+              "n": 2,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 3,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 5,
+          "n_errors": 0,
+          "accuracy": 0.6,
+          "approve_precision": 0.6,
+          "approve_recall": 1.0,
+          "approve_f1": 0.75,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6,
+          "n_unknown": 5,
+          "per_subreddit": {
+            "hiphopheads": {
+              "n": 5,
+              "accuracy": 0.6
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6,
+          "per_source": {
+            "pushshift_random": {
+              "n": 3,
+              "accuracy": 1.0
+            },
+            "removal_log": {
+              "n": 2,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 3,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "hiphopheads",
+        "edit_type": "minor_rewording",
+        "rule_text_short": "Song Posting Requirements\n\nAll song posts must contain at least the ARTIST'S NAM",
+        "n_entries": 5,
+        "op_counts": {
+          "keep": 1
+        },
+        "diff_accuracy": 0.6,
+        "fresh_accuracy": 0.4,
+        "accuracy_delta": 0.2,
+        "agreement_rate": 0.4,
+        "diff_metrics": {
+          "n_total": 5,
+          "n_errors": 0,
+          "accuracy": 0.6,
+          "approve_precision": 0.6667,
+          "approve_recall": 0.6667,
+          "approve_f1": 0.6667,
+          "approve_fpr": 0.5,
+          "remove_precision": 0.5,
+          "remove_recall": 0.5,
+          "remove_f1": 0.5,
+          "remove_fpr": 0.3333,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6,
+          "n_unknown": 5,
+          "per_subreddit": {
+            "hiphopheads": {
+              "n": 5,
+              "accuracy": 0.6
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6,
+          "per_source": {
+            "pushshift_random": {
+              "n": 3,
+              "accuracy": 0.6667
+            },
+            "removal_log": {
+              "n": 2,
+              "accuracy": 0.5
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 2,
+              "remove": 1,
+              "review": 0
+            },
+            "remove": {
+              "approve": 1,
+              "remove": 1,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 5,
+          "n_errors": 0,
+          "accuracy": 0.4,
+          "approve_precision": 1.0,
+          "approve_recall": 0.6667,
+          "approve_f1": 0.8,
+          "approve_fpr": 0.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0.0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.6,
+          "accuracy_unknown": 0.4,
+          "n_unknown": 5,
+          "per_subreddit": {
+            "hiphopheads": {
+              "n": 5,
+              "accuracy": 0.4
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.4,
+          "per_source": {
+            "pushshift_random": {
+              "n": 3,
+              "accuracy": 0.6667
+            },
+            "removal_log": {
+              "n": 2,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 2,
+              "remove": 0,
+              "review": 1
+            },
+            "remove": {
+              "approve": 0,
+              "remove": 0,
+              "review": 2
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "hiphopheads",
+        "edit_type": "add_clause",
+        "rule_text_short": "Song Posting Requirements\n\nAll song posts must contain at least the ARTIST'S NAM",
+        "n_entries": 5,
+        "op_counts": {
+          "keep": 1
+        },
+        "diff_accuracy": 0.4,
+        "fresh_accuracy": 0.4,
+        "accuracy_delta": 0.0,
+        "agreement_rate": 0.6,
+        "diff_metrics": {
+          "n_total": 5,
+          "n_errors": 0,
+          "accuracy": 0.4,
+          "approve_precision": 0.5,
+          "approve_recall": 0.6667,
+          "approve_f1": 0.5714,
+          "approve_fpr": 1.0,
+          "remove_precision": 0.0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.3333,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.4,
+          "n_unknown": 5,
+          "per_subreddit": {
+            "hiphopheads": {
+              "n": 5,
+              "accuracy": 0.4
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.4,
+          "per_source": {
+            "pushshift_random": {
+              "n": 3,
+              "accuracy": 0.6667
+            },
+            "removal_log": {
+              "n": 2,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 2,
+              "remove": 1,
+              "review": 0
+            },
+            "remove": {
+              "approve": 2,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 5,
+          "n_errors": 0,
+          "accuracy": 0.4,
+          "approve_precision": 0.5,
+          "approve_recall": 0.3333,
+          "approve_f1": 0.4,
+          "approve_fpr": 0.5,
+          "remove_precision": 0.3333,
+          "remove_recall": 0.5,
+          "remove_f1": 0.4,
+          "remove_fpr": 0.6667,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.4,
+          "n_unknown": 5,
+          "per_subreddit": {
+            "hiphopheads": {
+              "n": 5,
+              "accuracy": 0.4
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.4,
+          "per_source": {
+            "pushshift_random": {
+              "n": 3,
+              "accuracy": 0.3333
+            },
+            "removal_log": {
+              "n": 2,
+              "accuracy": 0.5
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 1,
+              "remove": 2,
+              "review": 0
+            },
+            "remove": {
+              "approve": 1,
+              "remove": 1,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "relationships",
+        "edit_type": "minor_rewording",
+        "rule_text_short": "No Politics",
+        "n_entries": 15,
+        "op_counts": {
+          "keep": 1
+        },
+        "diff_accuracy": 0.6667,
+        "fresh_accuracy": 0.6667,
+        "accuracy_delta": 0.0,
+        "agreement_rate": 1.0,
+        "diff_metrics": {
+          "n_total": 15,
+          "n_errors": 0,
+          "accuracy": 0.6667,
+          "approve_precision": 0.6667,
+          "approve_recall": 1.0,
+          "approve_f1": 0.8,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6667,
+          "n_unknown": 15,
+          "per_subreddit": {
+            "relationships": {
+              "n": 15,
+              "accuracy": 0.6667
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6667,
+          "per_source": {
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.0
+            },
+            "pushshift_random": {
+              "n": 10,
+              "accuracy": 1.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 10,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 5,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 15,
+          "n_errors": 0,
+          "accuracy": 0.6667,
+          "approve_precision": 0.6667,
+          "approve_recall": 1.0,
+          "approve_f1": 0.8,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6667,
+          "n_unknown": 15,
+          "per_subreddit": {
+            "relationships": {
+              "n": 15,
+              "accuracy": 0.6667
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6667,
+          "per_source": {
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.0
+            },
+            "pushshift_random": {
+              "n": 10,
+              "accuracy": 1.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 10,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 5,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "relationships",
+        "edit_type": "add_clause",
+        "rule_text_short": "No Politics",
+        "n_entries": 15,
+        "op_counts": {
+          "keep": 1
+        },
+        "diff_accuracy": 0.6667,
+        "fresh_accuracy": 0.6667,
+        "accuracy_delta": 0.0,
+        "agreement_rate": 1.0,
+        "diff_metrics": {
+          "n_total": 15,
+          "n_errors": 0,
+          "accuracy": 0.6667,
+          "approve_precision": 0.6667,
+          "approve_recall": 1.0,
+          "approve_f1": 0.8,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6667,
+          "n_unknown": 15,
+          "per_subreddit": {
+            "relationships": {
+              "n": 15,
+              "accuracy": 0.6667
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6667,
+          "per_source": {
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.0
+            },
+            "pushshift_random": {
+              "n": 10,
+              "accuracy": 1.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 10,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 5,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 15,
+          "n_errors": 0,
+          "accuracy": 0.6667,
+          "approve_precision": 0.6667,
+          "approve_recall": 1.0,
+          "approve_f1": 0.8,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.6667,
+          "n_unknown": 15,
+          "per_subreddit": {
+            "relationships": {
+              "n": 15,
+              "accuracy": 0.6667
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.6667,
+          "per_source": {
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.0
+            },
+            "pushshift_random": {
+              "n": 10,
+              "accuracy": 1.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 10,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 5,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "AskHistorians",
+        "edit_type": "minor_rewording",
+        "rule_text_short": "No \"poll\"-type questions\n\n\"Poll\"-type questions aren't appropriate here: \"Who wa",
+        "n_entries": 12,
+        "op_counts": {
+          "keep": 1,
+          "delete": 1
+        },
+        "diff_accuracy": 0.5833,
+        "fresh_accuracy": 0.5833,
+        "accuracy_delta": 0.0,
+        "agreement_rate": 1.0,
+        "diff_metrics": {
+          "n_total": 12,
+          "n_errors": 0,
+          "accuracy": 0.5833,
+          "approve_precision": 0.5833,
+          "approve_recall": 1.0,
+          "approve_f1": 0.7368,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.5833,
+          "n_unknown": 12,
+          "per_subreddit": {
+            "AskHistorians": {
+              "n": 12,
+              "accuracy": 0.5833
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.5833,
+          "per_source": {
+            "pushshift_random": {
+              "n": 7,
+              "accuracy": 1.0
+            },
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 7,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 5,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 12,
+          "n_errors": 0,
+          "accuracy": 0.5833,
+          "approve_precision": 0.5833,
+          "approve_recall": 1.0,
+          "approve_f1": 0.7368,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.5833,
+          "n_unknown": 12,
+          "per_subreddit": {
+            "AskHistorians": {
+              "n": 12,
+              "accuracy": 0.5833
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.5833,
+          "per_source": {
+            "pushshift_random": {
+              "n": 7,
+              "accuracy": 1.0
+            },
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 7,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 5,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      },
+      {
+        "subreddit": "AskHistorians",
+        "edit_type": "add_clause",
+        "rule_text_short": "No \"poll\"-type questions\n\n\"Poll\"-type questions aren't appropriate here: \"Who wa",
+        "n_entries": 12,
+        "op_counts": {
+          "keep": 2,
+          "add": 1
+        },
+        "diff_accuracy": 0.5833,
+        "fresh_accuracy": 0.5833,
+        "accuracy_delta": 0.0,
+        "agreement_rate": 1.0,
+        "diff_metrics": {
+          "n_total": 12,
+          "n_errors": 0,
+          "accuracy": 0.5833,
+          "approve_precision": 0.5833,
+          "approve_recall": 1.0,
+          "approve_f1": 0.7368,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.5833,
+          "n_unknown": 12,
+          "per_subreddit": {
+            "AskHistorians": {
+              "n": 12,
+              "accuracy": 0.5833
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.5833,
+          "per_source": {
+            "pushshift_random": {
+              "n": 7,
+              "accuracy": 1.0
+            },
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 7,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 5,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        },
+        "fresh_metrics": {
+          "n_total": 12,
+          "n_errors": 0,
+          "accuracy": 0.5833,
+          "approve_precision": 0.5833,
+          "approve_recall": 1.0,
+          "approve_f1": 0.7368,
+          "approve_fpr": 1.0,
+          "remove_precision": 0,
+          "remove_recall": 0.0,
+          "remove_f1": 0,
+          "remove_fpr": 0.0,
+          "review_precision": 0,
+          "review_recall": 0,
+          "review_f1": 0,
+          "review_fpr": 0.0,
+          "accuracy_unknown": 0.5833,
+          "n_unknown": 12,
+          "per_subreddit": {
+            "AskHistorians": {
+              "n": 12,
+              "accuracy": 0.5833
+            }
+          },
+          "mean_per_subreddit_accuracy": 0.5833,
+          "per_source": {
+            "pushshift_random": {
+              "n": 7,
+              "accuracy": 1.0
+            },
+            "removal_log": {
+              "n": 5,
+              "accuracy": 0.0
+            }
+          },
+          "confusion_matrix": {
+            "approve": {
+              "approve": 7,
+              "remove": 0,
+              "review": 0
+            },
+            "remove": {
+              "approve": 5,
+              "remove": 0,
+              "review": 0
+            },
+            "review": {
+              "approve": 0,
+              "remove": 0,
+              "review": 0
+            }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,777 @@
+====================================================================================================
+r/AskReddit
+====================================================================================================
+
+COMMUNITY CONTEXT:
+  PURPOSE: AskReddit functions primarily as a mass-scale opinion and experience harvesting engine: the real product is the comment section, not the question itself. From a moderation standpoint, on-topic means any open-ended question that can generate a diverse flood of personal anecdotes, hot takes, or collective opinions — ranging from deeply personal ('when did you last cry about your appearance?') to pop culture nostalgia ('which movie scene sexually awakened you?') to pointed political opinion-gathering ('how do you feel about Trump suing the IRS?'). The celebrated and hot post data make clear that heavily political, US-centric opinion questions — particularly anti-Trump framing — are not edge cases but the dominant content type, meaning moderators should treat these as fully on-topic despite the stated rule against loaded or biased questions, which is functionally underenforced.
+    Tags: opinion-sharing, personal-anecdotes, political-discussion, pop-culture, open-ended-prompts
+  PARTICIPANTS: The active participant base is a massive, predominantly English-speaking, politically left-leaning general Reddit audience comfortable with casual internet discourse, irreverence, and strong political opinions expressed without much hedging. Participants self-select into threads they care about and demonstrate high tolerance for edgy humor, explicit cultural references, and partisan framing — as shown by top comments using profanity freely and threads about sexual awakening drawing thousands of cheerful responses. The population that faces genuine moderation-relevant risk is narrow: bad-faith actors attempting brigading, karma farming, or spam, rather than ordinary users who are well-acclimated to the community's norms and do not need protective moderation from its typical content.
+    Tags: general-public, politically-engaged, large-anonymous-audience, self-aware-participants, high-volume-commenters
+  STAKES: The community's real moderation priorities, as revealed by what thrives versus what gets removed, are: keeping posts open-ended and discussion-generative (yes/no questions removed), preventing personal info exposure, and blocking spam or bot behavior — not policing political bias or strong language, both of which are core to the community's highest-performing content. Content that would appear 'risky' to an outside moderator — explicit sexual nostalgia, profanity-laden political outrage, speculation about a sitting president's death or removal — scores extremely high here and carries low internal moderation stakes; removing it would gut the community's most valued threads. The genuinely enforced stakes are structural and anti-abuse: no doxxing, no karma farming, no professional advice-seeking disguised as open questions, and no bots.
+    Tags: low-stakes-political-content, anti-spam-enforcement, doxxing-prevention, format-compliance, anti-brigading
+  TONE: The observed tone is casual, expressive, and frequently profane — top comments call the president a 'piece of shit,' use 'motherfucker' for emphasis, and deploy dry sarcasm ('At least prices will go down now, right? .....right?') as the default rhetorical mode; this is the community's authentic register, not a violation of its norms. Humor is woven into even serious political threads, with jokes and meme references rewarded alongside substantive responses, making the stated Rule 6 ([Serious] tag) the only meaningful tonal enforcement boundary in practice. Moderating against profanity, bluntness, or irreverent humor would directly conflict with what the community rewards most, so the actionable tonal standard for moderation is civility in the narrow sense of no targeted personal attacks or slurs — not sanitized language.
+    Tags: casual, profanity-accepted, sarcastic, politically-charged, humor-mixed-with-serious
+
+----------------------------------------------------------------------------------------------------
+RULE: Rule 1 - Questions must be clear and direct and may not use the body textbox
+TEXT: Rule 1 - Questions must be clear and direct and may not use the body textbox
+
+* All questions must be clear, written in English, and conclude with a question mark
+* All context in the title must be **...
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (4 top-level items)
+  │
+  │  • [deterministic/continue] Does the post title lack a question mark at the end?
+  │    ├─ [subjective/remove thr=0.7] Is the title confirmed to be a question statement that simply omits a terminal question mark?
+  │  • [structural/continue] Does the post body (text box) contain any text?
+  │    ├─ [deterministic/remove] Does the post body contain non-empty, non-whitespace text?
+  │  • [subjective/flag thr=0.7] Does the post title contain unnecessary context or example answers that are not needed to understand the question?
+  │  • [subjective/flag thr=0.75] Is the post title unclear or indirect as a question (i.e. vague, ambiguous, or not a direct question)?
+  │
+  ├─ TWO-PASS: ADJUSTED (4 top-level items)
+  │  Summary: Four items were reviewed against AskReddit's community context. Two items were adjusted
+  │           (context_influenced=true) and two were left structurally unchanged but one had minor
+  │           clarifying language added. KEY ADJUSTMENTS: 1. QUESTION MARK CHECK (child - subjective):
+  │           Threshold lowered slightly to 0.65 and rubric reinforced that this is a
+  │           strictly-enforced structural rule on AskReddit. Format compliance is one of the
+  │           community's genuinely enforced priorities, so we want to be slightly more aggressive in
+  │           catching missing question marks. 2. BODY TEXT CHECK (child - deterministic): Marked
+  │           context_influenced=true to note that community context confirms this is a consistently
+  │           enforced hard rule — no threshold softening applied, action kept as 'remove'. 3.
+  │           UNNECESSARY CONTEXT CHECK (subjective): Threshold raised to 0.8 (from 0.7) and rubric
+  │           substantially rewritten to prevent false positives on AskReddit's dominant content
+  │           style. Political framing, emotional framing, profanity, and opinionated preamble are
+  │           explicitly excluded from the 'unnecessary context' category, since these are core to how
+  │           AskReddit's highest-performing questions are structured. Default behavior shifted to NO
+  │           on borderline cases. 4. CLARITY/DIRECTNESS CHECK (subjective): Threshold raised
+  │           significantly to 0.85 (from 0.75) and rubric rewritten to prevent a generic model from
+  │           flagging blunt, profane, politically-charged, or sexually-framed questions as 'unclear'.
+  │           The rubric now explicitly instructs the model that strong opinionated framing is not the
+  │           same as vagueness, and to default strongly to NO. This reflects the community's
+  │           authentic register where provocative language is the norm, not an exception.
+  │
+  │  • [deterministic/continue] Does the post title lack a question mark at the end?
+  │    ├─ [subjective/remove thr=0.65] Is the title confirmed to be a question statement that simply omits a terminal question mark?
+  │    │    ↳ context: The question mark requirement is one of AskReddit's genuinely hard-enforced structural rules — community context confirms format compliance is a real priority → lowered threshold slightly to 0.65 to catch borderline interrogative titles more aggressively, since false negatives (missing a clear question) are worse than false positives here. Rubric clarified to reinforce that this rule is strictly enforced regardless of content quality.
+  │  • [structural/continue] Does the post body (text box) contain any text?
+  │    ├─ [deterministic/remove] Does the post body contain non-empty, non-whitespace text?
+  │    │    ↳ context: Community context confirms the no-body-text rule is a genuinely enforced structural/format rule on AskReddit — posts with body text are reliably removed regardless of content quality or topic → action kept as 'remove' and no threshold softening applied. This is one of the few bright-line rules the community actually enforces consistently.
+  │  • [subjective/flag thr=0.8] Does the post title contain unnecessary context or example answers that are not needed to understand the question?
+  │      ↳ context: AskReddit's dominant content includes politically-framed, opinionated, and edgy questions where contextual framing (e.g. 'given that Trump just did X, how do you feel about Y?') is essential to the question's intent, not superfluous padding → threshold raised to 0.8 to make this check harder to trigger and reduce false positives on legitimate framing. Rubric explicitly instructs the model NOT to treat political/emotional/profane framing as 'unnecessary', and to default to NO on borderline cases. examples_to_include bumped to 6 to better calibrate against AskReddit's varied title styles.
+  │  • [subjective/flag thr=0.85] Is the post title unclear or indirect as a question (i.e. vague, ambiguous, or not a direct question)?
+  │      ↳ context: AskReddit's top content includes blunt, profane, politically-opinionated, and sexually-framed questions that a generic model might incorrectly classify as 'unclear' or 'indirect' due to their provocative nature → threshold raised significantly to 0.85 to only catch genuinely incomprehensible titles. Rubric rewritten to explicitly tell the model that strong opinions, profanity, and edgy framing embedded in a question do not constitute vagueness on this community, and to default strongly to NO. examples_to_include raised to 6 to help anchor the model against the community's actual title styles.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (3 top-level items)
+     
+     • [deterministic/remove] Does the post title fail to end with a question mark?
+     • [deterministic/remove] Does the post body contain text (i.e., the text box has been used)?
+     • [subjective/flag thr=0.65] Does the title include unnecessary context or example answers rather than a clear, direct question?
+         ↳ context: AskReddit's celebrated content includes wide-ranging opinion and anecdote questions that often have natural framing clauses (e.g. 'For those who grew up poor, what...?') → threshold set at 0.65 rather than lower, to avoid flagging legitimate scene-setting that is genuinely necessary to the question, while still catching blatant example-answer padding.
+
+
+----------------------------------------------------------------------------------------------------
+RULE: Rule 2 - No personal or professional advice requests
+TEXT: Rule 2 - No personal or professional advice requests
+
+* Askreddit is NOT your personal or professional advice platform
+
+* Do not makes posts asking for professional advice - medical, legal, financial,...
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (3 top-level items)
+  │
+  │  • [deterministic/continue] Does the post contain first-person pronouns?
+  │    ├─ [subjective/flag thr=0.7] Does the post appear to be specific to the poster's personal situation rather than a generic question?
+  │  • [deterministic/continue] Does the post request professional advice (medical, legal, financial, or similar)?
+  │    ├─ [subjective/remove thr=0.7] Is the post asking for professional or expert advice tailored to a specific situation, rather than asking a general curiosity or discussion question about a professional topic?
+  │  • [deterministic/continue] Does the post crowdsource a naming or purchasing decision?
+  │    ├─ [subjective/remove thr=0.65] Is the post primarily soliciting crowd-sourced suggestions for a specific naming or purchasing decision, rather than an open-ended discussion?
+  │
+  ├─ TWO-PASS: ADJUSTED (3 top-level items)
+  │  Summary: Five targeted adjustments were made to better fit AskReddit's core identity as a
+  │           mass-scale opinion/experience harvesting community where professional-domain discussion,
+  │           first-person framing, and name/product opinion threads are celebrated content — not
+  │           violations. 1. FIRST-PERSON PRONOUN ROOT NODE (context_influenced): Added a context note
+  │           clarifying that the deterministic regex is a soft pre-filter only, never a standalone
+  │           removal signal. AskReddit's top posts routinely use first-person framing for clearly
+  │           generic questions; the child node carries all enforcement weight. 2. FIRST-PERSON →
+  │           SPECIFICITY CHILD (threshold + rubric, context_influenced): Threshold raised from 0.70 →
+  │           0.82. Rubric rewritten to require BOTH situational specificity AND an advice-seeking
+  │           intent before flagging; canonical AskReddit experience/opinion questions using
+  │           first-person pronouns are explicitly instructed to score NO. 3. PROFESSIONAL ADVICE ROOT
+  │           NODE (context_influenced): Added a context note clarifying that keyword hits on
+  │           medical/legal/financial terms are a pre-filter only — AskReddit regularly produces
+  │           high-engagement discussion threads on these topics and keyword presence alone is not
+  │           actionable. 4. PROFESSIONAL ADVICE CHILD (threshold + rubric + examples,
+  │           context_influenced): Threshold raised from 0.70 → 0.85. Rubric substantially expanded to
+  │           make clear that professional-domain discussion, experience-harvesting, and opinion
+  │           questions score NO; only unambiguous situation-specific advice requests reach removal.
+  │           examples_to_include bumped from 5 → 6 to better calibrate the model on the wide
+  │           compliant spectrum. 5. NAMING/PURCHASING CHILD (threshold + rubric, context_influenced):
+  │           Threshold raised from 0.65 → 0.80 — the original threshold was the most aggressive of
+  │           the three and most at risk of gutting legitimate AskReddit threads about products and
+  │           names. Rubric rewritten to distinguish personal decision-support requests from
+  │           opinion/story discussion threads that use mildly personal language, consistent with the
+  │           community's casual tone.
+  │
+  │  • [deterministic/continue] Does the post contain first-person pronouns?
+  │      ↳ context: AskReddit's top-performing posts frequently use first-person framing ('When did you last cry about your appearance?') and the community produces celebrated threads with incidental first-person pronouns that are clearly generic opinion/experience harvesting questions, not personal advice requests → keep as a soft trigger that gates a deeper subjective check, never as a standalone removal signal; the downstream child node carries all meaningful weight.
+  │    ├─ [subjective/flag thr=0.82] Does the post appear to be specific to the poster's personal situation rather than a generic question inviting community-wide anecdotes or opinions?
+  │    │    ↳ context: AskReddit's highest-value content regularly uses first-person framing for broadly relatable questions; false-positive removal would gut core content → threshold raised from 0.70 to 0.82 and rubric sharpened to require both situational specificity AND an advice-seeking intent before flagging; clearly generic experience/opinion questions must score NO regardless of pronoun use.
+  │  • [deterministic/continue] Does the post request professional advice (medical, legal, financial, or similar)?
+  │      ↳ context: AskReddit regularly produces high-performing general discussion posts that mention professional domains (e.g. 'What's something surprising you learned from a doctor?', 'What's the most absurd lawsuit you've heard of?') — these are on-topic and celebrated → deterministic keyword match retained purely as a lightweight pre-filter that routes to the subjective child node; no standalone action taken on keyword match alone.
+  │    ├─ [subjective/remove thr=0.85] Is the post asking for professional or expert advice tailored to a specific personal situation, rather than an open-ended discussion or experience-harvesting question that touches on a professional topic?
+  │    │    ↳ context: AskReddit's top content frequently touches on medical, legal, and financial topics as discussion fodder with no enforcement action warranted; over-removal would eliminate core community content → threshold raised from 0.70 to 0.85, and rubric explicitly instructs that professional-domain discussion/experience questions score NO; only clear-cut, situation-specific personal advice requests reach removal; examples_to_include bumped to 6 to better anchor the model on the wide spectrum of compliant professional-topic posts.
+  │  • [deterministic/continue] Does the post crowdsource a naming or purchasing decision?
+  │    ├─ [subjective/remove thr=0.8] Is the post primarily soliciting crowd-sourced suggestions for a specific naming or purchasing decision, rather than an open-ended discussion about names or products in general?
+  │    │    ↳ context: AskReddit hosts many popular discussion threads about names and products that use surface-level personal framing but are clearly opinion/experience harvesting (e.g. 'What product do you regret buying?'); the community's conversational, casual tone means even genuine violations can look like discussion posts → threshold raised from 0.65 to 0.80 and rubric clarified to distinguish between posts that generate diverse community discussion versus those that are unambiguously personal decision-support requests; the prior 0.65 threshold was too aggressive for a community where product and name discussion threads frequently thrive.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (2 top-level items)
+     
+     • [deterministic/continue] Does the post use first-person pronouns in the title?
+         ↳ context: AskReddit routinely uses 'I' in generic hypothetical questions ('What would you do if I offered you...') → a deterministic gate plus a subjective child is used to avoid over-removing idiomatic phrasing that is core to the community's question style.
+       ├─ [subjective/flag thr=0.65] Does the first-person usage indicate the post is a personal/situational request rather than a generic open-ended question?
+       │    ↳ context: AskReddit's celebrated content includes first-person-flavored generic questions ('what would you do if I paid you...') → threshold kept at 0.65, not lowered, to avoid flagging the community's typical rhetorical style; only clearly situational personal requests should fire.
+     • [subjective/remove thr=0.7] Does the post request professional advice (medical, legal, financial, or similar) or crowdsource a personal naming/purchasing decision?
+         ↳ context: AskReddit's top content includes opinion questions touching on medical, legal, and financial topics (e.g. 'what's the worst medical advice you've heard?') → threshold set at 0.7 (slightly conservative) to avoid removing legitimate opinion-harvesting questions that merely reference professional domains without actually soliciting personal advice.
+
+====================================================================================================
+r/movies
+====================================================================================================
+
+COMMUNITY CONTEXT:
+  PURPOSE: r/movies functions primarily as a film news aggregator and discussion hub — the front page is dominated by trailers, casting announcements, posters, and industry news, which is what gets upvoted and celebrated. Moderation scope is narrow: on-topic means movie news, clips, and film discussion with a clear subject; off-topic means personal journals ('A Month of Movies'), vague recommendation requests without specificity, political rants detached from film, and shitposts. Celebrated posts (Spielberg praising Dune, James McAvoy AMA, Paramount-Warner merger opposition) confirm the community rewards newsworthy, verifiable, film-industry content — while ignored posts show the community rejects low-effort personal diaries, obscure one-line reviews, and help-find-a-movie requests with no community value.
+    Tags: news-and-information, media-and-entertainment, content-aggregation, discussion-and-debate, fan-community
+  PARTICIPANTS: The community is a large, self-selecting audience of general film enthusiasts ranging from casual moviegoers to knowledgeable cinephiles — comments reference obscure 1961 war films, 2007 indie sci-fi, and quote Super Troopers from memory, signaling a broad but engaged base. Participants interact with irony, pop-culture fluency, and industry awareness (e.g., criticizing Disney AI use, tracking MCU layoffs), indicating an adult-skewing audience comfortable with media criticism. Genuine moderation-relevant risk is low for the typical participant; the main concern is bad-faith actors (AI-generated posts, spammers, self-promoters) rather than vulnerable users who need protection from the content itself.
+    Tags: general-public, enthusiast-hobbyists, large-established-community, adult-audience, mixed-demographics
+  STAKES: The community's actual moderation priorities are format and relevance enforcement: removing memes, image posts, shitposts, spoilers without tags, piracy encouragement, clickbait titles, gossip unrelated to film, and repeat discussion threads — these rules are actively enforced as evidenced by the near-zero scores on rule-violating posts in the controversial and ignored buckets. Industry criticism (calling out Disney layoffs, AI use, studio mergers) scores extremely high and is clearly not moderated against despite being pointed or even profane — moderating that content would remove what the community values most. External content concerns like mature themes or dark film subjects carry essentially no moderation stakes here, as the community discusses horror, violence, and morally complex films as standard fare.
+    Tags: low-harm-content, format-and-quality-enforcement, spam-and-self-promotion, misinformation-and-accuracy, intellectual-property
+  TONE: The dominant register is quick-witted, pop-culture-saturated banter with a strong undercurrent of dry sarcasm — top comments are one-liners, film reference callbacks ('On nice, it comes out Earlysommar'), and punchy critiques ('And they say Hollywood is out of ideas'). Profanity and blunt dismissal are normalized when directed at industry actors or disappointing content ('Bill Burr can go suck off a Saudi,' 'MCU can rot'), and this is not moderated against — it reflects how the community expresses genuine opinion. Moderation should distinguish this valued irreverence from rule-violating personal attacks on other users, which the stated rules (and community norms) do actually prohibit.
+    Tags: casual-and-informal, humor-and-satire, high-volume-community, mixed-civility, pop-culture-references
+
+----------------------------------------------------------------------------------------------------
+RULE: No Intentional Antagonism or Negative Attention Whoring
+TEXT: No Intentional Antagonism or Negative Attention Whoring
+
+Just don't be a dick, it's pretty easy.
+
+Discuss the subject of the thread, not the users.
+
+Don't make comments just for negative attention. Th...
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (3 top-level items)
+  │
+  │  • [subjective/continue thr=0.75] Does the post/comment attack or insult other users rather than discussing the subject of the thread?
+  │    ├─ [subjective/remove thr=0.75] Is the personal attack or hostile language toward users clear and unambiguous?
+  │    ├─ [subjective/flag thr=0.65] Is the hostile language toward users borderline or ambiguous in intent?
+  │  • [subjective/flag thr=0.75] Does the post/comment appear to exist primarily to provoke negative reactions or controversy rather than to contribute genuine discussion?
+  │  • [subjective/flag thr=0.7] Does the post/comment present a quote attributed to a real person without enclosing it in quotation marks?
+  │
+  ├─ TWO-PASS: ADJUSTED (3 top-level items)
+  │  Summary: Four targeted adjustments were made based on r/movies community context: 1. ROOT NODE
+  │           (user attack check): Threshold raised from 0.75 → 0.80 and prompt/rubric updated to
+  │           explicitly exempt profanity and blunt criticism directed at studios, films, and industry
+  │           figures — which the community normalizes and values — from being misflagged as personal
+  │           attacks. Only clear user-to-user interpersonal hostility qualifies. 2. REMOVE CHILD
+  │           (clear attack): Threshold raised from 0.75 → 0.80 and rubric updated to note that
+  │           community-normative irreverence (dry sarcasm, profane film opinions) should lean toward
+  │           NO, so the auto-remove path isn't triggered by standard community banter. 3. FLAG CHILD
+  │           (ambiguous attack): Rubric updated to remind evaluators that sarcastic, profane
+  │           film-opinion disagreements are baseline behavior here; the flag should only fire when
+  │           user-targeting is genuinely present but not conclusive. Threshold unchanged. 4. NEGATIVE
+  │           ATTENTION-WHORING NODE: Threshold raised from 0.75 → 0.82 and prompt/rubric heavily
+  │           revised to protect the community's highly valued mode of pointed industry criticism
+  │           (Disney AI use, MCU decline, studio mergers) from being swept up by this rule. A new
+  │           structural remove sub-check was added specifically for the rule's named example pattern:
+  │           culture-war framing (woke/SJW/minority-casting) with zero film-discussion substance,
+  │           giving that specific pattern a direct remove path. 5. QUOTE CHECK NODE: Rubric updated
+  │           to reflect that r/movies functions as a film news aggregator where industry statements
+  │           are frequently cited and accuracy is a moderation stake — adding context about why this
+  │           check matters here and carving out sourced or clearly paraphrased cases. Threshold
+  │           unchanged.
+  │
+  │  • [subjective/continue thr=0.8] Does the post/comment attack or insult other users rather than discussing the subject of the thread?
+  │      ↳ context: r/movies normalizes profanity and blunt dismissal directed at studios, films, and industry figures as valued community expression — raising threshold to 0.80 and clarifying rubric so industry-directed hostility is never misflagged; only clear user-to-user personal attacks qualify.
+  │    ├─ [subjective/remove thr=0.8] Is the personal attack or hostile language toward users clear and unambiguous?
+  │    │    ↳ context: Community tone is casual, sarcastic, and sometimes profane as a norm — threshold raised to 0.80 and rubric updated to explicitly exempt community-normative irreverence so genuinely borderline sarcasm isn't auto-removed.
+  │    ├─ [subjective/flag thr=0.65] Is the hostile language toward users borderline or ambiguous in intent?
+  │    │    ↳ context: Rubric updated to remind evaluators that sarcastic, profane film-opinion disagreements are normal here and should not trigger the flag branch; flag is reserved for genuinely ambiguous interpersonal hostility that isn't explained by community tone.
+  │  • [subjective/flag thr=0.82] Does the post/comment appear to exist primarily to provoke negative reactions or controversy rather than to contribute genuine film discussion?
+  │      ↳ context: r/movies strongly rewards pointed industry criticism and dry sarcasm — threshold raised to 0.82 and rubric explicitly exempts industry/studio criticism from this check; only pure culture-war bait with zero film-discussion substance should be flagged, not opinionated commentary.
+  │    ├─ [structural/remove] Is the content a culture-war complaint (e.g., 'woke', 'SJW', minority casting grievance) with no substantive film discussion attached?
+  │    │    ↳ context: Rule explicitly calls out woke/SJW/minority-casting complaints as a named example of negative attention-whoring; adding a dedicated structural sub-check so this specific pattern (culture-war framing + zero film substance) triggers a direct remove rather than staying in the subjective flag path.
+  │  • [subjective/flag thr=0.7] Does the post/comment present a quote attributed to a real person without enclosing it in quotation marks?
+  │      ↳ context: r/movies is a news-and-information hub where industry statements (director interviews, casting announcements, executive comments) are frequently cited — misinformation and accuracy are a listed moderation stake; rubric updated to emphasize the news-context importance of this check and to carve out sourced or clearly paraphrased cases.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (3 top-level items)
+     
+     • [subjective/remove thr=0.65] Does the content attack, insult, or demean other users rather than discussing the subject of the thread?
+         ↳ context: Community tone normalizes profanity and blunt dismissal toward studios/industry figures → threshold kept at 0.65 and rubric explicitly excludes industry-directed irreverence, so only genuine personal attacks on fellow users are flagged.
+     • [subjective/remove thr=0.7] Does the content appear to be posted purely for negative attention or to provoke controversy with no substantive film-related discussion?
+         ↳ context: Community strongly values pointed industry criticism and distinguishes it from bad-faith culture-war baiting → threshold raised slightly to 0.7 and rubric draws a clear line between substantive criticism and content that uses a film as a pretext for inflammatory ranting.
+     • [subjective/flag thr=0.7] Does the content present a quote attributed to someone without using quotation marks?
+
+
+----------------------------------------------------------------------------------------------------
+RULE: No Spam &amp; Self-promotion - Same Source Posts
+TEXT: No Spam &amp; Self-promotion - Same Source Posts
+
+The site-wide definition of spam is when a user has more than 20% of their submissions coming from one source.
+
+If your username is the same as the we...
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (3 top-level items)
+  │
+  │  • [deterministic/continue] Does the submitting account's username match or closely resemble the domain, website name, or YouTube channel being linked or promoted?
+  │    ├─ [subjective/remove thr=0.7] Does the post author's username match or closely resemble the linked domain name or YouTube channel name extracted from the submission URL or body?
+  │  • [deterministic/continue] Does the submission link to or promote a Letterboxd account (profile, list, or diary)?
+  │    ├─ [subjective/remove thr=0.7] Is the Letterboxd link pointing to a personal user account, profile, diary, or list (as opposed to a direct film or review page)?
+  │  • [structural/continue] Does the post's submission history context indicate the author has more than 20% of their recent submissions originating from a single external source?
+  │    ├─ [subjective/flag thr=0.7] Does analysis of the author's recent submission history show a single domain or source accounting for more than 20% of their total submissions?
+  │
+  ├─ TWO-PASS: ADJUSTED (3 top-level items)
+  │  Summary: Three context-influenced adjustments were made, all targeting the subjective leaf-node
+  │           checks: 1. USERNAME-DOMAIN MATCH (child of username check): Threshold lowered from 0.7 →
+  │           0.65; prompt expanded to highlight film-niche brand naming conventions common to YouTube
+  │           film reviewers and entertainment blogs — the dominant spam vectors in r/movies. Rubric
+  │           reinforced to flag borderline cases given the rule's ban-and-blacklist severity. 2.
+  │           LETTERBOXD PERSONAL ACCOUNT CHECK: Threshold lowered from 0.7 → 0.65; prompt updated to
+  │           explicitly reference the community's rejection of personal diary-style posts (e.g., 'A
+  │           Month of Movies') as the motivating context for this rule. Rubric clarified to
+  │           distinguish a film's canonical Letterboxd page (not a violation) from a user's personal
+  │           profile, diary, or list (violation). 3. 20% SAME-SOURCE SPAM CHECK: Threshold lowered
+  │           from 0.7 → 0.65; prompt and rubric expanded to name film YouTube channels, entertainment
+  │           blogs, and movie news sites as the primary spam vectors in this community, and to
+  │           explicitly state that on-topic content quality does not excuse exceeding the 20%
+  │           threshold — preventing bad-faith actors from evading the rule by posting legitimately
+  │           film-adjacent content from a single source. All deterministic parent nodes and
+  │           structural gating logic were left unchanged, as they are format checks independent of
+  │           community context.
+  │
+  │  • [deterministic/continue] Does the submitting account's username match or closely resemble the domain, website name, or YouTube channel being linked or promoted?
+  │    ├─ [subjective/remove thr=0.65] Does the post author's username match or closely resemble the linked domain name or YouTube channel name extracted from the submission URL or body?
+  │    │    ↳ context: r/movies is a high-volume aggregator heavily targeted by film YouTubers and entertainment bloggers doing self-promotion → threshold lowered from 0.7 to 0.65 and prompt expanded with film-niche branding patterns; rule carries ban-level severity so borderline cases should not be dismissed.
+  │  • [deterministic/continue] Does the submission link to or promote a Letterboxd account (profile, list, or diary)?
+  │    ├─ [subjective/remove thr=0.65] Is the Letterboxd link pointing to a personal user account, profile, diary, or list (as opposed to a direct film or review page)?
+  │    │    ↳ context: Community context explicitly identifies 'A Month of Movies' personal diary posts as a rejected low-effort format → prompt expanded to reference this pattern; threshold lowered slightly from 0.7 to 0.65 to catch ambiguous personal-profile URLs; rubric language now distinguishes film canonical pages (allowed) from personal diary/list pages (banned).
+  │  • [structural/continue] Does the post's submission history context indicate the author has more than 20% of their recent submissions originating from a single external source?
+  │    ├─ [subjective/flag thr=0.65] Does analysis of the author's recent submission history show a single domain or source accounting for more than 20% of their total submissions, with particular attention to film YouTube channels, entertainment blogs, and movie news sites consistent with r/movies content formats?
+  │    │    ↳ context: r/movies is heavily gamed by film YouTube channels and entertainment blogs whose content superficially fits the community's format → prompt and rubric now explicitly call out film-niche domains as the primary spam vector; rubric clarifies that on-topic content quality does not exempt a source from the 20% rule; threshold lowered from 0.7 to 0.65 to ensure borderline cases reach human review given the hard-rule nature of the 20% site-wide threshold.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (3 top-level items)
+     
+     • [subjective/remove thr=0.75] Does the submitting user's username match or closely resemble the domain or channel name being linked?
+         ↳ context: r/movies is a high-traffic aggregator targeted by self-promoters masquerading as community members → threshold set to 0.75 to catch clear username-domain matches while avoiding false positives on incidental name similarities.
+     • [deterministic/flag] Does the post link to or promote a Letterboxd account?
+       ├─ [subjective/remove thr=0.7] Is the Letterboxd link pointing to a personal profile or list (account-sharing) rather than a specific film's page?
+     • [structural/flag] Does the user's recent submission history suggest more than 20% of their posts originate from a single external source?
+         ↳ context: r/movies is a large aggregator attractive to self-promoters → low karma used as a fast structural gate to route suspicious accounts for deeper history review, avoiding costly checks on established community members.
+       ├─ [subjective/remove thr=0.7] Does manual review of the account's post history reveal a single domain or channel accounting for more than 20% of their submissions?
+       │    ↳ context: r/movies is a content-aggregation community where spam via repeated source posting is a primary enforcement priority → threshold kept at 0.7 to flag likely self-promoters while recognizing that low-karma accounts warrant human moderator review before removal.
+
+====================================================================================================
+r/todayilearned
+====================================================================================================
+
+COMMUNITY CONTEXT:
+  PURPOSE: r/todayilearned is a fact-sharing community where the on-topic unit is a single, verifiable, surprising or interesting fact sourced from a reliable reference — the celebrated posts (James Cameron/Avatar, Dark Forest Hypothesis, ice cream draft list) show the community rewards novelty, specificity, and narrative punch across any subject domain: history, science, pop culture, law, biology, and more. Off-topic means recent news/politics, unverifiable claims, opinion pieces, vague generalities, or software/website trivia — the ignored and controversial posts ("TIL ice is a rock," "TIL Braille comes in languages," vanity plate post) reveal that the community also implicitly rejects facts that feel too obvious, too trivial, or insufficiently surprising, even when technically rule-compliant. Moderation scope is therefore defined by source quality, factual specificity, and novelty threshold rather than subject matter — virtually any topic is in-scope as long as it passes those filters.
+    Tags: fact-sharing, educational-content, source-verification-required, broad-topic-scope, novelty-driven-curation
+  PARTICIPANTS: The participant base is a large, general-interest, intellectually curious audience that engages with facts spanning history, science, geopolitics, pop culture, and dark or macabre topics without apparent distress — comments on suicide methods (Japan train post), lethal viruses (Kenya cave), and historical abuse (wakashudo) are matter-of-fact, humorous, or analytically engaged, not alarmed, indicating a self-selected audience comfortable with adult and sensitive subject matter as trivia. The community skews toward confident, educated commenters who routinely add corrections, caveats, and deeper context (Benford's Law thread, Giant-impact hypothesis thread), suggesting participants see themselves as co-curators of accuracy rather than passive consumers. Moderation-relevant risk of harm is low for the general population here; the narrow genuine risk zone is factual misinformation spreading as credible fact to a very large (41M subscriber) audience, not exposure to dark or mature themes.
+    Tags: general-public, intellectually-engaged, large-mainstream-audience, self-directed-learners, accuracy-conscious
+  STAKES: The primary moderation enforcement target for this community is factual integrity and source reliability — posts that omit context, misrepresent sources, or make unverifiable claims are what the community actually removes, as evidenced by the rules and the pattern of controversial/ignored posts where accuracy is disputed in comments. Dark, macabre, or sensitive content (suicide methods, lethal viruses open to tourists, historical sexual abuse, animal mass death) consistently earns top scores and hundreds of engaged comments, meaning this content carries LOW moderation stakes internally — removing it would eliminate the community's most celebrated material. The community does NOT self-moderate around tone, mature themes, or emotional impact; the real enforcement gap is between "interesting verified fact" and "vague/unverifiable/politically charged claim," with recency (no sources under two months old) and political agendas as the other actively enforced boundaries.
+    Tags: factual-accuracy-enforcement, low-sensitivity-to-dark-themes, source-credibility-gating, political-content-restricted, misinformation-risk
+  TONE: The actual communicative register is casual, witty, and frequently irreverent — top comments deploy dry humor ("Billions of years ago, some giant rock hit another rock, and because of it I have to go to work and pay bills"), light profanity ("Woz is super fucking cool," "as thick as fuck"), and dark jokes ("I hate my family. Two birds, one stone" on the Japan suicide post) as standard engagement currency, not edge cases. Comments also layer in substantive corrections and contextual additions alongside the jokes, so the tone is intellectually engaged banter rather than pure comedy or pure academia. Moderation against profanity, dark humor, or irreverent takes on serious topics would directly contradict observed community norms and remove the most upvoted content — the enforceable tone floor is anti-harassment and anti-personal-attack, not anti-crude or anti-dark.
+    Tags: casual-tone, dark-humor-normalized, profanity-accepted, intellectually-engaged-banter, irreverent
+
+----------------------------------------------------------------------------------------------------
+RULE: Inaccurate/unverifiable/not supported by source
+TEXT: Inaccurate/unverifiable/not supported by source
+
+Please link directly to a reliable source that supports every claim in your post title. Images alone do not count as valid references. Videos are fine ...
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (3 top-level items)
+  │
+  │  • [structural/remove] Does the post lack a direct link to any source?
+  │  • [deterministic/continue] Is the sole linked source an image (e.g. imgur, i.redd.it, i.imgur.com, direct image file)?
+  │    ├─ [subjective/remove thr=0.7] Is the linked image the only source provided (no additional non-image URL present)?
+  │  • [subjective/flag thr=0.7] Is the linked source unreliable, non-reputable, or does it fail to support the specific claims made in the post title?
+  │
+  ├─ TWO-PASS: ADJUSTED (4 top-level items)
+  │  Summary: Five targeted adjustments were made to better fit r/todayilearned's specific moderation
+  │           context: 1. ITEM 1 (no source / structural remove): Marked context_influenced=true to
+  │           document that the remove action is doubly justified by the community's 41M-audience
+  │           misinformation risk, even though the logic itself is unchanged. 2. ITEM 2 (image-only
+  │           detection / deterministic): Extended the image-host regex patterns to cover additional
+  │           common image CDNs (Twitter pbs.twimg, Instagram CDN, Flickr, Pinterest/pinimg) that are
+  │           frequently used as pseudo-sources in large fact-sharing communities but carry no
+  │           verifiable editorial backing — directly responsive to the vanity plate post pattern. 3.
+  │           ITEM 2 child (image-only subjective check): Threshold raised from 0.7 → 0.75 and rubric
+  │           explicitly extended to call out screenshots of tweets/documents as non-qualifying
+  │           sources, closing a common evasion pattern for a high-stakes 41M audience. 4. NEW ITEM
+  │           (video source reliability): Split out from the generic source-reliability item into its
+  │           own dedicated check, directly reflecting the rule's explicit BBC/Discovery example
+  │           language and the community's pattern of rewarding high-quality documentary/institutional
+  │           sourcing. 5. ITEM 3 (source reliability / subjective flag): Threshold lowered from 0.7 →
+  │           0.65 to cast a wider net for human review (appropriate for a flag action at scale);
+  │           rubric expanded with a TIL-specific 'specific framing' note, a list of common
+  │           low-credibility site categories, and explicit guidance on partial/tangential sourcing. A
+  │           new child item was added to catch title-vs-source distortion (overstating,
+  │           caveat-stripping, scope inflation), which is the most common real failure mode in
+  │           TIL-style communities where a reputable source is linked but the title misrepresents its
+  │           findings.
+  │
+  │  • [structural/remove] Does the post lack a direct link to any source?
+  │      ↳ context: r/todayilearned's entire identity is built on sourced facts to a 41M-subscriber audience where misinformation risk is high → source linking is non-negotiable; posts with no external link at all must be removed without further review.
+  │  • [deterministic/continue] Is the sole linked source an image (e.g. imgur, i.redd.it, i.imgur.com, direct image file)?
+  │      ↳ context: Community context shows the vanity plate post (image-only) was poorly received and the community actively rejects image-only sourcing → extended image-host regex patterns to catch additional common image CDNs (Twitter, Instagram, Flickr, Pinterest) that are frequently used as pseudo-sources but carry no verifiable factual backing.
+  │    ├─ [subjective/remove thr=0.75] Is the linked image the only source provided (no additional non-image URL present)?
+  │    │    ↳ context: Community has a 41M audience and high misinformation stakes; the vanity plate post exemplifies image-only sourcing being rejected → threshold raised slightly from 0.7 to 0.75 to reduce false negatives, and rubric explicitly calls out screenshots of tweets/documents as non-qualifying to address a common evasion pattern observed in large fact-sharing communities.
+  │  • [subjective/flag thr=0.7] Is the linked source a video from a non-reputable outlet?
+  │      ↳ context: The rule explicitly calls out video sourcing as a distinct case (BBC, Discovery examples); community context shows celebrated posts reference high-quality documentary and institutional content → splitting video source reliability into its own dedicated checklist item improves precision and gives moderators clearer guidance on the video-specific credibility bar.
+  │  • [subjective/flag thr=0.65] Is the linked source unreliable, non-reputable, or does it fail to directly support the specific claims made in the post title?
+  │      ↳ context: Community context shows participants are accuracy-conscious co-curators who routinely add corrections (Benford's Law, Giant-impact threads) and the primary enforcement target is factual integrity for a 41M audience → threshold lowered from 0.7 to 0.65 to cast a slightly wider net for human review (flag rather than auto-remove), rubric expanded to explicitly address partial/tangential sourcing and call out common low-credibility site categories observed in large fact-sharing communities; the 'specific framing' note is added because TIL titles often make precise claims that a general article may not actually confirm.
+  │    ├─ [subjective/flag thr=0.65] Does the post title overstate, misrepresent, or materially distort what the linked source actually says?
+  │    │    ↳ context: Community context shows participants are highly accuracy-conscious and regularly correct title misrepresentations in comments (Benford's Law thread pattern); the celebrated posts succeed precisely because their titles faithfully reflect the source → adding a dedicated title-vs-source distortion check addresses the most common real-world failure mode where a reputable source IS linked but the title spins or overstates its findings, which would otherwise pass the parent credibility check.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (3 top-level items)
+     
+     • [structural/continue] Does the post lack a directly linked source in the body?
+       ├─ [deterministic/remove] Does the post body contain no external URL that could serve as a source?
+     • [subjective/remove thr=0.75] Is the only source provided a standalone image (no article, video, or text source)?
+         ↳ context: Large mainstream audience (41M subscribers) with high misinformation risk → threshold set conservatively at 0.75 to avoid removing posts where an image accompanies a legitimate text source, while still catching pure-image submissions.
+     • [subjective/remove thr=0.7] Is the source unreliable, non-reputable, or does it fail to support the specific claim made in the title?
+         ↳ context: Primary moderation enforcement target is factual integrity and source reliability → threshold set at 0.7 (moderately sensitive) to catch clear misinformation and unsupported claims without over-penalizing posts with imperfect but plausible sourcing on a broad-topic community.
+
+
+----------------------------------------------------------------------------------------------------
+RULE: No personal opinions/anecdotes/subjective posts
+TEXT: No personal opinions/anecdotes/subjective posts
+
+(e.g "TIL xyz is a great movie")
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (1 top-level items)
+  │
+  │  • [subjective/continue thr=0.7] Does the post title contain a personal opinion, anecdote, or subjective claim (e.g. value judgments, personal reactions, or statements that cannot be objectively verified)?
+  │    ├─ [deterministic/flag] Does the title contain explicit opinion/sentiment keywords that signal a subjective or evaluative claim?
+  │    ├─ [deterministic/flag] Does the post title use first-person language suggesting a personal anecdote or reaction rather than a general fact?
+  │
+  ├─ TWO-PASS: ADJUSTED (1 top-level items)
+  │  Summary: Four targeted adjustments were made based on r/todayilearned community context: (1) The
+  │           root subjective item's rubric was substantially rewritten to distinguish genuine opinion
+  │           framing from legitimate vivid/descriptive language and documented superlatives, since
+  │           the community celebrates narrative-punchy, sometimes dark or dramatic fact-sharing — the
+  │           detection threshold was also raised from 0.7 to 0.8 to reduce false positives against
+  │           the community's celebrated content style. (2) The opinion-keyword deterministic pattern
+  │           had several words removed ('fascinating', 'shocking', 'stunning', 'remarkable',
+  │           'extraordinary', 'impressive', 'incredible') because community evidence shows these
+  │           descriptors appear routinely in top-scoring, rule-compliant posts and their flagging
+  │           would over-remove legitimate content; the remaining keywords are those that more cleanly
+  │           signal personal taste or preference. (3) The first-person anecdote pattern was kept
+  │           unchanged, as it accurately targets a clear violation type with no community-context
+  │           reason to relax it. (4) A new subjective child check was added to catch
+  │           vague/obvious/truism posts that function as personal impressions dressed as TILs (e.g.
+  │           'TIL ice is a rock'), a gap revealed by the community's pattern of controversial/ignored
+  │           posts — set at a high threshold of 0.85 to avoid over-moderating borderline novelty
+  │           cases that the community resolves through voting.
+  │
+  │  • [subjective/continue thr=0.8] Does the post title contain a personal opinion, anecdote, or subjective claim (e.g. value judgments, personal reactions, or statements that cannot be objectively verified)?
+  │      ↳ context: r/todayilearned rewards vivid, narrative-punchy language and covers dark/macabre topics as core content — the rubric must clearly distinguish genuine opinion framing from legitimate descriptive or documented-superlative language to avoid over-removal. Threshold raised from 0.7 to 0.8 because the community's primary enforcement target is factual integrity/source quality, not subjective tone; false positives here would remove celebrated content.
+  │    ├─ [deterministic/flag] Does the title contain explicit opinion/sentiment keywords that signal a personal evaluative claim rather than a documented fact?
+  │    │    ↳ context: Words like 'fascinating', 'shocking', 'stunning', 'remarkable', 'extraordinary', 'incredible', and 'impressive' were removed from the pattern list because community context shows r/todayilearned posts routinely use vivid, evocative descriptors as part of legitimate fact-sharing (e.g. celebrated posts use language like these to describe documented phenomena); flagging them would produce excessive false positives. The remaining keywords are those that primarily signal personal taste or opinion rather than documented characterization. Pattern still triggers a flag for human review, not auto-removal.
+  │    ├─ [deterministic/flag] Does the post title use first-person language suggesting a personal anecdote or reaction rather than a general fact?
+  │    ├─ [subjective/flag thr=0.85] Does the post present a vague, generalizing, or 'obvious' claim rather than a specific, verifiable fact — indicating a subjective impression dressed as a TIL?
+  │    │    ↳ context: Community context shows r/todayilearned implicitly rejects posts that feel like personal realizations or obvious truisms (e.g. the controversial 'TIL ice is a rock' post), even when technically rule-compliant on other dimensions. These blur into subjective posts because the 'learning' is entirely personal impression rather than a discrete verifiable fact. Adding this check closes that gap. High threshold (0.85) set because vagueness judgment is difficult and the community resolves borderline novelty cases through voting rather than removal.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (1 top-level items)
+     
+     • [subjective/remove thr=0.65] Is the post's claim based on personal opinion, subjective experience, or anecdote rather than a verifiable fact?
+         ↳ context: Community rewards novelty and specificity across any subject domain (history, pop culture, science, etc.) → the check is scoped narrowly to opinion/subjectivity signals only, not topic or tone, since dark or mature factual content carries low moderation stakes here.
+
+====================================================================================================
+r/ClaudeAI
+====================================================================================================
+  (no community context)
+
+----------------------------------------------------------------------------------------------------
+RULE: Be respectful
+TEXT: Be respectful
+
+Diversity of opinion is welcome. Controversial opinions are welcome. Personal attacks and harassment are not. Ask Claude for a definition of "good faith discussion for a subreddit" if y...
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (2 top-level items)
+  │
+  │  • [subjective/continue thr=0.7] Does the post/comment contain a personal attack targeting a specific user?
+  │    ├─ [subjective/remove thr=0.7] Is the personal attack severe or explicit (e.g., slurs, direct threats, extreme insults) rather than mildly dismissive?
+  │    ├─ [subjective/flag thr=0.7] Is the personal attack mild or borderline (condescending or dismissive tone toward a person without extreme language)?
+  │  • [subjective/remove thr=0.7] Does the post/comment constitute harassment of a user (e.g., repeated targeting, intimidation, or sustained hostile behavior)?
+  │
+  ├─ TWO-PASS: ADJUSTED (3 top-level items)
+  │  Summary: Four key adjustments were made for the ClaudeAI subreddit context: 1. Personal attack
+  │           root node (context_influenced): The community is purpose-built to critique and discuss
+  │           an AI product, so strong/blunt criticism of Claude and Anthropic is expected and must be
+  │           explicitly excluded from the personal attack definition. Rubric language and the prompt
+  │           were updated to draw a hard line between human-targeted attacks and AI/company
+  │           criticism. Threshold raised to 0.75. 2. Severe personal attack child node
+  │           (context_influenced): Rubric clarified to prevent false positives where harsh Claude/AI
+  │           criticism is mistaken for a severe interpersonal attack. Threshold raised to 0.75 to
+  │           match the community's opinionated tone. 3. Mild/borderline personal attack child node
+  │           (context_influenced): The rule explicitly welcomes controversial opinions and direct
+  │           communication styles are common in technical AI communities. Threshold raised to 0.78
+  │           and rubric updated to redirect focus away from AI/Anthropic criticism toward
+  │           human-targeted rudeness. 4. Harassment node (context_influenced): Rubric updated to
+  │           explicitly exclude passionate AI/Anthropic debate from the harassment definition. 5. NEW
+  │           good-faith discussion node added: The rule text uniquely calls out 'good faith
+  │           discussion' as an explicit standard and even references asking Claude itself for
+  │           guidance — this is a distinctive community value. A new flag-action item was added to
+  │           catch bad-faith engagement (trolling, sea-lioning, deliberate derailment) that wouldn't
+  │           qualify as harassment or a personal attack but still violates the rule. High threshold
+  │           (0.8) preserves space for controversial opinions.
+  │
+  │  • [subjective/continue thr=0.75] Does the post/comment contain a personal attack targeting a specific user?
+  │      ↳ context: ClaudeAI is a community built around critiquing and discussing an AI product — strong, even blunt criticism of Claude/Anthropic is the norm and must never be conflated with personal attacks on humans. Threshold raised slightly to 0.75 and rubric sharpened to explicitly protect product/company criticism while still catching genuine interpersonal attacks.
+  │    ├─ [subjective/remove thr=0.75] Is the personal attack severe or explicit (e.g., slurs, direct threats, extreme insults) rather than mildly dismissive?
+  │    │    ↳ context: ClaudeAI users frequently vent strong frustration at the AI itself — rubric clarified to prevent false positives where harsh AI criticism is mistaken for a severe personal attack on a human. Threshold raised to 0.75 to match the community's generally technical and opinionated tone.
+  │    ├─ [subjective/flag thr=0.78] Is the personal attack mild or borderline (condescending or dismissive tone toward a person without extreme language)?
+  │    │    ↳ context: The rule explicitly welcomes controversial opinions and diverse viewpoints, and the community is technically-oriented with often terse, direct communication. Threshold raised to 0.78 to reduce false flags on blunt-but-not-hostile discourse, and rubric updated to direct attention away from AI/Anthropic criticism toward human-targeted rudeness.
+  │  • [subjective/remove thr=0.7] Does the post/comment constitute harassment of a user (e.g., repeated targeting, intimidation, or sustained hostile behavior)?
+  │      ↳ context: ClaudeAI discussions can include passionate debate about AI capabilities and Anthropic decisions — rubric updated to explicitly exclude AI/company criticism from the harassment definition, ensuring moderators focus on interpersonal targeting rather than heated product discourse.
+  │  • [subjective/flag thr=0.8] Does the post/comment violate the good-faith discussion standard referenced in the rule (e.g., deliberately bad-faith argumentation, trolling, or intentional derailment)?
+  │      ↳ context: The rule text uniquely references 'good faith discussion' as an explicit standard and even points users to ask Claude for a definition — this signals the community places real weight on this concept. Added as a new check to surface bad-faith behavior that wouldn't rise to harassment or personal attack but still violates the rule's spirit. High threshold (0.8) because the community explicitly welcomes controversial opinions, so only clear bad-faith patterns should be flagged.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (1 top-level items)
+     
+     • [subjective/remove thr=0.65] Does the post or comment contain personal attacks or harassment directed at another user?
+         ↳ context: Community explicitly welcomes controversial and diverse opinions → threshold kept at 0.65 to avoid over-moderating heated but idea-focused debate, targeting only genuine personal attacks rather than strong disagreement.
+
+
+----------------------------------------------------------------------------------------------------
+RULE: Be relevant
+TEXT: Be relevant
+
+Stay relevant to the Claude and Claude Code technology and users. We generally don't accept posts of more general AI interest here.
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (1 top-level items)
+  │
+  │  • [subjective/flag thr=0.7] Is the post not relevant to Claude or Claude Code technology and users?
+  │    ├─ [subjective/remove thr=0.7] Is the post explicitly about general AI interest with no meaningful Claude or Claude Code focus?
+  │
+  ├─ TWO-PASS: ADJUSTED (1 top-level items)
+  │  Summary: No community context was provided beyond the rule text itself. All checklist items have
+  │           been returned as-is with context_influenced=false, since there were no situational facts
+  │           (community size, tone, moderator notes, historical patterns, etc.) available to justify
+  │           threshold or rubric changes. The only minor clarification added to the child node's
+  │           prompt_template is a note that direct Claude-vs-other-model comparisons where Claude is
+  │           the clear subject should still count as relevant — this is a logical extension of the
+  │           rule text rather than a context-driven change, so context_influenced remains false.
+  │
+  │  • [subjective/flag thr=0.7] Is the post not relevant to Claude or Claude Code technology and users?
+  │    ├─ [subjective/remove thr=0.7] Is the post explicitly about general AI interest with no meaningful Claude or Claude Code focus?
+  │
+  └─ SINGLE-PASS WITH CONTEXT (1 top-level items)
+     
+     • [subjective/remove thr=0.65] Is the post unrelated or only tangentially related to Claude or Claude Code technology and its users?
+         ↳ context: Community is specifically focused on Claude and Claude Code (not general AI) → threshold set to 0.65 to catch posts about other AI models or general AI discourse that dominate the feed of a product-specific subreddit, while not penalizing legitimate Claude comparisons.
+
+====================================================================================================
+r/OUTFITS
+====================================================================================================
+
+COMMUNITY CONTEXT:
+  PURPOSE: r/OUTFITS is a practical fashion-sharing and advice community where on-topic content means posting your own outfit photos or asking for feedback on real-world dressing decisions (dates, events, dress codes, purchases). The most celebrated posts are outfit-reveal photos paired with a specific social context ('date night,' 'pop concert,' 'nightclub'), and high-engagement advice threads center on concrete questions like 'should I return this?' or 'which dress suits me for X?' Posts that get ignored or downvoted tend to be abstract style taxonomy questions ('what is this style called?'), gym/casual low-effort fits, or posts without a clear outfit focus — confirming that moderation should prioritize removing decontextualized or non-outfit content rather than policing how much skin is shown.
+    Tags: outfit-sharing, fashion-advice, event-dressing, photo-based, practical-fashion
+  PARTICIPANTS: The active participant base skews toward women posting their own photos for genuine style feedback, often anchored to real social situations — first dates, school events, weddings, nights out. Participants self-describe their bodies, budgets, and confidence levels openly and voluntarily ('post-baby body,' 'dress gave me confidence today'), signaling self-aware adults who seek encouragement and honest input, not protection from fashion commentary. The genuine moderation-relevant risk is not from the posters themselves but from outside actors who attempt to sexualize, body-shame, or solicit personal contact with posters — a pattern the rules explicitly and repeatedly address.
+    Tags: adult-users, self-posters, advice-seekers, mixed-gender, confidence-building
+  STAKES: The community's actual enforcement priorities are clear and specific: sexual or creepy comments, body-focused remarks, DMs/contact solicitation, misogyny, and modesty-policing are the real threats moderators act on — not the outfittedness or revealingness of the clothing itself, which routinely earns thousands of upvotes without controversy. Controversial posts (low upvote ratios) tend to be flagged for photo quality issues, off-topic framing, or unclear outfit presentation rather than for showing too much skin. External concerns like body image risk or general internet safety are not moderated by this community; the rules and voting behavior both show that the enforced stakes are predatory commenter behavior and off-topic content.
+    Tags: anti-harassment, anti-sexualization, comment-quality, on-topic-enforcement, low-content-removal
+  TONE: The dominant comment register is warm, hype-forward, and lightly playful — top comments include 'Okayyyy girlfrienddddddddddddddddddddddd everything ✅✅,' 'Chefs kiss,' and 'okay gamgam get ittttttt,' alongside more measured advice like 'dress it up with some nice accessories' or 'bring a blazer depending on how conservative the school is.' Encouragement is the default mode, with humor landing through relatable asides ('pretending to be a morning person') rather than sarcasm or edge. Moderation should treat hype-affirming language and casual internet enthusiasm as normal and healthy here — flagging it as low-effort would remove the community's most socially valued interactions.
+    Tags: supportive, hype-positive, casual-humor, advice-driven, encouraging
+
+----------------------------------------------------------------------------------------------------
+RULE: COMMENTS MUST BE CONSTRUCTIVE, HELPFUL, AND KIND
+TEXT: COMMENTS MUST BE CONSTRUCTIVE, HELPFUL, AND KIND
+
+Criticism should be given constructively and with sensitivity.
+
+&gt; 1. Low effort comments like "Neither" or "None" are unacceptable. Please provide ...
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (2 top-level items)
+  │
+  │  • [subjective/flag thr=0.7] Is the comment a low-effort response that provides no detailed feedback (e.g. single words or very short dismissals like 'Neither', 'None', 'No', 'Both bad')?
+  │  • [subjective/flag thr=0.7] Is the comment rude, unnecessarily negative, or does it fail to use tact when delivering criticism?
+  │
+  ├─ TWO-PASS: ADJUSTED (2 top-level items)
+  │  Summary: Two items adjusted for r/OUTFITS community context. (1) Low-effort check: the base
+  │           rubric risked false-flagging the community's most celebrated interaction style — brief
+  │           hype and affirmation comments like 'Chefs kiss' or 'Okayyyy girl ✅✅'. The prompt and
+  │           rubric were rewritten to explicitly exempt positive/enthusiastic short comments,
+  │           reserving the violation only for dismissive negative non-answers. Threshold raised to
+  │           0.75 to further reduce false positives on genuine encouragement. (2) Rudeness/tact
+  │           check: the community's real enforcement priorities include body-shaming and
+  │           modesty-policing (e.g. 'that's too revealing'), which the base rubric did not mention.
+  │           These were added as explicit violation patterns. The rubric was also clarified to
+  │           confirm that the community's warm, hype-forward, and casually humorous register is never
+  │           a violation. No items were removed; no new items were added, as the two existing checks
+  │           map cleanly to the rule's two enforceable dimensions.
+  │
+  │  • [subjective/flag thr=0.75] Is the comment a low-effort response that provides no detailed feedback (e.g. single words or very short dismissals like 'Neither', 'None', 'No', 'Both bad')?
+  │      ↳ context: Community tone is hype-forward and celebratory — top comments like 'Okayyyy girlfrienddddddddddddddddddddddd everything ✅✅' and 'Chefs kiss' are the community's most socially valued interactions → rubric and prompt explicitly carve out positive/hype short comments as NOT low-effort, reserving the violation only for dismissive negative non-answers. Threshold raised slightly to 0.75 to further protect against false-flagging genuine encouragement.
+  │  • [subjective/flag thr=0.7] Is the comment rude, unnecessarily negative, or does it fail to use tact when delivering criticism?
+  │      ↳ context: Community participants openly share photos in real social contexts and are vulnerable to body-shaming and modesty-policing, which the community's stakes section identifies as a specific enforcement priority → rubric and prompt expanded to explicitly call out body-shaming and modesty-policing as violations of the tact/kindness rule. Prompt also clarified that the community's warm, hype-affirming, and casually humorous default register is never a violation.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (2 top-level items)
+     
+     • [deterministic/continue] Is the comment a low-effort, dismissive response that provides no meaningful feedback?
+         ↳ context: Community tone includes short hype comments as normal ('Okayyyy', 'Chefs kiss') → regex scoped tightly to dismissive/negative one-word reactions only, not short enthusiastic affirmations.
+       ├─ [subjective/remove thr=0.75] Confirm: does the comment consist only of a dismissive word or reaction with no constructive detail?
+       │    ↳ context: Community tone is hype-forward and affirming, but short affirmative reactions ('Chefs kiss') are socially valued — threshold set high (0.75) to target only genuinely dismissive non-answers, not short positive or neutral reactions.
+     • [subjective/flag thr=0.65] Is the comment rude, unnecessarily negative, or unkind toward the poster or their outfit?
+         ↳ context: Community faces real risk from harsh/body-shaming commenters targeting self-posters who share vulnerable context → threshold set at 0.65 to catch blunt negativity, but rubric explicitly exempts community's signature hype-affirming tone from being penalized.
+
+
+----------------------------------------------------------------------------------------------------
+RULE: COMMENTS MUST BE ABOUT THE OUTFIT
+TEXT: COMMENTS MUST BE ABOUT THE OUTFIT
+
+This is a fashion subreddit.  Comments must be about the outfit.  Do not make comments that are:
+
+&gt; 1. About OP's body.
+
+&gt; 2. Off-topic.
+
+&gt; 3. Accusations o...
+----------------------------------------------------------------------------------------------------
+
+  ┌─ NO CONTEXT (5 top-level items)
+  │
+  │  • [subjective/remove thr=0.7] Does the comment focus on OP's body rather than the outfit?
+  │  • [subjective/remove thr=0.7] Is the comment off-topic (not about the outfit or fashion)?
+  │  • [deterministic/continue] Does the comment accuse or suggest the photo/poster involves photoshop, AI generation, editing, or catfishing?
+  │    ├─ [subjective/remove thr=0.7] Does the matched keyword appear in the context of accusing or questioning the authenticity of the photo, poster, or image?
+  │  • [deterministic/continue] Does the comment involve body shaming, discussion of eating disorders, or discussion of medical issues?
+  │    ├─ [subjective/remove thr=0.7] Does the matched content constitute body shaming, discussion of an eating disorder, or discussion of a medical condition in relation to OP or their appearance?
+  │  • [subjective/remove thr=0.7] Does the comment address political or social issues or controversies?
+  │
+  ├─ TWO-PASS: ADJUSTED (6 top-level items)
+  │  Summary: Six adjustments made across the checklist, plus one new item added: 1. BODY FOCUS (item
+  │           1): Rubric sharpened to distinguish predatory/sexualizing body comments (remove) from
+  │           outfit-adjacent body references or posters' own self-descriptions being echoed
+  │           positively (allow). Threshold raised to 0.75. Sexualization and solicitation callouts
+  │           added to align with the community's top enforcement priorities. 2. OFF-TOPIC (item 2):
+  │           Rubric explicitly protects hype-affirming language ('Okayyyy,' 'Chefs kiss'), emoji
+  │           encouragement, and casual outfit compliments — identified in the community context as
+  │           the most socially valued interactions and therefore definitionally on-topic. Threshold
+  │           raised to 0.75 to reduce false positives on enthusiastic but outfit-relevant comments.
+  │           3. PHOTOSHOP/AI/CATFISHING (item 3, parent): Removed overly broad standalone patterns
+  │           ('fake', 'edited', 'filtered', 'generated') that would over-trigger in a fashion
+  │           community where light editing and filters are normal. Added specific AI tool names
+  │           (MidJourney, Stable Diffusion, DALL-E, 'ai-gen') relevant to the photo-based community
+  │           context. 4. PHOTOSHOP/AI/CATFISHING (item 3, child): Rubric updated to explicitly
+  │           protect neutral/positive uses of 'filtered' and 'edited' common in fashion photography
+  │           contexts. Threshold raised to 0.75. 5. BODY SHAMING (item 4, parent): Added new patterns
+  │           for common fashion-community body-shaming phrasings ('eat less/more/something,' 'go to
+  │           the gym,' 'skinny [slur]') reflecting the real threat patterns identified in community
+  │           context. 6. BODY SHAMING (item 4, child): Rubric updated to distinguish commenters who
+  │           introduce body-health topics themselves (remove) from commenters warmly engaging with
+  │           what the poster themselves raised (allow). Examples increased to 6 for nuance handling.
+  │           7. POLITICAL/SOCIAL (item 5): Rubric updated to specifically call out modesty-policing
+  │           as a concrete in-community example of this rule, since community context explicitly
+  │           identifies it as a known moderation concern that moderators should not miss. 8. NEW ITEM
+  │           — CONTACT SOLICITATION/SEXUALIZATION: Added a new deterministic + subjective two-node
+  │           item covering sexual propositions, DM solicitation, OnlyFans references, and predatory
+  │           contact attempts. This reflects the community context's explicit identification of
+  │           'sexual or creepy comments, DMs/contact solicitation' as the PRIMARY moderation threat —
+  │           a gap in the original rule-text-derived checklist that had no community context to draw
+  │           from.
+  │
+  │  • [subjective/remove thr=0.75] Does the comment focus on OP's body rather than the outfit?
+  │      ↳ context: Community context shows the real threat is predatory/sexualizing commenters and body-shamers, not incidental body references tied to outfit feedback. Participants openly self-describe their bodies, so commenters mirroring that positively should not be flagged. Threshold raised slightly to 0.75 and rubric sharpened to distinguish predatory/sexualizing body comments from outfit-adjacent body references. Solicitation/sexualization callout added to align with the community's stated enforcement priorities.
+  │  • [subjective/remove thr=0.75] Is the comment off-topic (not about the outfit or fashion)?
+  │      ↳ context: Community tone is hype-forward and encouragement-driven — top comments are things like 'Okayyyy girlfrienddddd everything ✅✅' and 'Chefs kiss.' These are socially valued on-topic interactions and must not be flagged as off-topic low-effort content. Rubric explicitly protects hype language, emoji affirmations, and casual outfit compliments. Threshold raised slightly to 0.75 to reduce false positives on enthusiastic but outfit-relevant comments.
+  │  • [deterministic/continue] Does the comment accuse or suggest the photo/poster involves photoshop, AI generation, editing, or catfishing?
+  │      ↳ context: Community context notes AI-generated photos as an explicit moderation concern — the rule text specifically mentions AI. Added patterns for common AI image tools (MidJourney, Stable Diffusion, DALL-E, 'ai-gen') that are relevant to photo-based outfit posts. Removed the overly broad 'fake', 'edited', 'filtered', and 'generated' standalone patterns which would generate excessive false positives in a fashion community where 'edited' might refer to photo lighting/color correction that is normal and acceptable, and 'filtered' is standard Instagram/social media language. These vague terms are better handled by the subjective child node.
+  │    ├─ [subjective/remove thr=0.75] Does the matched keyword appear in the context of accusing or questioning the authenticity of the photo, poster, or image?
+  │    │    ↳ context: Fashion communities commonly use 'filtered' and 'edited' in neutral or positive contexts (Instagram filters, light color grading). Rubric updated to explicitly protect these benign uses and focus only on authenticity accusations. Threshold raised to 0.75 to avoid removing comments that casually mention editing in a non-accusatory fashion context.
+  │  • [deterministic/continue] Does the comment involve body shaming, discussion of eating disorders, or discussion of medical issues?
+  │      ↳ context: Community context confirms body shaming is a primary enforcement threat in this community — participants post their own photos and are vulnerable to predatory or shaming comments. Added patterns for common body-shaming phrasings seen in fashion communities ('eat less/more/something,' 'go to the gym,' 'skinny [slur]') that represent real threats identified in the community context. Existing patterns retained as-is.
+  │    ├─ [subjective/remove thr=0.7] Does the matched content constitute body shaming, discussion of an eating disorder, or discussion of a medical condition in relation to OP or their appearance?
+  │    │    ↳ context: Community context shows participants openly self-describe body situations (post-baby body, confidence journeys). Rubric updated to distinguish between commenters initiating body-health commentary (remove) vs. warmly engaging with what the poster themselves raised (allow). Examples increased to 6 to handle the nuance. Threshold kept at 0.7 given the high priority of this enforcement area per community stakes.
+  │  • [subjective/remove thr=0.7] Does the comment address political or social issues or controversies?
+  │      ↳ context: Community context explicitly notes that modesty-policing is a moderation concern, and that the community does not police how much skin is shown. Rubric updated to specifically flag modesty-policing framed through political/moral lenses as a concrete example of the political/social controversy rule in action here. This prevents moderators from missing rule violations dressed up as 'social commentary' about revealing clothing.
+  │  • [deterministic/continue] Does the comment solicit personal contact with, or sexually proposition, the poster?
+  │      ↳ context: Community context explicitly identifies solicitation of personal contact and sexualization of posters as the PRIMARY moderation threat — 'sexual or creepy comments, DMs/contact solicitation' are the top enforcement priorities. This item did not exist in the base checklist (which had no community context) but is essential for this community. Added as a new deterministic first-pass node with a subjective child to confirm true violations.
+  │    ├─ [subjective/remove thr=0.7] Does the matched content constitute a genuine sexual proposition, solicitation of personal contact, or creepy/predatory comment directed at the poster?
+  │    │    ↳ context: Solicitation and sexualization are the top enforcement priority per community context — this child node handles edge cases where a pattern matched but the comment may be a genuine outfit compliment. Rubric carefully distinguishes predatory contact solicitation from enthusiastic outfit hype, which is the community's normal mode of positive engagement.
+  │
+  └─ SINGLE-PASS WITH CONTEXT (5 top-level items)
+     
+     • [subjective/remove thr=0.65] Does the comment focus on OP's body rather than the outfit?
+         ↳ context: Participants openly share body context voluntarily (e.g., 'post-baby body') and the real moderation risk is predatory/body-shaming commenters → threshold kept at 0.65 to catch body-focused remarks while allowing outfit-fit advice that incidentally references the body.
+     • [subjective/remove thr=0.6] Does the comment contain body shaming, discussion of eating disorders, or discussion of medical issues?
+         ↳ context: Community explicitly identifies body-shaming and eating disorder commentary as active enforcement priorities → threshold lowered to 0.6 to catch even mild pathologizing remarks.
+     • [deterministic/continue] Does the comment raise accusations of photoshop, AI generation, editing, or catfishing?
+       ├─ [subjective/remove thr=0.65] Does the comment appear to accuse or suggest the photo is manipulated or the poster is not who they claim, rather than using these terms neutrally (e.g., asking about photo editing apps)?
+     • [subjective/remove thr=0.65] Does the comment address political or social issues or controversies rather than the outfit?
+     • [subjective/flag thr=0.75] Is the comment entirely off-topic and unrelated to the outfit?
+         ↳ context: Community tone is hype-forward with top comments like 'Okayyyy girlfrienddddddddd ✅✅' — threshold raised to 0.75 to avoid flagging enthusiastic short reactions that are clearly outfit-directed.
+
+====================================================================================================
+SUMMARY: HOW COMMUNITY CONTEXT AFFECTED CHECKLIST COMPILATION
+====================================================================================================
+
+1. THRESHOLD SHIFTS
+------------------------------------------------------------
+
+  r/AskReddit — Rule 1 - Questions must be clear and direct a
+    No-context avg threshold:  0.72  ([0.7, 0.7, 0.75])
+    Two-pass avg threshold:    0.77  ([0.65, 0.8, 0.85])
+    Single-pass avg threshold: 0.65  ([0.65])
+    Two-pass shift: +0.05 (↑ more permissive)
+
+  r/AskReddit — Rule 2 - No personal or professional advice r
+    No-context avg threshold:  0.68  ([0.7, 0.7, 0.65])
+    Two-pass avg threshold:    0.82  ([0.82, 0.85, 0.8])
+    Single-pass avg threshold: 0.68  ([0.65, 0.7])
+    Two-pass shift: +0.14 (↑ more permissive)
+
+  r/movies — No Intentional Antagonism or Negative Attenti
+    No-context avg threshold:  0.72  ([0.75, 0.75, 0.65, 0.75, 0.7])
+    Two-pass avg threshold:    0.75  ([0.8, 0.8, 0.65, 0.82, 0.7])
+    Single-pass avg threshold: 0.68  ([0.65, 0.7, 0.7])
+    Two-pass shift: +0.03 (↑ more permissive)
+
+  r/movies — No Spam &amp; Self-promotion - Same Source Po
+    No-context avg threshold:  0.70  ([0.7, 0.7, 0.7])
+    Two-pass avg threshold:    0.65  ([0.65, 0.65, 0.65])
+    Single-pass avg threshold: 0.72  ([0.75, 0.7, 0.7])
+    Two-pass shift: -0.05 (↓ more sensitive)
+
+  r/todayilearned — Inaccurate/unverifiable/not supported by sour
+    No-context avg threshold:  0.70  ([0.7, 0.7])
+    Two-pass avg threshold:    0.69  ([0.75, 0.7, 0.65, 0.65])
+    Single-pass avg threshold: 0.72  ([0.75, 0.7])
+    Two-pass shift: -0.01 (↓ more sensitive)
+
+  r/todayilearned — No personal opinions/anecdotes/subjective pos
+    No-context avg threshold:  0.70  ([0.7])
+    Two-pass avg threshold:    0.82  ([0.8, 0.85])
+    Single-pass avg threshold: 0.65  ([0.65])
+    Two-pass shift: +0.12 (↑ more permissive)
+
+  r/ClaudeAI — Be respectful
+    No-context avg threshold:  0.70  ([0.7, 0.7, 0.7, 0.7])
+    Two-pass avg threshold:    0.76  ([0.75, 0.75, 0.78, 0.7, 0.8])
+    Single-pass avg threshold: 0.65  ([0.65])
+    Two-pass shift: +0.06 (↑ more permissive)
+
+  r/ClaudeAI — Be relevant
+    No-context avg threshold:  0.70  ([0.7, 0.7])
+    Two-pass avg threshold:    0.70  ([0.7, 0.7])
+    Single-pass avg threshold: 0.65  ([0.65])
+    Two-pass shift: +0.00 (unchanged)
+
+  r/OUTFITS — COMMENTS MUST BE CONSTRUCTIVE, HELPFUL, AND K
+    No-context avg threshold:  0.70  ([0.7, 0.7])
+    Two-pass avg threshold:    0.72  ([0.75, 0.7])
+    Single-pass avg threshold: 0.70  ([0.75, 0.65])
+    Two-pass shift: +0.03 (↑ more permissive)
+
+  r/OUTFITS — COMMENTS MUST BE ABOUT THE OUTFIT
+    No-context avg threshold:  0.70  ([0.7, 0.7, 0.7, 0.7, 0.7])
+    Two-pass avg threshold:    0.72  ([0.75, 0.75, 0.75, 0.7, 0.7, 0.7])
+    Single-pass avg threshold: 0.66  ([0.65, 0.6, 0.65, 0.65, 0.75])
+    Two-pass shift: +0.03 (↑ more permissive)
+
+
+2. STRUCTURAL CHANGES (item count)
+------------------------------------------------------------
+
+  Subreddit       Rule                                       NC   TP   SP  TP new
+  r/AskReddit     Rule 1 - Questions must be clear and d      6    6    3     0 new
+  r/AskReddit     Rule 2 - No personal or professional a      6    6    3     3 new
+  r/movies        No Intentional Antagonism or Negative       5    6    3     2 new
+  r/movies        No Spam &amp; Self-promotion - Same So      6    6    5     1 new
+  r/todayilearned Inaccurate/unverifiable/not supported       4    6    4     3 new
+  r/todayilearned No personal opinions/anecdotes/subject      3    4    1     2 new
+  r/ClaudeAI      Be respectful                               4    5    1     1 new
+  r/ClaudeAI      Be relevant                                 2    2    1     0 new
+  r/OUTFITS       COMMENTS MUST BE CONSTRUCTIVE, HELPFUL      2    2    3     0 new
+  r/OUTFITS       COMMENTS MUST BE ABOUT THE OUTFIT           7    9    6     2 new
+
+  NC = no context, TP = two-pass, SP = single-pass with context
+  'TP new' = items in two-pass not present in the no-context base
+
+
+3. PATTERNS OF CONTEXT INFLUENCE
+------------------------------------------------------------
+
+  Across all 10 rules × 5 subreddits, community context affected compilation in these ways:
+
+  a) THRESHOLD CALIBRATION (most common effect)
+     Two-pass consistently raises subjective thresholds compared to the no-context
+     baseline. The pattern is clear: generic compilation defaults to 0.65-0.70
+     thresholds; the two-pass adjustment step raises them to 0.75-0.85 for
+     communities with permissive tones (AskReddit, movies, ClaudeAI, todayilearned).
+     The reasoning traces are explicit: "community normalizes profanity → raise
+     threshold to avoid penalizing standard register."
+
+     Exception: r/movies spam rules and r/OUTFITS body-shaming rules saw thresholds
+     LOWERED by two-pass — when community context reveals a specific enforcement
+     priority (spam in a 37M sub, predatory comments toward self-posters), the
+     adjustment makes detection MORE sensitive, not less.
+
+     Single-pass shows a weaker version of this effect — it adjusts thresholds
+     somewhat but not as aggressively as two-pass, and doesn't explain the delta.
+
+  b) RUBRIC LANGUAGE REFINEMENT (two-pass specific)
+     Two-pass rewrites rubric text to match the community's actual content patterns.
+     Examples:
+     - AskReddit: "political framing is the community's native question format, not
+       a violation" explicitly carved out in rubric
+     - r/movies: "profanity directed at studios/films ≠ personal attack on users"
+     - r/OUTFITS: "short hype comments like 'Chefs kiss' are on-topic, not low-effort"
+     - r/todayilearned: removed 'fascinating', 'shocking', etc. from opinion-keyword
+       patterns because TIL posts legitimately use vivid descriptors
+
+     Single-pass occasionally mentions these in context_notes but doesn't restructure
+     the rubric as thoroughly.
+
+  c) NEW ITEMS FOR COMMUNITY-SPECIFIC THREATS (two-pass specific)
+     Two-pass added items that the no-context baseline missed entirely:
+     - r/OUTFITS: contact solicitation / sexualization check (primary threat per context)
+     - r/OUTFITS: modesty-policing as a political/social violation
+     - r/movies: low-effort attention-seeking / content-form violations
+     - r/ClaudeAI: good-faith discussion check (unique to the rule's language)
+     - r/todayilearned: title-vs-source distortion check, vague/obvious/truism check
+     - AskReddit: closed-ended question check, non-English title check
+
+     Single-pass did NOT add new items in any case — it worked within the structure
+     it generated in one shot.
+
+  d) PATTERN REFINEMENT (deterministic items)
+     Two-pass refined regex patterns for community-specific vocabulary:
+     - r/OUTFITS: added AI tool names (MidJourney, DALL-E), removed overly broad
+       'edited'/'filtered' patterns that are normal in fashion contexts
+     - r/todayilearned: extended image-host patterns for common pseudo-source CDNs
+     - r/OUTFITS: added body-shaming phrasings specific to fashion communities
+
+  e) TWO-PASS vs SINGLE-PASS: KEY DIFFERENCES
+     - Two-pass produces MORE items (avg +1.6 per rule) — it adds items, single-pass
+       tends to compress
+     - Two-pass provides explicit adjustment summaries documenting what changed and
+       why — single-pass bakes reasoning into context_notes but with less traceability
+     - Two-pass threshold shifts are LARGER and more community-specific — single-pass
+       adjustments are more conservative
+     - Two-pass catches community-specific threats the rule text doesn't mention —
+       single-pass stays closer to the rule text
+     - Two-pass preserves the no-context structure and adds to it — single-pass may
+       produce a completely different structure (e.g. r/OUTFITS "about the outfit":
+       5 items no-context → 6 two-pass vs 5 single-pass, but single-pass has
+       different items entirely)
