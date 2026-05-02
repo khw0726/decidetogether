@@ -37,6 +37,65 @@ def _weight_label(w: Optional[float]) -> str:
     return " (STRONGLY informs this rule)"
 
 
+# ── Rule Intent Translation ───────────────────────────────────────────────────
+
+INTENT_TRANSLATION_SYSTEM = """You are a moderation assistant. A moderator is thinking out loud about how a rule should be interpreted or scoped — informally, sometimes phrased as a question ("...right?"), sometimes referring to a specific post they're reviewing. Your job is to translate this casual intent into a concrete, minimal edit to the rule text — but ONLY when the message actually implies a change.
+
+Decide one of two outcomes:
+
+1. **propose**: The message implies a clarification or scope change to the rule text. Output a minimal edit that captures the moderator's intent. Preserve the rule's existing structure and voice. Do NOT rewrite from scratch — change as little as possible. Add or modify clauses; don't delete unrelated content. The rationale should be one short sentence describing the change.
+
+2. **no_change**: The message is just thinking-out-loud, agreement with the current rule, a question that doesn't imply an edit, or too vague to act on. Output a one-line reason explaining why no edit is needed (e.g., "the current rule already covers this", "no specific change is implied").
+
+Important:
+- Never invent constraints the moderator didn't express.
+- If the moderator describes a specific post and asks whether the rule applies, that often implies a *clarification* of scope — propose minimal text that makes the answer explicit.
+- If the message is purely a per-post note ("I removed this because X"), and the rule already covers X, return no_change.
+- Output the FULL proposed rule text, not a diff."""
+
+
+def build_intent_translation_prompt(
+    rule_title: str,
+    rule_text: str,
+    community_name: str,
+    new_message: str,
+    recent_messages: Optional[list[dict]] = None,
+    anchored_post: Optional[dict] = None,
+) -> str:
+    parts: list[str] = []
+    parts.append(f"Community: {community_name}")
+    parts.append(f"Rule title: {rule_title}")
+    parts.append("Current rule text:")
+    parts.append(f"---\n{rule_text}\n---")
+
+    if recent_messages:
+        parts.append("\nRecent moderator messages on this rule (oldest first):")
+        for m in recent_messages:
+            body = (m.get("body") or "").strip()
+            if not body:
+                continue
+            parts.append(f"- {body}")
+
+    if anchored_post:
+        post_inner = anchored_post.get("content", {}) if isinstance(anchored_post, dict) else {}
+        title = (post_inner.get("title") if isinstance(post_inner, dict) else "") or ""
+        body = (post_inner.get("body") if isinstance(post_inner, dict) else "") or ""
+        parts.append("\nThe moderator is reviewing this specific post:")
+        if title:
+            parts.append(f"Title: {title}")
+        if body:
+            parts.append(f"Body: {body[:1500]}")
+
+    parts.append("\nNew moderator message:")
+    parts.append(f'"""\n{new_message}\n"""')
+    parts.append(
+        "\nDecide whether this message implies a minimal edit to the rule text. "
+        "If yes, return decision=propose with the FULL new rule_text and a one-sentence rationale. "
+        "If no, return decision=no_change with a short reason."
+    )
+    return "\n".join(parts)
+
+
 # ── Triage ─────────────────────────────────────────────────────────────────────
 
 TRIAGE_SYSTEM = """You are a moderation rule classifier. Your task is to classify community rules into one of four categories:

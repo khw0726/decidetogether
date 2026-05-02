@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  ChevronDown, ChevronUp, CheckCircle, XCircle, AlertTriangle, Filter, Inbox, Loader2, Sparkles, Download, X,
+  ChevronDown, ChevronUp, CheckCircle, XCircle, AlertTriangle, Filter, Inbox, Loader2, MessageSquare, Sparkles, Download, X,
 } from 'lucide-react'
 import { showErrorToast } from '../components/Toast'
 import {
@@ -12,6 +12,7 @@ import {
 } from '../api/client'
 import PostCard from '../components/PostCard'
 import NewRuleSuggestionModal from '../components/NewRuleSuggestionModal'
+import RuleIntentChat from '../components/RuleIntentChat'
 import RuleReasoningBlock from '../components/RuleReasoningBlock'
 
 interface DecisionQueueProps {
@@ -525,6 +526,9 @@ function DecisionCard({
   const [selectedVerdict, setSelectedVerdict] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([])
+  // The rule whose chat thread is open inline on this decision card.
+  // Anchored to decision.id so the translator sees the post as context.
+  const [chatRuleId, setChatRuleId] = useState<string | null>(null)
 
   // Rule picker is needed when the agent did not attribute the post to any rule
   // (verdict approve, or review = community-norms flag) but the moderator removes/warns.
@@ -603,10 +607,46 @@ function DecisionCard({
         {decision.triggered_rules.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {decision.triggered_rules.map(ruleId => (
-              <span key={ruleId} className="badge badge-gray">
+              <span key={ruleId} className="badge badge-gray inline-flex items-center gap-1">
                 {rulesMap[ruleId]?.title || ruleId}
+                <button
+                  type="button"
+                  className={`ml-1 rounded p-0.5 transition-colors ${
+                    chatRuleId === ruleId
+                      ? 'bg-indigo-100 text-indigo-700'
+                      : 'text-gray-400 hover:text-indigo-600 hover:bg-indigo-50'
+                  }`}
+                  title="Think out loud about this rule (anchored to this post)"
+                  onClick={e => {
+                    e.stopPropagation()
+                    setChatRuleId(prev => (prev === ruleId ? null : ruleId))
+                  }}
+                >
+                  <MessageSquare size={10} />
+                </button>
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Inline rule-intent chat (anchored to this post) */}
+        {chatRuleId && (
+          <div className="mt-3 border border-indigo-200 rounded-lg overflow-hidden bg-white">
+            <div className="flex items-center justify-between px-3 py-1.5 bg-indigo-50 border-b border-indigo-200">
+              <span className="text-xs font-semibold text-indigo-700">
+                Chatting about: {rulesMap[chatRuleId]?.title || chatRuleId}
+              </span>
+              <button
+                type="button"
+                className="text-indigo-500 hover:text-indigo-800"
+                onClick={() => setChatRuleId(null)}
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <div className="h-72 flex flex-col">
+              <RuleIntentChat ruleId={chatRuleId} decisionId={decision.id} compact />
+            </div>
           </div>
         )}
 

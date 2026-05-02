@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  MessageSquare,
   Play,
   Plus,
   Trash2,
@@ -41,6 +42,7 @@ import {
 import ChecklistTree from '../components/ChecklistTree'
 import ChecklistPreview from '../components/ChecklistPreview'
 import DecisionsPanel from '../components/DecisionsPanel'
+import RuleIntentChat from '../components/RuleIntentChat'
 import RuleContextPicker from '../components/RuleContextPicker'
 import RuleHealthPanel from '../components/RuleHealthPanel'
 import { RuleTextSuggestion } from '../components/RuleTextSuggestion'
@@ -208,6 +210,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   const [showTestModal, setShowTestModal] = useState(false)
   const [showNewRule, setShowNewRule] = useState(false)
   const [decisionsExpanded, setDecisionsExpanded] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
 
   const { data: rules = [], isLoading: rulesLoading } = useQuery({
     queryKey: ['rules', communityId],
@@ -695,6 +698,14 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 }}
               />
               <button
+                className={`btn-secondary text-xs ${chatOpen ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : ''}`}
+                onClick={() => setChatOpen(v => !v)}
+                title="Casually describe how this rule should be interpreted; get a proposed rule-text edit"
+              >
+                <MessageSquare size={12} />
+                Moderator chat
+              </button>
+              <button
                 className="btn-secondary text-xs"
                 onClick={() => setShowTestModal(true)}
                 title="Test a hypothetical post against the automod"
@@ -1030,6 +1041,31 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
           </div>
         )}
       </div>
+
+      {/* Moderator chat drawer (right edge) */}
+      {chatOpen && selectedRuleId && (
+        <div className="w-96 flex-shrink-0 border-l border-gray-200 bg-white flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center gap-1.5">
+              <MessageSquare size={13} className="text-indigo-500" />
+              <span className="text-xs font-semibold text-gray-700">
+                {selectedRule?.title || 'Rule'} — chat
+              </span>
+            </div>
+            <button
+              type="button"
+              className="text-gray-400 hover:text-gray-700"
+              onClick={() => setChatOpen(false)}
+              title="Close chat"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 flex flex-col">
+            <RuleIntentChat ruleId={selectedRuleId} />
+          </div>
+        </div>
+      )}
 
       {/* Test modal */}
       {showTestModal && (

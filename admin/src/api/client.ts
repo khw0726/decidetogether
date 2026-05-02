@@ -617,6 +617,41 @@ export const acceptContextSuggestion = (suggestionId: string, affectedRuleIds: s
 export const dismissSuggestion = (suggestionId: string) =>
   api.post<Suggestion>(`/suggestions/${suggestionId}/dismiss`).then(r => r.data)
 
+// ── Rule Intent Chat ───────────────────────────────────────────────────────────
+
+export interface RuleIntentMessage {
+  id: string
+  rule_id: string
+  body: string
+  author: string
+  decision_id: string | null
+  suggestion_id: string | null
+  no_suggestion_reason: string | null
+  created_at: string
+  suggestion_status: string | null
+  suggestion_content: Record<string, unknown> | null
+}
+
+export interface RuleIntentMessageResponse {
+  message: RuleIntentMessage
+  suggestion: Suggestion | null
+}
+
+export const listRuleIntentMessages = (ruleId: string) =>
+  api.get<RuleIntentMessage[]>(`/rules/${ruleId}/intent-messages`).then(r => r.data)
+
+export const postRuleIntentMessage = (
+  ruleId: string,
+  text: string,
+  decisionId?: string | null,
+) =>
+  api
+    .post<RuleIntentMessageResponse>(`/rules/${ruleId}/intent-messages`, {
+      text,
+      decision_id: decisionId ?? null,
+    })
+    .then(r => r.data)
+
 export const revertSuggestion = (suggestionId: string) =>
   api.post<Suggestion>(`/suggestions/${suggestionId}/revert`).then(r => r.data)
 
