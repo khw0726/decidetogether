@@ -295,6 +295,26 @@ _DRAFT_RULE_FROM_CONTEXT_TOOL = {
     },
 }
 
+_REVISE_RULE_TEXT_TOOL = {
+    "name": "revise_rule_text",
+    "description": "Produce a minimally-revised version of an existing rule text aligned with updated title/context.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "revised_text": {
+                "type": "string",
+                "description": "The revised full rule text. Preserve existing wording wherever the updated context does not demand a change. Return the existing text verbatim if no change is needed.",
+            },
+            "change_summary": {
+                "type": "string",
+                "description": "One-sentence description of what was changed and why, or 'No change needed.' if the text was returned verbatim.",
+            },
+        },
+        "required": ["revised_text", "change_summary"],
+    },
+}
+
+
 _MATCH_RELEVANT_CONTEXT_TOOL = {
     "name": "submit_relevant_context",
     "description": "Pick the (dimension, tag) bundles from the community context that actually inform how this rule should be moderated, with a per-tag weight in [-1.0, 1.0].",
@@ -1354,6 +1374,42 @@ class RuleCompiler:
             "draft_text": result.get("draft_text", ""),
             "clauses": result.get("clauses", []),
             "suggested_relevant_context": result.get("suggested_relevant_context", []),
+        }
+
+    async def revise_rule_text(
+        self,
+        title: str,
+        current_rule_text: str,
+        target_community_name: str,
+        community_context: dict,
+        relevant_context: Optional[list[dict]],
+        custom_context_notes: Optional[list[dict]],
+    ) -> dict:
+        """Produce a minimally-revised rule text given updated title + context.
+
+        Filters community_context by relevant_context the same way the logic compiler does
+        so the LLM only sees notes the moderator marked as relevant to this rule.
+        Returns: {revised_text, change_summary}.
+        """
+        filtered_context = _filter_context_by_relevant(community_context, relevant_context) or {}
+        logger.info(
+            f"Revising rule text '{title}' for community '{target_community_name}'"
+        )
+        user_prompt = prompts.build_revise_rule_text_prompt(
+            title=title,
+            current_rule_text=current_rule_text,
+            target_community_name=target_community_name,
+            target_context=filtered_context,
+            custom_context_notes=custom_context_notes,
+        )
+        result = await self._call_claude(
+            prompts.REVISE_RULE_TEXT_SYSTEM,
+            user_prompt,
+            tool=_REVISE_RULE_TEXT_TOOL,
+        )
+        return {
+            "revised_text": result.get("revised_text", current_rule_text),
+            "change_summary": result.get("change_summary", ""),
         }
 
     async def synthesize_rule_from_examples(

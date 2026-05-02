@@ -437,6 +437,29 @@ export const suggestRuleText = (
     })
     .then(r => r.data)
 
+export type ReviseRuleTextResponse = {
+  revised_text: string
+  change_summary: string
+}
+
+export const suggestRuleTextRevision = (
+  ruleId: string,
+  payload: {
+    title: string
+    current_rule_text: string
+    relevant_context?: RuleContextTag[] | null
+    custom_context_notes?: CommunityContextNote[]
+  },
+) =>
+  api
+    .post<ReviseRuleTextResponse>(`/rules/${ruleId}/suggest-text-revision`, {
+      title: payload.title,
+      current_rule_text: payload.current_rule_text,
+      relevant_context: payload.relevant_context ?? null,
+      custom_context_notes: payload.custom_context_notes ?? [],
+    })
+    .then(r => r.data)
+
 export const updateRule = (ruleId: string, data: Partial<Rule>) =>
   api.put<Rule>(`/rules/${ruleId}`, data).then(r => r.data)
 

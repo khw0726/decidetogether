@@ -1,4 +1,5 @@
-import { ReactNode, useState } from 'react'
+import { ReactNode, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 interface TooltipProps {
   content: ReactNode
@@ -10,19 +11,27 @@ interface TooltipProps {
   showCue?: boolean
 }
 
-// Lightweight hover/focus tooltip. We avoid a portal since the content is short
-// and our containers are not clipping-overflow constrained.
+// Lightweight hover/focus tooltip. Renders the popup via a portal so it isn't
+// clipped by ancestors with `overflow: auto/hidden`.
 export default function Tooltip({ content, children, className, side = 'top', showCue }: TooltipProps) {
   const [open, setOpen] = useState(false)
+  const triggerRef = useRef<HTMLSpanElement | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+
+  useLayoutEffect(() => {
+    if (!open || !triggerRef.current) return
+    const r = triggerRef.current.getBoundingClientRect()
+    const cx = r.left + r.width / 2
+    setPos(side === 'top' ? { top: r.top - 6, left: cx } : { top: r.bottom + 6, left: cx })
+  }, [open, side])
+
   if (!content) {
     return <>{children}</>
   }
-  const positionCls = side === 'top'
-    ? 'bottom-full mb-1.5'
-    : 'top-full mt-1.5'
 
   return (
     <span
+      ref={triggerRef}
       className={`relative inline-flex items-center ${className || ''}`}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
@@ -36,13 +45,20 @@ export default function Tooltip({ content, children, className, side = 'top', sh
           className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-indigo-300 group-hover:bg-indigo-500"
         />
       )}
-      {open && (
+      {open && pos && createPortal(
         <span
           role="tooltip"
-          className={`absolute z-30 left-1/2 -translate-x-1/2 ${positionCls} whitespace-normal max-w-xs min-w-[12rem] text-xs leading-snug bg-gray-900 text-gray-100 rounded shadow-lg px-2.5 py-1.5 pointer-events-none`}
+          style={{
+            position: 'fixed',
+            top: pos.top,
+            left: pos.left,
+            transform: side === 'top' ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+          }}
+          className="z-50 whitespace-normal max-w-xs min-w-[12rem] text-xs leading-snug bg-gray-900 text-gray-100 rounded shadow-lg px-2.5 py-1.5 pointer-events-none"
         >
           {content}
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   )

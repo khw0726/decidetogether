@@ -37,6 +37,8 @@ from ..models.schemas import (
     SuggestedContextBundle,
     SuggestRuleTextRequest,
     SuggestRuleTextResponse,
+    ReviseRuleTextRequest,
+    ReviseRuleTextResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -764,6 +766,64 @@ async def suggest_rule_text(
     )
 
 
+@router.post(
+    "/rules/{rule_id}/suggest-text-revision",
+    response_model=ReviseRuleTextResponse,
+)
+async def suggest_rule_text_revision(
+    rule_id: str,
+    body: ReviseRuleTextRequest,
+    db: AsyncSession = Depends(get_db),
+) -> ReviseRuleTextResponse:
+    """Suggest a minimally-revised rule text given updated title/context drafts.
+
+    Used by the editor when the moderator changes the title or relevant-context
+    selection: the response is shown as an inline diff over the current rule text,
+    pending moderator confirmation before it lands in the editing buffer.
+    """
+    rule_result = await db.execute(select(Rule).where(Rule.id == rule_id))
+    rule = rule_result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    comm_result = await db.execute(select(Community).where(Community.id == rule.community_id))
+    community = comm_result.scalar_one_or_none()
+    if not community:
+        raise HTTPException(status_code=404, detail="Community not found")
+
+    title = (body.title or "").strip()
+    if len(title) < 3:
+        raise HTTPException(status_code=400, detail="title must be at least 3 characters")
+    current_text = (body.current_rule_text or "").strip()
+    if not current_text:
+        raise HTTPException(status_code=400, detail="current_rule_text must not be empty")
+
+    relevant_context_dicts = (
+        [e.model_dump() for e in body.relevant_context]
+        if body.relevant_context is not None else None
+    )
+    custom_notes_dicts = [n.model_dump() for n in body.custom_context_notes]
+
+    compiler = get_compiler()
+    try:
+        result = await compiler.revise_rule_text(
+            title=title,
+            current_rule_text=current_text,
+            target_community_name=community.name,
+            community_context=community.community_context or {},
+            relevant_context=relevant_context_dicts,
+            custom_context_notes=custom_notes_dicts,
+        )
+    except Exception as e:
+        logger.error(f"revise_rule_text failed for rule {rule_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"rule-text revision failed: {e}")
+
+    return ReviseRuleTextResponse(
+        revised_text=result.get("revised_text", current_text),
+        change_summary=result.get("change_summary", ""),
+    )
+
+
 @router.post("/communities/{community_id}/rules", response_model=RuleRead, status_code=201)
 async def create_rule(
     community_id: str,
@@ -1000,18 +1060,27 @@ async def commit_recompile(
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
 
+    from .alignment import _same_relevant_context, _same_custom_notes
+
     text_changed = body.rule_text != rule.text
     rule.text = body.rule_text
     if body.title is not None:
         rule.title = body.title
 
     # Apply draft context fields, if supplied.
+    context_changed = False
     if body.context is not None:
-        rule.relevant_context = (
+        new_relevant = (
             [t.model_dump() for t in body.context.relevant_context]
             if body.context.relevant_context is not None else None
         )
-        rule.custom_context_notes = [n.model_dump() for n in body.context.custom_context_notes]
+        new_notes = [n.model_dump() for n in body.context.custom_context_notes]
+        context_changed = (
+            not _same_relevant_context(new_relevant, rule.relevant_context)
+            or not _same_custom_notes(new_notes, rule.custom_context_notes)
+        )
+        rule.relevant_context = new_relevant
+        rule.custom_context_notes = new_notes
 
     # Clear any stashed context preview — text or context changed.
     rule.pending_checklist_json = None
@@ -1032,6 +1101,7 @@ async def commit_recompile(
             logger.error(f"Re-triage failed during commit-recompile: {e}")
 
     # Apply the supplied operations synchronously, mirroring _compile_rule_persist's recompile path.
+    ops_applied = False
     if rule.rule_type == "actionable" and body.operations:
         existing_result = await db.execute(
             select(ChecklistItem).where(ChecklistItem.rule_id == rule_id)
@@ -1041,6 +1111,7 @@ async def commit_recompile(
             await _apply_diff_operations(db, body.operations, existing_by_id, rule_id)
             await db.flush()
             await _re_resolve_checklist_links(db, rule_id)
+            ops_applied = True
         except Exception as e:
             logger.error(f"Apply ops failed during commit-recompile for {rule_id}: {e}")
             await db.rollback()
@@ -1049,8 +1120,22 @@ async def commit_recompile(
     await db.commit()
     await db.refresh(rule)
 
-    # Re-eval the moderation queue against the new logic.
-    if rule.rule_type == "actionable":
+    # Safety net: if text or context changed but the client didn't supply a
+    # pre-computed diff (e.g. Save was clicked before the live preview finished
+    # debouncing, or the moderator dismissed the rule-text suggestion and saved
+    # a context-only edit), schedule a background recompile so the checklist
+    # doesn't drift from the rule.
+    needs_fallback_recompile = (
+        rule.rule_type == "actionable"
+        and (text_changed or context_changed)
+        and not ops_applied
+    )
+    if needs_fallback_recompile:
+        background_tasks.add_task(_compile_rule_background, rule.id, rule.community_id)
+
+    # Re-eval the moderation queue against the new logic. Skip when a background
+    # recompile is queued — that task spawns its own re-eval after compilation.
+    if rule.rule_type == "actionable" and not needs_fallback_recompile:
         from .checklist import spawn_pending_queue_reeval
         spawn_pending_queue_reeval(rule_id)
 

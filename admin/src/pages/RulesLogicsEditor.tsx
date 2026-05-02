@@ -10,6 +10,7 @@ import {
   Play,
   Plus,
   Trash2,
+  Wand2,
   X,
 } from 'lucide-react'
 import {
@@ -18,6 +19,7 @@ import {
   DecisionPreviewResult,
   ItemHealthMetrics,
   PreviewRecompileResult,
+  ReviseRuleTextResponse,
   Rule,
   RuleContextTag,
   RuleHealthSummary,
@@ -33,6 +35,7 @@ import {
   overrideRuleType,
   previewDecisions,
   previewRecompile,
+  suggestRuleTextRevision,
   updateRule,
 } from '../api/client'
 import ChecklistTree from '../components/ChecklistTree'
@@ -127,6 +130,12 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   // Draft per-rule context state — edits buffer here until commit, mirroring rule-text edits.
   const [draftRelevantContext, setDraftRelevantContext] = useState<RuleContextTag[] | null>(null)
   const [draftCustomNotes, setDraftCustomNotes] = useState<CommunityContextNote[]>([])
+
+  // Context-driven rule-text revision: when the moderator edits title or context,
+  // a debounced effect calls the LLM for a minimally-revised rule text and surfaces
+  // it as an inline diff over the textarea, awaiting Accept/Dismiss.
+  const [revisedTextSuggestion, setRevisedTextSuggestion] = useState<ReviseRuleTextResponse | null>(null)
+  const [isRevisionLoading, setIsRevisionLoading] = useState(false)
 
   // Driven by RuleHealthPanel's carousel: the primary suggestion of the currently-shown
   // slide, or null. All suggestion-driven previews flow through this single source.
@@ -298,6 +307,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     setDraftRelevantContext(rule.relevant_context ?? null)
     setDraftCustomNotes(rule.custom_context_notes ?? [])
     setActiveSuggestion(null)
+    setRevisedTextSuggestion(null)
     setDecisionPreview(null)
   }
 
@@ -310,11 +320,12 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   }, [selectedRule?.id, selectedRule?.relevant_context, selectedRule?.custom_context_notes])
 
   const textDirty = !!selectedRule && editingText !== selectedRule.text
+  const titleDirty = !!selectedRule && editingTitle !== selectedRule.title
   const contextDirty =
     !!selectedRule &&
     (!sameTagSet(draftRelevantContext, selectedRule.relevant_context) ||
       !sameNotes(draftCustomNotes, selectedRule.custom_context_notes))
-  const anyDirty = textDirty || contextDirty
+  const anyDirty = textDirty || titleDirty || contextDirty
 
   const handleSaveRule = async () => {
     if (!selectedRuleId) return
@@ -364,20 +375,22 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   const handleDiscardEdit = () => {
     if (selectedRule) {
       setEditingText(selectedRule.text)
+      setEditingTitle(selectedRule.title)
       setDraftRelevantContext(selectedRule.relevant_context ?? null)
       setDraftCustomNotes(selectedRule.custom_context_notes ?? [])
     }
     setPreviewResult(null)
+    setRevisedTextSuggestion(null)
     setDecisionPreview(null)
   }
 
-  // Fluid editor: debounce any draft change (text, context, OR an active suggestion's
-  // proposed text/context) and auto-recompile. User drafts and suggestion previews share
-  // this single pipeline; the suggest-fixes button is disabled when user drafts are dirty
-  // so the two never conflict.
+  // Fluid editor: debounce text drafts (or an active suggestion's proposed text/context)
+  // and auto-recompile the checklist. Context-only edits no longer trigger a recompile —
+  // they flow through the rule-text revision suggestion first; the moderator must accept
+  // a rule-text update (which sets textDirty) before the logic preview fires.
   useEffect(() => {
     if (!selectedRule || selectedRule.rule_type !== 'actionable') return
-    const hasUserDraft = textDirty || contextDirty
+    const hasUserDraft = textDirty
     const hasSuggestionDraft = !!activePreviewText || !!activeContextDraft
     if (!hasUserDraft && !hasSuggestionDraft) {
       // No drafts → clear any stale preview.
@@ -444,6 +457,69 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       window.clearTimeout(handle)
     }
   }, [editingText, draftRelevantContext, draftCustomNotes, selectedRule, textDirty, contextDirty, activePreviewText, activeContextDraft, activePrecomputedOps])
+
+  // Context- or title-driven rule-text revision: debounce and call the LLM for a
+  // minimally-revised rule text. Shown as an inline diff awaiting Accept/Dismiss.
+  // Skipped while the moderator is hand-editing rule text (textDirty) — the
+  // suggestion would clobber their in-progress edits.
+  useEffect(() => {
+    if (!selectedRule || selectedRule.rule_type !== 'actionable') {
+      setRevisedTextSuggestion(null)
+      setIsRevisionLoading(false)
+      return
+    }
+    if (textDirty) {
+      // Don't fire during manual rule-text edits; clear any stale suggestion.
+      setRevisedTextSuggestion(null)
+      setIsRevisionLoading(false)
+      return
+    }
+    if (!titleDirty && !contextDirty) {
+      setRevisedTextSuggestion(null)
+      setIsRevisionLoading(false)
+      return
+    }
+    const ruleId = selectedRule.id
+    const baselineText = selectedRule.text
+    const titleForRequest = editingTitle.trim() || selectedRule.title
+    const controller = new AbortController()
+    const handle = window.setTimeout(async () => {
+      setIsRevisionLoading(true)
+      try {
+        const res = await suggestRuleTextRevision(ruleId, {
+          title: titleForRequest,
+          current_rule_text: baselineText,
+          relevant_context: draftRelevantContext,
+          custom_context_notes: draftCustomNotes,
+        })
+        if (controller.signal.aborted) return
+        // Drop verbatim no-ops so the diff overlay only appears for real changes.
+        if ((res.revised_text || '').trim() === baselineText.trim()) {
+          setRevisedTextSuggestion(null)
+        } else {
+          setRevisedTextSuggestion(res)
+        }
+      } catch (e) {
+        if (!controller.signal.aborted) showErrorToast(extractErrorMessage(e))
+      } finally {
+        if (!controller.signal.aborted) setIsRevisionLoading(false)
+      }
+    }, 800)
+    return () => {
+      controller.abort()
+      window.clearTimeout(handle)
+    }
+  }, [editingTitle, draftRelevantContext, draftCustomNotes, selectedRule, titleDirty, contextDirty, textDirty])
+
+  const handleAcceptRevision = () => {
+    if (!revisedTextSuggestion) return
+    setEditingText(revisedTextSuggestion.revised_text)
+    setRevisedTextSuggestion(null)
+  }
+
+  const handleDismissRevision = () => {
+    setRevisedTextSuggestion(null)
+  }
 
   // Trigger decisions preview when rule-text preview becomes active.
   useEffect(() => {
@@ -606,7 +682,14 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 value={editingTitle}
                 onChange={e => setEditingTitle(e.target.value)}
                 onBlur={() => {
-                  if (selectedRule && editingTitle !== selectedRule.title) {
+                  // For actionable rules the title is buffered alongside text/context
+                  // so the moderator can review the LLM-revised rule text the title
+                  // change implies before committing. Save-on-blur only for non-actionable.
+                  if (
+                    selectedRule
+                    && editingTitle !== selectedRule.title
+                    && selectedRule.rule_type !== 'actionable'
+                  ) {
                     handleSaveRule()
                   }
                 }}
@@ -637,6 +720,27 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 <PanelHeader title="Rule Text" />
 
                 <div className="flex-1 flex flex-col overflow-hidden p-4 gap-2 min-h-0">
+                  {/* Context comes first — title + context are now the primary inputs that
+                      drive the rule text suggestion below. */}
+                  {selectedRule.rule_type === 'actionable' && (
+                    <div className="max-h-48 overflow-auto flex-shrink-0">
+                      <RuleContextPicker
+                        key={selectedRule.id}
+                        rule={{
+                          ...selectedRule,
+                          relevant_context: draftRelevantContext,
+                          custom_context_notes: draftCustomNotes,
+                        }}
+                        community_context={community?.community_context ?? null}
+                        readOnly={false}
+                        onChange={({ relevant_context, custom_context_notes }) => {
+                          setDraftRelevantContext(relevant_context)
+                          setDraftCustomNotes(custom_context_notes)
+                        }}
+                      />
+                    </div>
+                  )}
+
                   {selectedRule.rule_type === 'actionable' && editingText !== selectedRule.text && (
                     <div className="flex-shrink-0 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 flex items-start gap-2">
                       <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-500" />
@@ -647,11 +751,44 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                       </span>
                     </div>
                   )}
+
+                  {selectedRule.rule_type === 'actionable' && isRevisionLoading && !revisedTextSuggestion && (
+                    <div className="flex-shrink-0 text-[11px] text-indigo-600 flex items-center gap-1.5">
+                      <Loader2 size={11} className="animate-spin" />
+                      Drafting suggested rule-text edits from context…
+                    </div>
+                  )}
+                  {revisedTextSuggestion && (
+                    <div className="flex-shrink-0 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-xs text-emerald-900 flex items-start gap-2">
+                      <Wand2 size={13} className="mt-0.5 flex-shrink-0 text-emerald-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold mb-0.5">Suggested rule-text update</p>
+                        <p className="text-emerald-800/90">
+                          {revisedTextSuggestion.change_summary || 'Revised to align with the updated title/context.'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          className="text-[11px] px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                          onClick={handleAcceptRevision}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="text-[11px] px-2 py-0.5 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                          onClick={handleDismissRevision}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <HighlightedTextarea
                     value={editingText}
                     onChange={setEditingText}
                     anchor={hoveredAnchor}
-                    previewText={activePreviewText}
+                    previewText={activePreviewText ?? revisedTextSuggestion?.revised_text ?? null}
                     placeholder="Rule text..."
                   />
                   {selectedRule.rule_type === 'actionable' && isPreviewLoading && (
@@ -676,27 +813,8 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                     </div>
                   )}
 
-                  {/* Rule metadata: context + type + scope */}
+                  {/* Type + applies-to controls (context picker moved above textarea) */}
                   <div className="border-t border-gray-100 pt-2 flex flex-col gap-2 flex-shrink-0">
-                    {selectedRule.rule_type === 'actionable' && (
-                      <div className="max-h-48 overflow-auto">
-                        <RuleContextPicker
-                          key={selectedRule.id}
-                          rule={{
-                            ...selectedRule,
-                            relevant_context: draftRelevantContext,
-                            custom_context_notes: draftCustomNotes,
-                          }}
-                          community_context={community?.community_context ?? null}
-                          readOnly={false}
-                          onChange={({ relevant_context, custom_context_notes }) => {
-                            setDraftRelevantContext(relevant_context)
-                            setDraftCustomNotes(custom_context_notes)
-                          }}
-                        />
-                      </div>
-                    )}
-
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-gray-500">Type:</span>
                       {['actionable', 'procedural', 'meta', 'informational'].map(type => {
@@ -1047,7 +1165,7 @@ function NewRuleModal({
 }) {
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set())
+  const [tagWeights, setTagWeights] = useState<Record<string, number>>({})
 
   const allBundles = useMemo(() => {
     const out: { dim: keyof CommunityContext; tag: string; text: string }[] = []
@@ -1065,14 +1183,21 @@ function NewRuleModal({
   }, [communityContext])
 
   const keyOf = (dim: string, tag: string) => `${dim}::${tag}`
-
-  const toggleTag = (dim: string, tag: string) => {
-    const k = keyOf(dim, tag)
-    const next = new Set(selectedTags)
-    if (next.has(k)) next.delete(k)
-    else next.add(k)
-    setSelectedTags(next)
+  const snapWeight = (w: number) => {
+    const r = Math.round(w * 2) / 2
+    return r < 0 ? 0 : r > 1 ? 1 : r
   }
+  const weightLabel = (w: number): { text: string; cls: string } => {
+    if (w < 0.25) return { text: 'ignore', cls: 'text-gray-400' }
+    if (w < 0.75) return { text: 'informs', cls: 'text-indigo-500' }
+    return { text: 'strongly informs', cls: 'text-indigo-700 font-medium' }
+  }
+
+  const updateWeight = (dim: string, tag: string, w: number) => {
+    setTagWeights(prev => ({ ...prev, [keyOf(dim, tag)]: snapWeight(w) }))
+  }
+
+  const selectedCount = Object.values(tagWeights).filter(w => w > 0).length
 
   const applySuggestion = (
     suggestionText: string,
@@ -1081,14 +1206,16 @@ function NewRuleModal({
   ) => {
     setText(suggestionText)
     if (titleOverride) setTitle(titleOverride)
-    // Auto-select shared tags so the user sees which contexts the suggestion implies.
-    const next = new Set(selectedTags)
-    for (const t of relevantContext) {
-      if (allBundles.some(b => b.dim === t.dimension && b.tag === t.tag)) {
-        next.add(keyOf(t.dimension, t.tag))
+    // Auto-select shared tags at full weight so the user sees which contexts the suggestion implies.
+    setTagWeights(prev => {
+      const next = { ...prev }
+      for (const t of relevantContext) {
+        if (allBundles.some(b => b.dim === t.dimension && b.tag === t.tag)) {
+          if (!next[keyOf(t.dimension, t.tag)]) next[keyOf(t.dimension, t.tag)] = 1
+        }
       }
-    }
-    setSelectedTags(next)
+      return next
+    })
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1096,11 +1223,15 @@ function NewRuleModal({
     if (!title.trim() || !text.trim()) return
     // null = unmatched (auto-match runs on first compile); only emit a list if the user
     // explicitly picked tags or accepted a suggestion's shared tags.
-    const relevantContext: RuleContextTag[] | null = selectedTags.size === 0
+    const relevantContext: RuleContextTag[] | null = selectedCount === 0
       ? null
       : allBundles
-          .filter(b => selectedTags.has(keyOf(b.dim, b.tag)))
-          .map(b => ({ dimension: b.dim as string, tag: b.tag, weight: 1 }))
+          .filter(b => (tagWeights[keyOf(b.dim, b.tag)] ?? 0) > 0)
+          .map(b => ({
+            dimension: b.dim as string,
+            tag: b.tag,
+            weight: tagWeights[keyOf(b.dim, b.tag)] ?? 1,
+          }))
     onCreate(title.trim(), text.trim(), relevantContext)
   }
 
@@ -1119,47 +1250,59 @@ function NewRuleModal({
               autoFocus
             />
           </div>
-          {/* Context picker — placed above suggestions so the user can scope what gets matched */}
+          {/* Context picker — placed above suggestions so the user can scope what gets matched.
+              Mirrors the 3-level slider used in the rules editor for consistency. */}
           {allBundles.length > 0 && (
             <div>
               <label className="block text-sm font-medium mb-1">
                 Relevant context tags
                 <span className="ml-2 text-xs font-normal text-gray-500">
                   Pick to scope suggestions
-                  {selectedTags.size === 0
+                  {selectedCount === 0
                     ? ' — empty = match against all of this community\'s context'
-                    : ` — ${selectedTags.size} selected`}
+                    : ` — ${selectedCount} selected`}
                 </span>
               </label>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {(['purpose', 'participants', 'stakes', 'tone'] as const).map(dim => {
                   const bundles = allBundles.filter(b => b.dim === dim)
                   if (bundles.length === 0) return null
                   return (
-                    <div key={dim} className="flex items-start gap-2">
-                      <span className="text-[10px] uppercase tracking-wider text-gray-400 mt-1 w-20 flex-shrink-0">
+                    <div key={dim}>
+                      <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
                         {dim}
-                      </span>
-                      <div className="flex flex-wrap gap-1 flex-1">
+                      </div>
+                      <div className="space-y-1">
                         {bundles.map(b => {
-                          const selected = selectedTags.has(keyOf(b.dim, b.tag))
+                          const k = keyOf(b.dim, b.tag)
+                          const w = tagWeights[k] ?? 0
+                          const lbl = weightLabel(w)
                           return (
-                            <Tooltip
-                              key={b.tag}
-                              content={b.text || <span className="italic text-gray-300">No description</span>}
-                            >
-                              <button
-                                type="button"
-                                className={`text-xs px-2 py-0.5 rounded-full border transition-colors border-dashed ${
-                                  selected
-                                    ? 'bg-indigo-100 text-indigo-700 border-indigo-400 font-medium'
-                                    : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-300 hover:text-indigo-600'
-                                }`}
-                                onClick={() => toggleTag(b.dim, b.tag)}
+                            <div key={k} className="flex items-center gap-2 text-xs">
+                              <Tooltip
+                                content={b.text || <span className="italic text-gray-300">No description</span>}
+                                className="w-32"
                               >
-                                {b.tag.replace(/_/g, ' ')}
-                              </button>
-                            </Tooltip>
+                                <span
+                                  className={`truncate border-b border-dotted border-gray-300 cursor-help ${
+                                    w === 0 ? 'text-gray-400' : 'text-gray-700 font-medium'
+                                  }`}
+                                >
+                                  {b.tag.replace(/_/g, ' ')}
+                                </span>
+                              </Tooltip>
+                              <input
+                                type="range"
+                                min={0}
+                                max={1}
+                                step={0.5}
+                                value={w}
+                                onChange={e => updateWeight(b.dim, b.tag, parseFloat(e.target.value))}
+                                className="w-20 accent-indigo-500"
+                                title={`weight ${w}`}
+                              />
+                              <div className={`flex-1 ${lbl.cls}`}>{lbl.text}</div>
+                            </div>
                           )
                         })}
                       </div>
@@ -1174,7 +1317,7 @@ function NewRuleModal({
             communityId={communityId}
             title={title}
             selectedRelevantContext={allBundles
-              .filter(b => selectedTags.has(keyOf(b.dim, b.tag)))
+              .filter(b => (tagWeights[keyOf(b.dim, b.tag)] ?? 0) > 0)
               .map(b => ({ dimension: b.dim as string, tag: b.tag }))}
             onApply={applySuggestion}
           />

@@ -1448,3 +1448,67 @@ Uncovered violations (removed by moderators, not yet linked to any checklist ite
 {violations_str}
 
 For each violation that matches a checklist item, return the link. Only include confident matches."""
+
+
+# ── Revise an existing rule text given updated title/context ─────────────────
+
+REVISE_RULE_TEXT_SYSTEM = """You are a community moderation rule editor. The moderator is editing an existing rule and has just changed the rule's title and/or its grounding community-context notes (purpose, participants, stakes, tone, plus any rule-specific custom notes). Produce a minimally-revised version of the existing rule text that reflects the updated framing.
+
+Hard requirements:
+- Be CONSERVATIVE. Preserve the existing wording wherever the updated context does not demand a change. The moderator wants to see a small diff, not a full rewrite.
+- Only change phrasing that is now misaligned with the updated title or context. If the existing rule already fits, return it unchanged.
+- Do not invent specifics that were not implied by either the prior rule text or the updated context.
+- Match the register of the community's `tone` notes (casual vs. formal, etc.).
+- Keep the result enforceable and concrete; do not soften it into a vague slogan.
+- If the updated title implies a different rule entirely from the existing text, prefer revising the title's intent into the existing rule's structure rather than discarding it wholesale — but do follow the updated title's lead.
+
+Output via the provided tool only."""
+
+
+def build_revise_rule_text_prompt(
+    title: str,
+    current_rule_text: str,
+    target_community_name: str,
+    target_context: dict,
+    custom_context_notes: list[dict] | None,
+) -> str:
+    context_lines: list[str] = []
+    for dim in ("purpose", "participants", "stakes", "tone"):
+        d = (target_context or {}).get(dim) or {}
+        notes = d.get("notes") or []
+        if not notes:
+            continue
+        context_lines.append(f"  {dim}:")
+        for note in notes:
+            tag = note.get("tag", "") if isinstance(note, dict) else ""
+            text_ = note.get("text", "") if isinstance(note, dict) else str(note)
+            context_lines.append(f"    - tag={tag!r}: {text_}")
+    context_str = "\n".join(context_lines) if context_lines else "  (no community context notes apply to this rule)"
+
+    custom_lines: list[str] = []
+    for note in custom_context_notes or []:
+        if not isinstance(note, dict):
+            continue
+        tag = note.get("tag", "")
+        text_ = note.get("text", "")
+        if not text_:
+            continue
+        custom_lines.append(f"  - tag={tag!r}: {text_}")
+    custom_str = "\n".join(custom_lines) if custom_lines else "  (none)"
+
+    return f"""Target community: {target_community_name!r}
+
+Updated rule title: {title!r}
+
+Current rule text (revise minimally):
+{current_rule_text!r}
+
+Updated relevant community-context notes:
+{context_str}
+
+Updated rule-specific custom context notes:
+{custom_str}
+
+Produce a minimally-revised rule text that reflects the updated title and context. Preserve as much of the existing wording as possible — change only what the updated framing requires. If nothing needs to change, return the existing text verbatim.
+
+Also produce a one-sentence change_summary describing what you changed and why (or "No change needed." if you returned the text verbatim)."""

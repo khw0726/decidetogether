@@ -244,11 +244,11 @@ function RuleContextPicker({
                       value={w}
                       disabled={readOnly}
                       onChange={e => updateWeight(b.dim, b.tag, parseFloat(e.target.value))}
-                      className="flex-1 accent-indigo-500"
+                      className="w-20 accent-indigo-500"
                       title={`weight ${w}`}
                     />
-                    <div className={`w-28 text-right ${lbl.cls}`}>
-                      {w.toFixed(1)} · {lbl.text}
+                    <div className={`flex-1 ${lbl.cls}`}>
+                      {lbl.text}
                     </div>
                   </div>
                 )

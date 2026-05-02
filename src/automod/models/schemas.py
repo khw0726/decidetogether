@@ -576,3 +576,20 @@ class SuggestRuleTextResponse(BaseModel):
     peer_rules_considered: int
     target_has_context: bool
     peer_options: list[PeerRuleOption] = []
+
+
+class ReviseRuleTextRequest(BaseModel):
+    """Drafts buffered in the editor that drive a minimally-revised rule text suggestion.
+
+    All fields override the persisted rule. `current_rule_text` is the in-flight text
+    the moderator is editing (may already differ from the saved version).
+    """
+    title: str
+    current_rule_text: str
+    relevant_context: Optional[list[RuleContextTag]] = None
+    custom_context_notes: list[CommunityContextNote] = []
+
+
+class ReviseRuleTextResponse(BaseModel):
+    revised_text: str
+    change_summary: str
