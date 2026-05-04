@@ -16,6 +16,8 @@ import {
   dismissSuggestion,
   revertSuggestion,
   populateQueue,
+  listScenarios,
+  createCommunityFromScenario,
   CommunityContext,
   CommunityContextDimension,
   ContextSamples,
@@ -55,6 +57,29 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
       setStep(2)
     },
     onError: () => setStep1Error('Failed to create community. Please try again.'),
+  })
+
+  // ── Scenario shortcut (user-study setup) ──────────────────────────────────
+  const { data: scenarios = [] } = useQuery({
+    queryKey: ['scenarios'],
+    queryFn: listScenarios,
+  })
+  const [selectedScenario, setSelectedScenario] = useState('')
+  const [scenarioNameOverride, setScenarioNameOverride] = useState('')
+  const [scenarioError, setScenarioError] = useState('')
+  const scenarioMutation = useMutation({
+    mutationFn: (args: { filename: string; communityName?: string }) =>
+      createCommunityFromScenario(args.filename, args.communityName),
+    onSuccess: (resp) => {
+      setCommunityId(resp.community_id)
+      setName(resp.community_name)
+      setPlatform('hypothetical')
+      queryClient.invalidateQueries({ queryKey: ['communities'] })
+      // Jump straight to the calibrate/progress step — context, rules, and queue
+      // posts are all set up in the background by the from-scenario endpoint.
+      setStep(5)
+    },
+    onError: () => setScenarioError('Failed to set up community from scenario.'),
   })
 
   // ── Step 2 ────────────────────────────────────────────────────────────────
@@ -307,8 +332,57 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
         <div className="w-full max-w-2xl">
           {/* ── Step 1 ── */}
           {step === 1 && (
-            <div className="card p-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-1">Create your community</h2>
+            <div className="space-y-4">
+              {scenarios.length > 0 && (
+                <div className="card p-6 border-indigo-200 bg-indigo-50/30">
+                  <h2 className="text-base font-semibold text-gray-900 mb-1">Load from scenario</h2>
+                  <p className="text-xs text-gray-500 mb-4">
+                    For user studies — instantly create a hypothetical community pre-loaded with rules and a moderation queue. Context is sampled from a real subreddit and cached, so repeated runs of the same scenario produce identical setups.
+                  </p>
+                  <div className="space-y-2">
+                    <select
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      value={selectedScenario}
+                      onChange={e => {
+                        setSelectedScenario(e.target.value)
+                        const sc = scenarios.find(s => s.filename === e.target.value)
+                        setScenarioNameOverride(sc?.community_name ?? '')
+                        setScenarioError('')
+                      }}
+                    >
+                      <option value="">— Select a scenario —</option>
+                      {scenarios.map(s => (
+                        <option key={s.filename} value={s.filename}>
+                          {s.community_name} · r/{s.base_subreddit} · {s.rule_count}r/{s.queue_post_count}p {s.context_cached ? '· cached' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        placeholder="Community name (defaults to the scenario's name)"
+                        value={scenarioNameOverride}
+                        onChange={e => setScenarioNameOverride(e.target.value)}
+                        disabled={!selectedScenario}
+                      />
+                      <button
+                        className="btn-primary whitespace-nowrap"
+                        disabled={!selectedScenario || scenarioMutation.isPending}
+                        onClick={() => scenarioMutation.mutate({
+                          filename: selectedScenario,
+                          communityName: scenarioNameOverride,
+                        })}
+                      >
+                        {scenarioMutation.isPending ? <><Loader2 size={14} className="animate-spin mr-1.5 inline" />Setting up…</> : 'Use scenario →'}
+                      </button>
+                    </div>
+                  </div>
+                  {scenarioError && <p className="text-sm text-red-600 mt-2">{scenarioError}</p>}
+                </div>
+              )}
+
+              <div className="card p-8">
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Create your community</h2>
               <p className="text-sm text-gray-500 mb-6">Give your community a name and choose the platform it belongs to.</p>
               <div className="space-y-4">
                 <div>
@@ -345,6 +419,7 @@ export default function CommunitySetup({ onCommunityChange }: CommunitySetupProp
                   {step1Mutation.isPending ? <><Loader2 size={14} className="animate-spin mr-1.5 inline" />Creating...</> : 'Continue →'}
                 </button>
               </div>
+            </div>
             </div>
           )}
 

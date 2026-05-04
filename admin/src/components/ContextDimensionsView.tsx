@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Loader2, Pencil, Eye } from 'lucide-react'
-import { CommunityContext, CommunityContextDimension, CommunityContextNote, previewContextImpact, type ContextPreviewImpact, type ContextTaxonomy, getContextTaxonomy, getContextTagUsage, type TagUsageEntry } from '../api/client'
-import { showErrorToast } from './Toast'
+import { Loader2, Pencil } from 'lucide-react'
+import { CommunityContext, CommunityContextDimension, CommunityContextNote, type ContextTaxonomy, getContextTaxonomy, getContextTagUsage, type TagUsageEntry } from '../api/client'
 
 export const DIMENSION_META: [string, keyof CommunityContext][] = [
   ['Purpose', 'purpose'],
@@ -33,8 +32,9 @@ function deriveTags(notes: (string | CommunityContextNote)[]): string[] {
 interface Props {
   context: CommunityContext
   communityId: string
-  onRegenerate: () => void
-  isRegenerating: boolean
+  // When omitted, the Regenerate button is hidden entirely.
+  onRegenerate?: () => void
+  isRegenerating?: boolean
   onSaveDimension?: (key: keyof CommunityContext, dim: CommunityContextDimension) => Promise<void>
   isSaving?: boolean
 }
@@ -50,8 +50,6 @@ export default function ContextDimensionsView({
   const [expandedDim, setExpandedDim] = useState<string | null>(null)
   const [editingDim, setEditingDim] = useState<string | null>(null)
   const [editNotes, setEditNotes] = useState<CommunityContextNote[]>([])
-  const [preview, setPreview] = useState<ContextPreviewImpact | null>(null)
-  const [isPreviewing, setIsPreviewing] = useState(false)
   const [taxonomy, setTaxonomy] = useState<ContextTaxonomy | null>(null)
   const [tagUsage, setTagUsage] = useState<Record<string, TagUsageEntry>>({})
 
@@ -82,21 +80,6 @@ export default function ContextDimensionsView({
   const cancelEdit = () => {
     setEditingDim(null)
     setEditNotes([])
-    setPreview(null)
-  }
-
-  const handlePreview = async (key: keyof CommunityContext) => {
-    setIsPreviewing(true)
-    setPreview(null)
-    try {
-      const draft = { [key]: { notes: editNotes.filter(n => n.tag) } }
-      const result = await previewContextImpact(communityId, draft)
-      setPreview(result)
-    } catch (e) {
-      showErrorToast(e instanceof Error ? e.message : 'Preview failed')
-    } finally {
-      setIsPreviewing(false)
-    }
   }
 
   const saveEdit = async (key: keyof CommunityContext) => {
@@ -131,8 +114,13 @@ export default function ContextDimensionsView({
           const displayTags = isEditing ? deriveTags(editNotes) : deriveTags(dim.notes)
 
           return (
-            <div key={key} className="rounded-lg bg-gray-50 border border-gray-200">
+            <div
+              key={key}
+              className="rounded-lg bg-gray-50 border border-gray-200"
+              data-log-context={JSON.stringify({ dimension: key })}
+            >
               <button
+                data-log="context.dimension.toggle-expand"
                 className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-gray-100 transition-colors rounded-lg"
                 onClick={() => {
                   if (!isEditing) setExpandedDim(isOpen ? null : key)
@@ -184,6 +172,7 @@ export default function ContextDimensionsView({
                 </div>
                 {!isEditing && onSaveDimension && (
                   <button
+                    data-log="context.dimension.edit-start"
                     className="text-gray-400 hover:text-indigo-600 flex-shrink-0 p-1"
                     onClick={(e) => { e.stopPropagation(); startEdit(key, dim) }}
                     title="Edit this dimension"
@@ -258,6 +247,8 @@ export default function ContextDimensionsView({
                           return (
                             <button
                               key={tag}
+                              data-log={selected ? 'context.tag.deselect' : 'context.tag.select'}
+                              data-log-context={JSON.stringify({ dimension: key, tag })}
                               className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
                                 selected
                                   ? 'bg-indigo-100 border-indigo-300 text-indigo-700 font-medium'
@@ -280,16 +271,21 @@ export default function ContextDimensionsView({
                   {editNotes.filter(n => n.tag).length > 0 && (
                     <div>
                       <label className="text-xs font-medium text-gray-500 block mb-1.5">
-                        Explanations <span className="font-normal text-gray-400">(how each tag applies here)</span>
+                        Notes <span className="font-normal text-gray-400">(how each tag relates to this community and how it should inform moderation decisions)</span>
                       </label>
                       <div className="space-y-1.5">
                         {editNotes.filter(n => n.tag).map(note => (
-                          <div key={note.tag} className="flex gap-1.5 items-start">
+                          <div
+                            key={note.tag}
+                            className="flex gap-1.5 items-start"
+                            data-log-context={JSON.stringify({ tag: note.tag })}
+                          >
                             <span className="text-xs px-1.5 py-1 rounded bg-indigo-50 text-indigo-600 font-medium flex-shrink-0 mt-px min-w-[80px] text-center">
                               {note.tag.replace(/_/g, ' ')}
                             </span>
                             <input
                               type="text"
+                              data-log="context.note.edit-text"
                               className="flex-1 text-sm border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-indigo-400"
                               value={note.text}
                               onChange={(e) => updateNoteText(note.tag, e.target.value)}
@@ -301,26 +297,10 @@ export default function ContextDimensionsView({
                     </div>
                   )}
 
-                  {/* Preview results */}
-                  {preview && (
-                    <div className="bg-white border border-indigo-200 rounded-lg p-2.5 text-xs">
-                      <p className="font-medium text-gray-700 mb-1.5">
-                        {preview.rules_affected === 0
-                          ? 'No rules would be affected.'
-                          : `${preview.rules_affected} rule${preview.rules_affected > 1 ? 's' : ''} affected:`}
-                      </p>
-                      {preview.impacts.map((imp) => (
-                        <div key={imp.rule_id} className="mb-1.5 last:mb-0">
-                          <p className="font-medium text-gray-800">{imp.rule_title}</p>
-                          <p className="text-gray-600 mt-0.5">{imp.adjustment_summary}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
                   {/* Actions */}
                   <div className="flex gap-2 pt-1">
                     <button
+                      data-log="context.dimension.save"
                       className="btn-primary text-xs px-3 py-1.5 flex items-center gap-1.5"
                       onClick={() => saveEdit(key)}
                       disabled={isSaving}
@@ -329,14 +309,7 @@ export default function ContextDimensionsView({
                       Save
                     </button>
                     <button
-                      className="text-xs px-3 py-1.5 flex items-center gap-1.5 border border-indigo-200 rounded text-indigo-600 hover:bg-indigo-50 transition-colors"
-                      onClick={() => handlePreview(key)}
-                      disabled={isPreviewing}
-                    >
-                      {isPreviewing ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
-                      Preview impact
-                    </button>
-                    <button
+                      data-log="context.dimension.edit-cancel"
                       className="btn-secondary text-xs px-3 py-1.5"
                       onClick={cancelEdit}
                     >
@@ -349,14 +322,17 @@ export default function ContextDimensionsView({
           )
         })}
       </div>
-      <button
-        className="btn-secondary flex items-center gap-2 text-sm"
-        onClick={onRegenerate}
-        disabled={isRegenerating}
-      >
-        {isRegenerating && <Loader2 size={14} className="animate-spin" />}
-        Regenerate
-      </button>
+      {onRegenerate && (
+        <button
+          data-log="context.regenerate"
+          className="btn-secondary flex items-center gap-2 text-sm"
+          onClick={onRegenerate}
+          disabled={isRegenerating}
+        >
+          {isRegenerating && <Loader2 size={14} className="animate-spin" />}
+          Regenerate
+        </button>
+      )}
     </>
   )
 }

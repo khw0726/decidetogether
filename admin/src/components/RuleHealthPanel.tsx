@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Loader2, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Zap, Eye, Check } from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, Zap, Eye, Check } from 'lucide-react'
 import { showErrorToast } from './Toast'
 import {
   getRuleHealth,
@@ -13,8 +13,6 @@ import {
   previewFixes,
   reevaluateDecisions,
   ItemHealthMetrics,
-  ExampleSummary,
-  ErrorCase,
   Suggestion,
   ImpactPreviewResult,
   ImpactEvaluation,
@@ -36,18 +34,6 @@ const ACTION_COLORS: Record<string, string> = {
   add_item: 'bg-green-100 text-green-800',
 }
 
-const ITEM_TYPE_COLORS: Record<string, string> = {
-  deterministic: 'bg-violet-100 text-violet-700',
-  structural: 'bg-cyan-100 text-cyan-700',
-  subjective: 'bg-orange-100 text-orange-700',
-}
-
-const LABEL_COLORS: Record<string, string> = {
-  compliant: 'bg-green-100 text-green-800',
-  violating: 'bg-red-100 text-red-800',
-  borderline: 'bg-amber-100 text-amber-800',
-}
-
 const HEALTH_ACTIONS = new Set([
   'tighten_rubric',
   'adjust_threshold',
@@ -58,72 +44,6 @@ const HEALTH_ACTIONS = new Set([
 
 function pct(n: number) {
   return `${(n * 100).toFixed(0)}%`
-}
-
-function conf(n: number | null) {
-  return n != null ? n.toFixed(2) : '—'
-}
-
-function isUnhealthy(item: ItemHealthMetrics) {
-  return item.false_positive_rate > 0.15 || item.false_negative_rate > 0.15
-}
-
-// ── ExampleRow ──────────────────────────────────────────────────────────────────
-
-function ExampleRow({ ex }: { ex: ExampleSummary }) {
-  return (
-    <div className="flex items-center gap-2 py-1 border-b border-gray-100 last:border-0">
-      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0 ${LABEL_COLORS[ex.label] || 'bg-gray-100 text-gray-700'}`}>
-        {ex.label}
-      </span>
-      <span className="text-xs text-gray-600 truncate">{ex.title}</span>
-    </div>
-  )
-}
-
-// ── ErrorCaseList ───────────────────────────────────────────────────────────────
-
-const ERROR_CASE_COLORS: Record<string, { border: string; bg: string; label: string; text: string }> = {
-  red:   { border: 'border-red-100', bg: 'bg-red-50', label: 'text-red-600', text: 'text-red-500' },
-  amber: { border: 'border-amber-100', bg: 'bg-amber-50', label: 'text-amber-600', text: 'text-amber-500' },
-}
-
-function ErrorCaseList({
-  label,
-  sublabel,
-  cases,
-  color,
-}: {
-  label: string
-  sublabel: string
-  cases: ErrorCase[]
-  color: 'red' | 'amber'
-}) {
-  const c = ERROR_CASE_COLORS[color]
-  return (
-    <div>
-      <p className={`text-xs font-medium mb-0.5 ${c.label}`}>{label}</p>
-      <p className={`text-[10px] mb-1 ${c.text}`}>{sublabel}</p>
-      <div className={`border ${c.border} rounded ${c.bg} px-2 py-1 max-h-28 overflow-y-auto`}>
-        {cases.map(cs => (
-          <div key={cs.decision_id} className="py-1 border-b border-gray-100/50 last:border-0">
-            <div className="flex items-center gap-2">
-              <span className={`text-[10px] font-mono ${c.text} flex-shrink-0`}>
-                {(cs.confidence * 100).toFixed(0)}%
-              </span>
-              <span className="text-xs text-gray-700 truncate">{cs.title}</span>
-            </div>
-            {cs.moderator_notes && (
-              <p className="text-[10px] text-gray-400 italic ml-8 mt-0.5 truncate">
-                {cs.moderator_reasoning_category && <span className="not-italic font-medium text-gray-500">{cs.moderator_reasoning_category}: </span>}
-                {cs.moderator_notes}
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 // ── Suggested Fixes Panel ──────────────────────────────────────────────────────
@@ -489,15 +409,33 @@ function SuggestedFixesPanel({
         const rank = (t: string) => (t === 'rule_text' ? 0 : t === 'context' ? 1 : 2)
         return rank(a.suggestion_type) - rank(b.suggestion_type)
       })
+      // Pre-compute the L1s a rule_text accept will supersede so we don't try
+      // to accept them afterward (they'd 404 — server requires status=pending).
+      const supersededIds = new Set<string>()
       for (const s of ordered) {
-        if (s.suggestion_type === 'checklist') {
-          await acceptRecompile(ruleId, s.id)
-        } else if (s.suggestion_type === 'context') {
-          const affects = (s.content as Record<string, unknown>).affects_rules as
-            Array<{ rule_id: string }> | undefined
-          await acceptContextSuggestion(s.id, (affects || []).map(r => r.rule_id))
-        } else {
-          await acceptSuggestion(s.id)
+        if (s.suggestion_type === 'rule_text') {
+          const id = (s.content as Record<string, unknown>).supersedes_logic_suggestion_id as string | undefined
+          if (id) supersededIds.add(id)
+        }
+      }
+      for (const s of ordered) {
+        if (supersededIds.has(s.id)) continue
+        try {
+          if (s.suggestion_type === 'checklist') {
+            await acceptRecompile(ruleId, s.id)
+          } else if (s.suggestion_type === 'context') {
+            const affects = (s.content as Record<string, unknown>).affects_rules as
+              Array<{ rule_id: string }> | undefined
+            await acceptContextSuggestion(s.id, (affects || []).map(r => r.rule_id))
+          } else {
+            await acceptSuggestion(s.id)
+          }
+        } catch (err) {
+          // A 404/400 here typically means an earlier accept already superseded
+          // or applied this one — safe to skip and continue with the rest.
+          const status = (err as { response?: { status?: number } })?.response?.status
+          if (status === 404 || status === 400) continue
+          throw err
         }
       }
       setAcceptAllPhase('reevaluating')
@@ -605,128 +543,10 @@ function SuggestedFixesPanel({
   )
 }
 
-// ── ItemHealthCard ──────────────────────────────────────────────────────────────
-
-function ItemHealthCard({
-  item,
-  depth = 0,
-  highlighted = false,
-}: {
-  item: ItemHealthMetrics
-  depth?: number
-  highlighted?: boolean
-}) {
-  const [expanded, setExpanded] = useState(isUnhealthy(item) || highlighted)
-  const cardRef = useRef<HTMLDivElement | null>(null)
-  const unhealthy = isUnhealthy(item)
-
-  useEffect(() => {
-    if (highlighted) {
-      setExpanded(true)
-      cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }
-  }, [highlighted])
-  const totalExamples = [
-    ...item.examples.compliant,
-    ...item.examples.violating,
-    ...item.examples.borderline,
-  ]
-
-  return (
-    <div
-      ref={cardRef}
-      className={`border rounded-lg ${highlighted ? 'border-indigo-400 ring-1 ring-indigo-200' : unhealthy ? 'border-amber-200' : 'border-gray-200'} ${depth > 0 ? 'border-l-2 border-l-gray-300' : ''}`}
-      style={depth > 0 ? { marginLeft: depth * 20 } : undefined}
-    >
-      {/* Header */}
-      <button
-        className="w-full flex items-center gap-2 p-3 text-left hover:bg-gray-50 rounded-t-lg"
-        onClick={() => setExpanded(e => !e)}
-      >
-        {depth > 0 && <span className="text-gray-300 text-xs flex-shrink-0">↳</span>}
-        {unhealthy
-          ? <AlertTriangle size={14} className="text-amber-500 flex-shrink-0" />
-          : <CheckCircle size={14} className="text-green-500 flex-shrink-0" />
-        }
-        <span className="text-sm font-medium text-gray-800 flex-1 min-w-0 truncate">
-          {item.description}
-        </span>
-        <span className={`text-xs px-1.5 py-0.5 rounded flex-shrink-0 ${ITEM_TYPE_COLORS[item.item_type] || 'bg-gray-100 text-gray-600'}`}>
-          {item.item_type}
-        </span>
-        {expanded ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
-      </button>
-
-      {expanded && (
-        <div className="px-3 pb-3 space-y-3 border-t border-gray-100">
-          {/* Metrics table */}
-          <div className="grid grid-cols-3 gap-2 mt-3">
-            <div className="bg-red-50 border border-red-100 rounded p-2 text-center">
-              <p className="text-xs text-red-500 font-semibold">Wrongly Flagged</p>
-              <p className="text-[10px] text-red-400">Triggered, but mod approved</p>
-              <p className="text-base font-bold text-red-700">{pct(item.false_positive_rate)}</p>
-              <p className="text-xs text-red-400">{item.false_positive_count}/{item.decision_count}</p>
-              {item.avg_confidence_errors != null && (
-                <p className="text-xs text-red-400 mt-0.5">conf: {conf(item.avg_confidence_errors)}</p>
-              )}
-            </div>
-            <div className="bg-amber-50 border border-amber-100 rounded p-2 text-center">
-              <p className="text-xs text-amber-600 font-semibold">Missed</p>
-              <p className="text-[10px] text-amber-500">Didn't trigger, but mod removed</p>
-              <p className="text-base font-bold text-amber-700">{pct(item.false_negative_rate)}</p>
-              <p className="text-xs text-amber-500">{item.false_negative_count}/{item.decision_count}</p>
-            </div>
-            <div className="bg-gray-50 border border-gray-200 rounded p-2 text-center">
-              <p className="text-xs text-gray-500 font-semibold">Decisions</p>
-              <p className="text-base font-bold text-gray-700">{item.decision_count}</p>
-              {item.avg_confidence_correct != null && (
-                <p className="text-xs text-gray-400 mt-0.5">correct conf: {conf(item.avg_confidence_correct)}</p>
-              )}
-            </div>
-          </div>
-
-          {/* Wrongly flagged cases */}
-          {item.wrongly_flagged.length > 0 && (
-            <ErrorCaseList
-              label="Wrongly Flagged"
-              sublabel="Rule triggered but moderator approved these posts"
-              cases={item.wrongly_flagged}
-              color="red"
-            />
-          )}
-
-          {/* Missed violation cases */}
-          {item.missed_violations.length > 0 && (
-            <ErrorCaseList
-              label="Missed Violations"
-              sublabel="Rule didn't trigger but moderator removed these posts"
-              cases={item.missed_violations}
-              color="amber"
-            />
-          )}
-
-          {/* Linked examples */}
-          {totalExamples.length > 0 && (
-            <div>
-              <p className="text-xs text-gray-400 font-medium mb-1">Linked examples</p>
-              <div className="border border-gray-100 rounded bg-white px-2 py-1 max-h-28 overflow-y-auto">
-                {totalExamples.slice(0, 8).map(ex => (
-                  <ExampleRow key={ex.example_id} ex={ex} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── RuleHealthPanel ─────────────────────────────────────────────────────────────
 
 interface RuleHealthPanelProps {
   ruleId: string
-  highlightItemId?: string | null
   onHealthSuggestionsChange?: (suggestions: Suggestion[]) => void
   // Fires the primary suggestion of the currently-displayed carousel slide (or null
   // when no slide is shown). The parent uses this to drive the unified live-preview
@@ -736,15 +556,20 @@ interface RuleHealthPanelProps {
   // disabled while dirty so suggestion-driven previews don't collide with user drafts.
   userDraftDirty?: boolean
   compact?: boolean
+  // Click-through filter on the FP/FN boxes — selecting a box flips this in the
+  // parent, which then narrows the Decisions panel to those decision IDs.
+  errorTypeFilter?: 'wrongly_flagged' | 'missed' | null
+  onErrorTypeFilterChange?: (next: 'wrongly_flagged' | 'missed' | null) => void
 }
 
 export default function RuleHealthPanel({
   ruleId,
-  highlightItemId = null,
   onHealthSuggestionsChange,
   onActiveSuggestionChange,
   userDraftDirty = false,
   compact = false,
+  errorTypeFilter = null,
+  onErrorTypeFilterChange,
 }: RuleHealthPanelProps) {
   const queryClient = useQueryClient()
 
@@ -799,10 +624,6 @@ export default function RuleHealthPanel({
   }
 
   const { overall, items } = health
-  const unhealthyCount = items.filter(isUnhealthy).length
-  const selectedItem = highlightItemId
-    ? items.find(i => i.item_id === highlightItemId) || null
-    : null
 
   return (
     <div className={compact ? 'overflow-y-auto p-3' : 'h-full overflow-y-auto p-4 space-y-4'}>
@@ -830,39 +651,46 @@ export default function RuleHealthPanel({
 
         {/* Rule-level FP/FN metrics */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-red-50 border border-red-100 rounded p-2">
+          <button
+            type="button"
+            disabled={!onErrorTypeFilterChange || overall.wrongly_flagged_count === 0}
+            onClick={() => onErrorTypeFilterChange?.(
+              errorTypeFilter === 'wrongly_flagged' ? null : 'wrongly_flagged'
+            )}
+            className={`text-left bg-red-50 border rounded p-2 transition ${
+              errorTypeFilter === 'wrongly_flagged'
+                ? 'border-red-500 ring-1 ring-red-400'
+                : 'border-red-100 hover:border-red-300'
+            } ${(!onErrorTypeFilterChange || overall.wrongly_flagged_count === 0) ? 'cursor-default' : 'cursor-pointer'}`}
+            title={overall.wrongly_flagged_count > 0 ? 'Filter the Decisions panel to these cases' : ''}
+          >
             <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wider">Wrongly Flagged</p>
             <p className="text-lg font-bold text-red-700 leading-tight">{pct(overall.wrongly_flagged_rate)}</p>
-            <p className="text-[10px] text-red-400">{overall.wrongly_flagged_count}/{overall.total_decisions}</p>
-          </div>
-          <div className="bg-amber-50 border border-amber-100 rounded p-2">
+            <p className="text-[10px] text-red-400">{overall.wrongly_flagged_count}/{overall.rule_denominator ?? overall.total_decisions}</p>
+          </button>
+          <button
+            type="button"
+            disabled={!onErrorTypeFilterChange || overall.missed_count === 0}
+            onClick={() => onErrorTypeFilterChange?.(
+              errorTypeFilter === 'missed' ? null : 'missed'
+            )}
+            className={`text-left bg-amber-50 border rounded p-2 transition ${
+              errorTypeFilter === 'missed'
+                ? 'border-amber-500 ring-1 ring-amber-400'
+                : 'border-amber-100 hover:border-amber-300'
+            } ${(!onErrorTypeFilterChange || overall.missed_count === 0) ? 'cursor-default' : 'cursor-pointer'}`}
+            title={overall.missed_count > 0 ? 'Filter the Decisions panel to these cases' : ''}
+          >
             <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wider">Missed</p>
             <p className="text-lg font-bold text-amber-700 leading-tight">{pct(overall.missed_rate)}</p>
-            <p className="text-[10px] text-amber-500">{overall.missed_count}</p>
-          </div>
+            <p className="text-[10px] text-amber-500">{overall.missed_count}/{overall.rule_denominator ?? overall.total_decisions}</p>
+          </button>
           <div className="bg-gray-50 border border-gray-200 rounded p-2">
             <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Decisions</p>
             <p className="text-lg font-bold text-gray-700 leading-tight">{overall.total_decisions}</p>
             <p className="text-[10px] text-gray-400">{pct(overall.override_rate)} override</p>
           </div>
         </div>
-
-        {(unhealthyCount > 0 || overall.total_decisions > 0) && (
-          <div className="flex items-center gap-3 text-[11px] text-gray-500">
-            {unhealthyCount > 0 && (
-              <span className="text-amber-600 font-semibold flex items-center gap-1">
-                <AlertTriangle size={11} />
-                {unhealthyCount} item{unhealthyCount !== 1 ? 's' : ''} need attention
-              </span>
-            )}
-            {unhealthyCount === 0 && overall.total_decisions > 0 && (
-              <span className="text-green-600 font-semibold flex items-center gap-1">
-                <CheckCircle size={11} />
-                All items healthy
-              </span>
-            )}
-          </div>
-        )}
 
         {overall.total_decisions === 0 && (
           <p className="text-sm text-gray-400 text-center py-2">
@@ -880,20 +708,6 @@ export default function RuleHealthPanel({
           />
         )}
       </div>
-
-      {/* Item-specific health — only when a checklist item is selected; hidden in compact mode */}
-      {!compact && items.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Selected Item Health</p>
-          {selectedItem ? (
-            <ItemHealthCard item={selectedItem} depth={0} highlighted={true} />
-          ) : (
-            <p className="text-xs text-gray-400 italic px-1">
-              Select a checklist item on the left to see its health.
-            </p>
-          )}
-        </div>
-      )}
     </div>
   )
 }

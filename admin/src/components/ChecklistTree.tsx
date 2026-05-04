@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ChevronRight, ChevronDown, Edit2, Check, X, Code, Trash2, Plus, Sparkles, Pin, PinOff, Loader2, Gauge, FileText, Type, Zap, PlusCircle, Search, RefreshCw } from 'lucide-react'
-import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem, setContextOverride, Rule, ItemHealthMetrics, StructuralFieldSpec, getStructuralFields } from '../api/client'
+import { ChecklistItem, createChecklistItem, updateChecklistItem, deleteChecklistItem, setContextOverride, Rule, StructuralFieldSpec, getStructuralFields } from '../api/client'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 // Default empty logic per item type — used when the user switches the
@@ -291,72 +291,6 @@ function LogicEditor({
   )
 }
 
-// ── Health Chip ──────────────────────────────────────────────────────────────
-
-function HealthChip({ metrics }: { metrics: ItemHealthMetrics }) {
-  const [open, setOpen] = useState(false)
-  if (metrics.decision_count === 0) return null
-  const fpRate = metrics.false_positive_rate
-  const fnRate = metrics.false_negative_rate
-  const errorRate = Math.max(fpRate, fnRate)
-  const errorCount = metrics.false_positive_count + metrics.false_negative_count
-  const unhealthy = errorRate > 0.15
-  const errorPct = Math.round(errorRate * 100)
-  const tone = unhealthy
-    ? 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100'
-    : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-
-  return (
-    <span className="relative inline-block">
-      <button
-        type="button"
-        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-medium transition-colors ${tone}`}
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onClick={(e) => { e.stopPropagation(); setOpen(v => !v) }}
-        title=""
-      >
-        {unhealthy ? '⚠' : '✓'} {unhealthy ? `${errorPct}% error` : `${metrics.decision_count} ok`}
-      </button>
-      {open && (
-        <div
-          className="absolute left-0 top-full mt-1 z-30 w-72 bg-white border border-gray-200 rounded-lg shadow-lg p-2 text-[11px] text-gray-700 cursor-default"
-          onMouseEnter={() => setOpen(true)}
-          onMouseLeave={() => setOpen(false)}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="grid grid-cols-3 gap-1.5 mb-1.5">
-            <div className="bg-red-50 border border-red-100 rounded px-1.5 py-1 text-center">
-              <p className="text-[9px] text-red-500 font-semibold uppercase tracking-wide">Wrongly flagged</p>
-              <p className="text-sm font-bold text-red-700 leading-tight">{Math.round(fpRate * 100)}%</p>
-              <p className="text-[9px] text-red-400">{metrics.false_positive_count}/{metrics.decision_count}</p>
-            </div>
-            <div className="bg-amber-50 border border-amber-100 rounded px-1.5 py-1 text-center">
-              <p className="text-[9px] text-amber-600 font-semibold uppercase tracking-wide">Missed</p>
-              <p className="text-sm font-bold text-amber-700 leading-tight">{Math.round(fnRate * 100)}%</p>
-              <p className="text-[9px] text-amber-500">{metrics.false_negative_count}/{metrics.decision_count}</p>
-            </div>
-            <div className="bg-gray-50 border border-gray-200 rounded px-1.5 py-1 text-center">
-              <p className="text-[9px] text-gray-500 font-semibold uppercase tracking-wide">Decisions</p>
-              <p className="text-sm font-bold text-gray-700 leading-tight">{metrics.decision_count}</p>
-              {metrics.avg_confidence_correct != null && (
-                <p className="text-[9px] text-gray-400">conf {metrics.avg_confidence_correct.toFixed(2)}</p>
-              )}
-            </div>
-          </div>
-          {errorCount > 0 ? (
-            <p className="text-[10px] text-gray-500">
-              {metrics.false_positive_count} wrongly flagged, {metrics.false_negative_count} missed
-              {metrics.avg_confidence_errors != null && ` · errors avg conf ${metrics.avg_confidence_errors.toFixed(2)}`}
-            </p>
-          ) : (
-            <p className="text-[10px] text-emerald-600">No errors recorded.</p>
-          )}
-        </div>
-      )}
-    </span>
-  )
-}
 
 // ── Change Type Icons ────────────────────────────────────────────────────────
 
@@ -619,10 +553,9 @@ interface ChecklistTreeProps {
   selectedItemId?: string | null
   onItemSelect?: (itemId: string | null) => void
   highlightedItemId?: string | null
-  itemHealthById?: Record<string, ItemHealthMetrics>
 }
 
-export default function ChecklistTree({ items, ruleId, rule, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId, itemHealthById }: ChecklistTreeProps) {
+export default function ChecklistTree({ items, ruleId, rule, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId }: ChecklistTreeProps) {
   const [adding, setAdding] = useState(false)
   const [showGhosts, setShowGhosts] = useState(false)
 
@@ -665,7 +598,6 @@ export default function ChecklistTree({ items, ruleId, rule, onAnchorHover, sele
           onItemSelect={onItemSelect}
           highlightedItemId={highlightedItemId}
           baseItemMap={baseItemMap}
-          itemHealthById={itemHealthById}
         />
       ))}
       {showGhosts && ghostItems.map((ghost, i) => (
@@ -977,7 +909,7 @@ function AddItemForm({ ruleId, parentId, onDone }: { ruleId: string; parentId: s
 
 // ── ChecklistNode ─────────────────────────────────────────────────────────────
 
-function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId, baseItemMap, itemHealthById }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void; selectedItemId?: string | null; onItemSelect?: (itemId: string | null) => void; highlightedItemId?: string | null; baseItemMap: BaseItemMap; itemHealthById?: Record<string, ItemHealthMetrics> }) {
+function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onItemSelect, highlightedItemId, baseItemMap }: { item: ChecklistItem; ruleId: string; depth: number; onAnchorHover?: (anchor: string | null) => void; selectedItemId?: string | null; onItemSelect?: (itemId: string | null) => void; highlightedItemId?: string | null; baseItemMap: BaseItemMap }) {
   const [expanded, setExpanded] = useState(true)
   const [editing, setEditing] = useState(false)
   const [showLogic, setShowLogic] = useState(false)
@@ -1063,12 +995,6 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
   const effectiveChangeTypes = inferChangeTypes(item, baseItemMap)
   const isContextAdded = effectiveChangeTypes.includes('new_item')
 
-  const healthMetrics = itemHealthById?.[item.id]
-  const errorRate = healthMetrics
-    ? Math.max(healthMetrics.false_positive_rate, healthMetrics.false_negative_rate)
-    : 0
-  const isUnhealthy = !!healthMetrics && healthMetrics.decision_count > 0 && errorRate > 0.15
-
   // Look up base threshold for this item by description match
   const currentThreshold = item.item_type === 'subjective' ? (item.logic as Record<string, unknown>).threshold as number | null : null
   const baseThreshold = getBaseThreshold(baseItemMap, item)
@@ -1083,7 +1009,6 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
             ? 'bg-emerald-50/30 border-dashed border-emerald-300 hover:border-emerald-400'
             : isSelected ? 'bg-white border-indigo-400 ring-1 ring-indigo-300'
             : isHighlighted ? 'bg-amber-50 border-amber-400 ring-1 ring-amber-300'
-            : isUnhealthy ? 'bg-amber-50/40 border-amber-300 hover:border-amber-400'
             : 'bg-white border-gray-200 hover:border-gray-300'
         }`}
         onMouseEnter={() => onAnchorHover?.(item.rule_text_anchor || null)}
@@ -1121,11 +1046,6 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
                 <span className="text-sm font-medium text-gray-800">{item.description}</span>
               )}
             </div>
-            {!editing && healthMetrics && healthMetrics.decision_count > 0 && (
-              <div className="mt-1">
-                <HealthChip metrics={healthMetrics} />
-              </div>
-            )}
 
             {editing ? (
               <div className="mt-2 space-y-3">
@@ -1307,7 +1227,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
       {expanded && (item.children.length > 0 || addingChild) && (
         <div className="mt-1 space-y-1">
           {item.children.map(child => (
-            <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} baseItemMap={baseItemMap} itemHealthById={itemHealthById} />
+            <ChecklistNode key={child.id} item={child} ruleId={ruleId} depth={depth + 1} onAnchorHover={onAnchorHover} selectedItemId={selectedItemId} onItemSelect={onItemSelect} highlightedItemId={highlightedItemId} baseItemMap={baseItemMap} />
           ))}
           {addingChild && (
             <AddItemForm ruleId={ruleId} parentId={item.id} onDone={() => setAddingChild(false)} />

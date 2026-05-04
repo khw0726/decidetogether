@@ -3,7 +3,11 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query'
 import App from './App.tsx'
 import { showErrorToast } from './components/Toast.tsx'
+import { ImportProgressProvider } from './contexts/ImportProgress.tsx'
+import { initTelemetry } from './telemetry'
 import './index.css'
+
+initTelemetry()
 
 function extractErrorMessage(error: unknown): string {
   if (error && typeof error === 'object') {
@@ -33,7 +37,9 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <ImportProgressProvider>
+        <App />
+      </ImportProgressProvider>
     </QueryClientProvider>
   </React.StrictMode>,
 )

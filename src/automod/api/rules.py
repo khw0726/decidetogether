@@ -856,7 +856,7 @@ async def create_rule(
     # Triage the rule (blocking — user needs to see the type)
     try:
         compiler = get_compiler()
-        triage = await compiler.triage_rule(rule.text, community.name, community.platform)
+        triage = await compiler.triage_rule(rule.title, rule.text, community.name, community.platform)
         rule.rule_type = triage["rule_type"]
         rule.rule_type_reasoning = triage["reasoning"]
         rule.applies_to = triage.get("applies_to", "both")
@@ -906,7 +906,7 @@ async def batch_import_rules(
 
     async def _triage(rule: Rule) -> tuple[Rule, str | None]:
         try:
-            result = await compiler.triage_rule(rule.text, community.name, community.platform)
+            result = await compiler.triage_rule(rule.title, rule.text, community.name, community.platform)
             rule.rule_type = result["rule_type"]
             rule.rule_type_reasoning = result["reasoning"]
             rule.applies_to = result.get("applies_to", "both")
@@ -1093,7 +1093,7 @@ async def commit_recompile(
     if text_changed:
         try:
             compiler = get_compiler()
-            triage = await compiler.triage_rule(rule.text, community.name, community.platform)
+            triage = await compiler.triage_rule(rule.title, rule.text, community.name, community.platform)
             rule.rule_type = triage["rule_type"]
             rule.rule_type_reasoning = triage["reasoning"]
             rule.applies_to = triage.get("applies_to", "both")
@@ -1198,7 +1198,7 @@ async def update_rule(
         if community:
             try:
                 compiler = get_compiler()
-                triage = await compiler.triage_rule(rule.text, community.name, community.platform)
+                triage = await compiler.triage_rule(rule.title, rule.text, community.name, community.platform)
                 rule.rule_type = triage["rule_type"]
                 rule.rule_type_reasoning = triage["reasoning"]
                 rule.applies_to = triage.get("applies_to", "both")

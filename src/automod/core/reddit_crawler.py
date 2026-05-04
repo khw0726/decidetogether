@@ -446,6 +446,7 @@ async def sample_subreddit_for_context(
                         result["comments"].append({
                                 "body": body[:300],
                                 "score": comment.score,
+                                "post_title": post.title.strip(),
                             })
                 except Exception:
                     continue

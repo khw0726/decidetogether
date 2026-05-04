@@ -9,11 +9,14 @@ import {
   listDecisions, resolveDecision, bulkResolveDecisions, Decision, listRules,
   suggestRuleFromDecisions, acceptSuggestion, dismissSuggestion, NewRuleSuggestion,
   importRedditPosts, RedditImportResponse, getCommunity,
+  scenarioImportNext, scenarioImportStatus,
 } from '../api/client'
 import PostCard from '../components/PostCard'
 import NewRuleSuggestionModal from '../components/NewRuleSuggestionModal'
 import RuleIntentChat from '../components/RuleIntentChat'
 import RuleReasoningBlock from '../components/RuleReasoningBlock'
+import { useImportProgress } from '../contexts/ImportProgress'
+import { logEvent } from '../telemetry'
 
 interface DecisionQueueProps {
   communityId: string
@@ -35,6 +38,9 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
   const [suggesting, setSuggesting] = useState(false)
   const [suggestion, setSuggestion] = useState<NewRuleSuggestion | null>(null)
   const [showImportModal, setShowImportModal] = useState(false)
+  // Import progress lives in a global context so polling and the loader survive
+  // page changes (and even reloads, via sessionStorage).
+  const { importInFlight, arrivedCount, startImport } = useImportProgress()
 
   const queryClient = useQueryClient()
 
@@ -79,6 +85,43 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
   })
 
   const isReddit = community?.platform === 'reddit'
+  const isHypothetical = community?.platform === 'hypothetical'
+
+  const { data: scenarioStatus } = useQuery({
+    queryKey: ['scenario-import-status', communityId],
+    queryFn: () => scenarioImportStatus(communityId),
+    enabled: !!communityId && community?.platform === 'hypothetical',
+    // Refetch while an import is being evaluated so the count reflects new arrivals.
+    refetchInterval: (q) => {
+      const data = q.state.data
+      if (!data) return false
+      return importInFlight ? 3_000 : false
+    },
+  })
+
+  const scenarioImportMutation = useMutation({
+    mutationFn: () => scenarioImportNext(communityId),
+    onSuccess: (resp) => {
+      queryClient.invalidateQueries({ queryKey: ['scenario-import-status', communityId] })
+      if (resp.imported_count === 0) {
+        showErrorToast('No more queue posts left to import for this scenario.')
+        return
+      }
+      // Decisions appear as the background task evaluates them. Latch into the
+      // global "evaluating" state so the loader stays up until they actually
+      // arrive — and survives page changes.
+      startImport({
+        communityId,
+        baselineCount: decisions.length,
+        expected: resp.imported_count,
+      })
+      queryClient.invalidateQueries({ queryKey: ['decisions', communityId] })
+    },
+    onError: (e: unknown) => {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      showErrorToast(detail || (e instanceof Error ? e.message : 'Failed to import next batch'))
+    },
+  })
 
   const { data: decisions = [], isLoading } = useQuery({
     queryKey: ['decisions', communityId, filter, verdictFilter, ruleFilter, contentTypeFilter],
@@ -91,7 +134,10 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
         limit: 50,
       }),
     enabled: !!communityId,
-    refetchInterval: 30_000,
+    // Poll fast while a scenario import is being evaluated so the queue
+    // reflects new arrivals quickly. The context also polls in the background
+    // so the latch clears even when this page isn't mounted.
+    refetchInterval: importInFlight ? 2_000 : 30_000,
   })
 
   const { data: rules = [] } = useQuery({
@@ -101,6 +147,9 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
   })
 
   const rulesMap = Object.fromEntries(rules.map(r => [r.id, r]))
+
+  // Reeval status (banner + auto-refetch on completion) is now driven globally
+  // by ReevalStatusProvider — no per-page polling needed.
 
   const bulkResolveMutation = useMutation({
     mutationFn: ({ verdict }: { verdict: string }) =>
@@ -169,8 +218,12 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
           {selectedIds.size > 0 && (
             <>
               <button
+                data-log="decision.bulk.approve"
                 className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded border border-green-300 text-green-700 font-medium hover:bg-green-50 transition-colors"
-                onClick={() => bulkResolveMutation.mutate({ verdict: 'approve' })}
+                onClick={() => {
+                  logEvent('decision.bulk.approve', { count: selectedIds.size, decision_ids: [...selectedIds] })
+                  bulkResolveMutation.mutate({ verdict: 'approve' })
+                }}
                 disabled={bulkResolveMutation.isPending}
               >
                 {bulkResolveMutation.isPending && bulkResolveMutation.variables?.verdict === 'approve'
@@ -179,8 +232,12 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
                 Approve All ({selectedIds.size})
               </button>
               <button
+                data-log="decision.bulk.remove"
                 className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded border border-red-300 text-red-700 font-medium hover:bg-red-50 transition-colors"
-                onClick={() => bulkResolveMutation.mutate({ verdict: 'remove' })}
+                onClick={() => {
+                  logEvent('decision.bulk.remove', { count: selectedIds.size, decision_ids: [...selectedIds] })
+                  bulkResolveMutation.mutate({ verdict: 'remove' })
+                }}
                 disabled={bulkResolveMutation.isPending}
               >
                 {bulkResolveMutation.isPending && bulkResolveMutation.variables?.verdict === 'remove'
@@ -189,8 +246,12 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
                 Reject All ({selectedIds.size})
               </button>
               <button
+                data-log="rule.suggest-from-decisions"
                 className="btn-primary text-xs flex items-center gap-1.5"
-                onClick={handleSuggestRule}
+                onClick={() => {
+                  logEvent('rule.suggest-from-decisions', { count: selectedIds.size, decision_ids: [...selectedIds] })
+                  handleSuggestRule()
+                }}
                 disabled={suggesting}
               >
                 {suggesting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
@@ -200,6 +261,7 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
           )}
           {isReddit && (
             <button
+              data-log="reddit.import.open-modal"
               className="btn-secondary text-xs flex items-center gap-1.5"
               onClick={() => setShowImportModal(true)}
             >
@@ -207,6 +269,39 @@ export default function DecisionQueue({ communityId }: DecisionQueueProps) {
               Import from Reddit
             </button>
           )}
+          {isHypothetical && (() => {
+            const exhausted = !!scenarioStatus && scenarioStatus.remaining_count === 0
+            const remaining = scenarioStatus?.remaining_count ?? null
+            const total = scenarioStatus?.total_count ?? null
+            const nextBatch = remaining != null ? Math.min(25, remaining) : 25
+            return (
+              <button
+                data-log="scenario.import-next-batch"
+                data-log-context={JSON.stringify({ remaining, total, next_batch: nextBatch })}
+                className="btn-secondary text-xs flex items-center gap-1.5"
+                disabled={scenarioImportMutation.isPending || !!importInFlight || exhausted}
+                onClick={() => scenarioImportMutation.mutate()}
+                title={
+                  exhausted && total != null
+                    ? `All ${total} scenario posts have been imported.`
+                    : remaining != null
+                      ? `${remaining} of ${total} scenario posts remaining.`
+                      : ''
+                }
+              >
+                {(scenarioImportMutation.isPending || importInFlight)
+                  ? <Loader2 size={12} className="animate-spin" />
+                  : <Download size={12} />}
+                {importInFlight
+                  ? `Evaluating ${Math.min(arrivedCount, importInFlight.expected)}/${importInFlight.expected}…`
+                  : exhausted && total != null
+                    ? `All ${total} imported`
+                    : remaining != null
+                      ? `Load ${nextBatch} more (${remaining} left)`
+                      : 'Load 25 more'}
+              </button>
+            )
+          })()}
           <Filter size={14} className="text-gray-400" />
           <span className="text-xs text-gray-500">Agent verdict:</span>
           <select
@@ -454,6 +549,7 @@ function RedditImportModal({
               <div className="flex justify-end gap-2 pt-2">
                 <button className="btn-secondary text-xs" onClick={onClose}>Cancel</button>
                 <button
+                  data-log="reddit.import.start"
                   className="btn-primary text-xs flex items-center gap-1.5"
                   onClick={handleImport}
                   disabled={importing || !subreddit.trim()}
@@ -577,12 +673,17 @@ function DecisionCard({
   }
 
   return (
-    <div ref={cardRef} className={`card overflow-hidden ${selected ? 'ring-2 ring-indigo-400' : ''} ${highlighted ? 'ring-2 ring-yellow-400' : ''} ${decision.was_override ? 'border-amber-200' : ''}`}>
+    <div
+      ref={cardRef}
+      data-log-context={JSON.stringify({ decision_id: decision.id, agent_verdict: decision.agent_verdict })}
+      className={`card overflow-hidden ${selected ? 'ring-2 ring-indigo-400' : ''} ${highlighted ? 'ring-2 ring-yellow-400' : ''} ${decision.was_override ? 'border-amber-200' : ''}`}
+    >
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start gap-3">
           <input
             type="checkbox"
+            data-log="decision.toggle-select"
             className="mt-1 flex-shrink-0 cursor-pointer"
             checked={selected}
             onChange={onToggleSelect}
@@ -607,10 +708,15 @@ function DecisionCard({
         {decision.triggered_rules.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {decision.triggered_rules.map(ruleId => (
-              <span key={ruleId} className="badge badge-gray inline-flex items-center gap-1">
+              <span
+                key={ruleId}
+                className="badge badge-gray inline-flex items-center gap-1"
+                data-log-context={JSON.stringify({ rule_id: ruleId })}
+              >
                 {rulesMap[ruleId]?.title || ruleId}
                 <button
                   type="button"
+                  data-log="decision.rule-chat.toggle"
                   className={`ml-1 rounded p-0.5 transition-colors ${
                     chatRuleId === ruleId
                       ? 'bg-indigo-100 text-indigo-700'
@@ -655,6 +761,7 @@ function DecisionCard({
           {isPending ? (
             <>
               <button
+                data-log="decision.verdict.approve"
                 className={`btn-success text-xs ${selectedVerdict === 'approve' ? 'ring-2 ring-green-500' : ''}`}
                 onClick={() => handleVerdictClick('approve')}
                 disabled={resolving}
@@ -663,6 +770,7 @@ function DecisionCard({
                 Approve
               </button>
               <button
+                data-log="decision.verdict.warn"
                 className={`text-xs px-2.5 py-1.5 rounded-md font-medium inline-flex items-center gap-1.5 border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50 ${selectedVerdict === 'warn' ? 'ring-2 ring-amber-500' : ''}`}
                 onClick={() => handleVerdictClick('warn')}
                 disabled={resolving}
@@ -671,6 +779,7 @@ function DecisionCard({
                 Warn
               </button>
               <button
+                data-log="decision.verdict.remove"
                 className={`btn-danger text-xs ${selectedVerdict === 'remove' ? 'ring-2 ring-red-500' : ''}`}
                 onClick={() => handleVerdictClick('remove')}
                 disabled={resolving}
@@ -708,9 +817,14 @@ function DecisionCard({
                 </p>
                 <div className="space-y-1 max-h-32 overflow-y-auto">
                   {Object.entries(rulesMap).map(([id, rule]) => (
-                    <label key={id} className="flex items-center gap-2 text-xs cursor-pointer">
+                    <label
+                      key={id}
+                      className="flex items-center gap-2 text-xs cursor-pointer"
+                      data-log-context={JSON.stringify({ rule_id: id })}
+                    >
                       <input
                         type="checkbox"
+                        data-log="decision.rule-picker.toggle"
                         checked={selectedRuleIds.includes(id)}
                         onChange={e => setSelectedRuleIds(prev =>
                           e.target.checked ? [...prev, id] : prev.filter(r => r !== id)
@@ -724,6 +838,7 @@ function DecisionCard({
             )}
             {isOverride && (
               <input
+                data-log="decision.override.notes"
                 className="w-full text-xs border border-gray-300 rounded px-2 py-1.5 focus:outline-none"
                 placeholder="Quick note on why you're overriding the agent's decision (optional)"
                 value={notes}
@@ -732,14 +847,27 @@ function DecisionCard({
             )}
             <div className="flex gap-2">
               <button
+                data-log={isOverride ? 'decision.override.confirm' : 'decision.resolve.confirm'}
+                data-log-context={JSON.stringify({ verdict: selectedVerdict, is_override: !!isOverride, rule_ids: needsRulePicker ? selectedRuleIds : undefined })}
                 className="btn-primary text-xs py-1"
-                onClick={handleResolve}
+                onClick={() => {
+                  logEvent(isOverride ? 'decision.override.confirm' : 'decision.resolve.confirm', {
+                    decision_id: decision.id,
+                    verdict: selectedVerdict,
+                    agent_verdict: decision.agent_verdict,
+                    is_override: !!isOverride,
+                    rule_ids: needsRulePicker ? selectedRuleIds : undefined,
+                    notes: isOverride ? notes : undefined,
+                  })
+                  handleResolve()
+                }}
                 disabled={resolving}
               >
                 {resolving ? <Loader2 size={12} className="animate-spin" /> : null}
                 Confirm: {selectedVerdict}
               </button>
               <button
+                data-log="decision.resolve.cancel"
                 className="btn-secondary text-xs py-1"
                 onClick={() => setSelectedVerdict(null)}
               >

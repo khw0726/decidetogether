@@ -73,7 +73,7 @@ async def list_communities(db: AsyncSession = Depends(get_db)) -> list[Community
 async def create_community(
     body: CommunityCreate, db: AsyncSession = Depends(get_db)
 ) -> CommunityRead:
-    valid_platforms = {"reddit", "chatroom", "forum"}
+    valid_platforms = {"reddit", "chatroom", "forum", "hypothetical"}
     if body.platform not in valid_platforms:
         raise HTTPException(
             status_code=422,
@@ -110,6 +110,37 @@ async def get_community(
     if not community:
         raise HTTPException(status_code=404, detail="Community not found")
     return CommunityRead.model_validate(community)
+
+
+class ReevalStatusResponse(BaseModel):
+    rules_compiling: list[str]
+    rules_reevaluating: list[str]
+    in_progress: bool
+
+
+@router.get("/communities/{community_id}/reeval-status", response_model=ReevalStatusResponse)
+async def get_reeval_status(
+    community_id: str, db: AsyncSession = Depends(get_db)
+) -> ReevalStatusResponse:
+    """Return rule ids currently mid-compile or mid-pending-queue-reeval for this
+    community, so the moderation queue can show a progress indicator while the
+    queue's verdicts are still being recomputed against newly added/edited rules.
+    """
+    from .checklist import get_running_reevals
+
+    compiling_rows = await db.execute(
+        select(Rule.id).where(
+            Rule.community_id == community_id,
+            Rule.compile_status == "pending",
+        )
+    )
+    rules_compiling = list(compiling_rows.scalars().all())
+    rules_reevaluating = get_running_reevals(community_id)
+    return ReevalStatusResponse(
+        rules_compiling=rules_compiling,
+        rules_reevaluating=rules_reevaluating,
+        in_progress=bool(rules_compiling) or bool(rules_reevaluating),
+    )
 
 
 @router.delete("/communities/{community_id}", status_code=204)

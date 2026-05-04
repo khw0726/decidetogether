@@ -70,13 +70,13 @@ export default function PostCard({ post, compact = false }: PostCardProps) {
             href={postUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`block text-gray-600 hover:text-indigo-600 hover:bg-indigo-50/40 -mx-1 px-1 rounded transition-colors ${compact ? 'text-xs line-clamp-3' : 'text-sm'}`}
+            className={`block text-gray-600 hover:text-indigo-600 hover:bg-indigo-50/40 -mx-1 px-1 rounded transition-colors ${compact ? 'text-xs' : 'text-sm'}`}
           >
             {body}
             <ExternalLink size={compact ? 11 : 12} className="inline-block ml-1 -mt-0.5 text-gray-400" />
           </a>
         ) : (
-          <p className={`text-gray-600 ${compact ? 'text-xs line-clamp-3' : 'text-sm'}`}>
+          <p className={`text-gray-600 whitespace-pre-wrap ${compact ? 'text-xs' : 'text-sm'}`}>
             {body}
           </p>
         )

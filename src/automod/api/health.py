@@ -124,43 +124,28 @@ async def get_rules_health_summary(
         ]
         decision_count = len(rule_decisions)
 
+        # Rule-level FP: any item triggered (rule wanted to act) but mod approved.
+        # Mirror get_rule_health exactly so panel and sidebar share a numerator.
         error_count = 0
         for decision in rule_decisions:
             reasoning = decision.agent_reasoning.get(rid, {})
             item_reasoning = reasoning.get("item_reasoning", {})
             mod_verdict = decision.moderator_verdict
-
             any_item_triggered = any(
                 ir.get("triggered", False)
                 for iid, ir in item_reasoning.items()
                 if iid in rule_item_ids
             )
-
-            # Decision-level error: a decision counts as one error if ANY of its
-            # item-level evaluations disagreed with the moderator. Per-item counts
-            # would let a single decision contribute >1 errors and push the rate
-            # above 100%.
-            decision_errored = False
-            for item_id, item_data in item_reasoning.items():
-                if item_id not in rule_item_ids:
-                    continue
-                triggered = item_data.get("triggered", False)
-                # FP: item triggered but mod approved
-                if triggered and mod_verdict == "approve":
-                    decision_errored = True
-                    break
-                # FN: item missed but mod acted (removed/warned), and rule was relevant
-                if not triggered and mod_verdict in ("remove", "warn") and any_item_triggered:
-                    decision_errored = True
-                    break
-            if decision_errored:
+            if any_item_triggered and mod_verdict == "approve":
                 error_count += 1
 
         # Rule-level FN: mod explicitly linked this rule to a violation the agent missed.
-        # Match get_rule_health: denominator grows with these cases too.
+        # The rule_fn posts are already in the decision pool (see rule_fn_by_rule
+        # construction at line 99-114, which requires post_id ∈ decisions_by_post_id),
+        # so the denominator stays at decision_count — no inflation.
         rule_fn = rule_fn_by_rule.get(rid, 0)
         error_count += rule_fn
-        denom = decision_count + rule_fn
+        denom = decision_count
 
         summaries.append({
             "rule_id": rid,
@@ -220,6 +205,9 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
     override_count = 0
     rule_fp_count = 0  # rule triggered but mod approved
     rule_fn_count = 0  # rule didn't trigger but mod removed (and rule looks relevant)
+    # Decision IDs powering the click-through filter on the health panel boxes.
+    wrongly_flagged_decision_ids: list[str] = []
+    missed_decision_ids: list[str] = []
 
     for decision in rule_decisions:
         reasoning = decision.agent_reasoning.get(rule_id, {})
@@ -249,6 +237,7 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
             override_count += 1
         if rule_would_act and mod_verdict == "approve":
             rule_fp_count += 1
+            wrongly_flagged_decision_ids.append(decision.id)
 
         post = decision.post_content or {}
         inner = post.get("content", {})
@@ -309,6 +298,7 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
         decision = decisions_by_post_id.get(post_id)
         if decision and rule_id not in (decision.triggered_rules or []):
             rule_fn_count += 1
+            missed_decision_ids.append(decision.id)
 
     # Fetch examples linked to this rule
     example_ids_result = await db.execute(
@@ -409,18 +399,24 @@ async def get_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) -> d
     )
     covered_pct = items_with_examples / len(all_items) if all_items else 0.0
 
-    fn_denominator = total_decisions + rule_fn_count
+    # Denominator is the decision pool. rule_fn_count is a subset of those decisions
+    # (the FN candidate query at line 297-311 filters to posts already in the pool),
+    # so adding it would double-count.
+    rule_denominator = total_decisions
 
     return {
         "rule_id": rule_id,
         "overall": {
             "total_decisions": total_decisions,
+            "rule_denominator": rule_denominator,
             "override_rate": override_count / total_decisions if total_decisions > 0 else 0.0,
             "covered_by_examples": covered_pct,
             "wrongly_flagged_count": rule_fp_count,
-            "wrongly_flagged_rate": rule_fp_count / total_decisions if total_decisions > 0 else 0.0,
+            "wrongly_flagged_rate": rule_fp_count / rule_denominator if rule_denominator > 0 else 0.0,
+            "wrongly_flagged_decision_ids": wrongly_flagged_decision_ids,
             "missed_count": rule_fn_count,
-            "missed_rate": rule_fn_count / fn_denominator if fn_denominator > 0 else 0.0,
+            "missed_rate": rule_fn_count / rule_denominator if rule_denominator > 0 else 0.0,
+            "missed_decision_ids": missed_decision_ids,
         },
         "items": item_metrics,
         "uncovered_violations": uncovered_violations,
@@ -958,11 +954,14 @@ async def reevaluate_decisions(
     if not checklist:
         return {"reevaluated": 0}
 
+    # Re-evaluate ALL resolved decisions where this rule was evaluated, not just
+    # was_override=True. After a logic change, a previously-agreeing decision can
+    # become wrong (or vice versa) — skipping non-overrides leaves stale
+    # item_reasoning that the FP/FN predicates then misread.
     decisions_result = await db.execute(
         select(Decision).where(
             Decision.community_id == rule.community_id,
             Decision.moderator_verdict != "pending",
-            Decision.was_override == True,  # noqa: E712
         )
     )
     decisions = [
@@ -972,6 +971,8 @@ async def reevaluate_decisions(
 
     if not decisions:
         return {"reevaluated": 0}
+
+    from ..core.actions import resolve_verdict
 
     client = get_anthropic_client()
     subjective_evaluator = SubjectiveEvaluator(client, settings)
@@ -996,8 +997,33 @@ async def reevaluate_decisions(
                 "item_reasoning": new_result["reasoning"],
                 "triggered_items": new_result["triggered_items"],
             }
+
+            # Recompute top-level Decision fields so they don't drift from the
+            # per-rule reasoning (mirrors _reevaluate_pending_queue).
+            rule_results = [
+                {"verdict": v.get("verdict", "approve"), "confidence": v.get("confidence", 0.5)}
+                for k, v in reasoning.items()
+                if k != "__community_norms__"
+            ]
+            if rule_results:
+                agg_verdict, agg_confidence = resolve_verdict(rule_results)
+            else:
+                agg_verdict, agg_confidence = "approve", 1.0
+            norms = reasoning.get("__community_norms__")
+            if norms and agg_verdict == "approve":
+                agg_verdict = "review"
+                agg_confidence = norms.get("confidence", agg_confidence)
+            triggered_rules = [
+                rid for rid, r in reasoning.items()
+                if rid != "__community_norms__" and r.get("verdict") in ("remove", "warn")
+            ]
+
             decision.agent_reasoning = reasoning
             flag_modified(decision, "agent_reasoning")
+            decision.agent_verdict = agg_verdict
+            decision.agent_confidence = agg_confidence
+            decision.triggered_rules = triggered_rules
+            flag_modified(decision, "triggered_rules")
             updated += 1
         except Exception as e:
             logger.warning(f"Re-evaluation failed for decision {decision.id}: {e}")

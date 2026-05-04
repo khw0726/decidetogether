@@ -13,6 +13,33 @@ from . import prompts
 logger = logging.getLogger(__name__)
 
 
+def _enforce_action_invariants(items: list[ChecklistItem]) -> None:
+    """Coerce actions so non-leaves are always 'continue' and leaves never are.
+
+    The decision-tree semantics require parents to defer the verdict to their
+    children ("continue") and leaves to carry a terminal verdict ("warn" or
+    "remove"). LLM compiler output occasionally violates this; fix it in place
+    before persisting. Mutates `items`.
+    """
+    has_children: set[Optional[str]] = {it.parent_id for it in items if it.parent_id is not None}
+    for it in items:
+        is_non_leaf = it.id in has_children
+        if is_non_leaf:
+            if it.action != "continue":
+                logger.warning(
+                    "Coercing non-leaf checklist item %s action %r → 'continue'",
+                    it.id, it.action,
+                )
+                it.action = "continue"
+        else:
+            if it.action == "continue":
+                logger.warning(
+                    "Coercing leaf checklist item %s action 'continue' → 'warn'",
+                    it.id,
+                )
+                it.action = "warn"
+
+
 def _filter_context_by_relevant(
     community_context: Optional[dict],
     relevant_context: Optional[list[dict]],
@@ -659,10 +686,12 @@ class RuleCompiler:
         )
         return response.content[0].input
 
-    async def triage_rule(self, rule_text: str, community_name: str, platform: str) -> dict[str, str]:
+    async def triage_rule(
+        self, rule_title: str, rule_text: str, community_name: str, platform: str
+    ) -> dict[str, str]:
         """Classify rule as actionable/procedural/meta/informational."""
         logger.info(f"Triaging rule for community '{community_name}'")
-        user_prompt = prompts.build_triage_prompt(rule_text, community_name, platform)
+        user_prompt = prompts.build_triage_prompt(rule_title, rule_text, community_name, platform)
         result = await self._call_claude(prompts.TRIAGE_SYSTEM, user_prompt, tool=_TRIAGE_TOOL)
         return {
             "rule_type": result.get("rule_type", "informational"),
@@ -675,7 +704,7 @@ class RuleCompiler:
             return "No other rules."
         lines = []
         for r in other_rules:
-            lines.append(f"- [{r.rule_type.upper()}] {r.title}: {r.text[:100]}...")
+            lines.append(f"- [{r.rule_type.upper()}] {r.title}: {r.text}")
         return "\n".join(lines)
 
     def _checklist_item_to_dict(self, item: ChecklistItem) -> dict:
@@ -1051,6 +1080,7 @@ class RuleCompiler:
             if item.id not in top_referenced:
                 append_subtree_unchanged(item, None)
 
+        _enforce_action_invariants(result)
         return result
 
     async def compile_rule_two_pass(
@@ -1141,6 +1171,7 @@ class RuleCompiler:
         """Parse items recursively, returning a flat list with parent_id set correctly."""
         result = []
         self._parse_items_recursive(items_data, rule_id, None, result, 0)
+        _enforce_action_invariants(result)
         return result
 
     def _parse_items_recursive(

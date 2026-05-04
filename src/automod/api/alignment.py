@@ -259,6 +259,11 @@ async def accept_suggestion(
 
     suggestion.status = "accepted"
 
+    # Track whether we need to await an inline recompile after commit.
+    # Rule_text accept must finish recompiling before returning so the frontend's
+    # follow-up reevaluateDecisions runs against the new checklist.
+    rule_text_accepted_rule_id: str | None = None
+
     # Apply the suggestion if it's a rule_text update
     if suggestion.suggestion_type == "rule_text" and suggestion.rule_id:
         rule_result = await db.execute(select(Rule).where(Rule.id == suggestion.rule_id))
@@ -283,10 +288,7 @@ async def accept_suggestion(
                     sup = sup_res.scalar_one_or_none()
                     if sup:
                         sup.status = "superseded"
-                # Silent recompile: re-derive checklist from the new text.
-                background_tasks.add_task(
-                    _recompile_after_text_accept, str(suggestion.rule_id)
-                )
+                rule_text_accepted_rule_id = str(suggestion.rule_id)
 
     # Apply the suggestion if it's a context update
     if suggestion.suggestion_type == "context" and suggestion.rule_id:
@@ -387,7 +389,7 @@ async def accept_suggestion(
 
         # Triage the new rule
         compiler = get_compiler()
-        triage = await compiler.triage_rule(new_rule.text, community.name, community.platform)
+        triage = await compiler.triage_rule(new_rule.title, new_rule.text, community.name, community.platform)
         new_rule.rule_type = triage["rule_type"]
         new_rule.rule_type_reasoning = triage.get("reasoning")
 
@@ -405,6 +407,12 @@ async def accept_suggestion(
 
     await db.commit()
     await db.refresh(suggestion)
+
+    # Inline recompile so the response only returns once the new checklist is
+    # persisted. The frontend then calls reevaluateDecisions against fresh logic.
+    if rule_text_accepted_rule_id:
+        await _recompile_after_text_accept(rule_text_accepted_rule_id)
+
     return SuggestionRead.model_validate(suggestion)
 
 

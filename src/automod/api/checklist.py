@@ -37,6 +37,28 @@ _PENDING_REEVAL_DEBOUNCE_SECONDS = 5
 # another background task).
 _detached_reeval_tasks: set[asyncio.Task] = set()
 
+# Tracks rules currently mid-re-eval per community so the admin UI can surface
+# a "re-evaluating queue" indicator. Populated when the LLM phase starts and
+# cleared in a finally block so a crash can't strand the flag.
+_running_reevals: dict[str, set[str]] = {}
+
+
+def _mark_reeval_running(community_id: str, rule_id: str) -> None:
+    _running_reevals.setdefault(community_id, set()).add(rule_id)
+
+
+def _clear_reeval_running(community_id: str, rule_id: str) -> None:
+    rules = _running_reevals.get(community_id)
+    if not rules:
+        return
+    rules.discard(rule_id)
+    if not rules:
+        _running_reevals.pop(community_id, None)
+
+
+def get_running_reevals(community_id: str) -> list[str]:
+    return sorted(_running_reevals.get(community_id, set()))
+
 
 async def _link_uncovered_violations(rule_id: str, generation: int) -> None:
     """Background task: find uncovered violations for a rule and link them to checklist items via LLM.
@@ -223,6 +245,8 @@ async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
     subjective_evaluator = SubjectiveEvaluator(client, settings)
     tree_evaluator = TreeEvaluator(subjective_evaluator)
 
+    from ..core.actions import resolve_verdict
+
     updates: list[dict] = []
     for snap in candidate_decisions:
         try:
@@ -263,8 +287,33 @@ async def _reevaluate_error_cases(rule_id: str, generation: int) -> None:
                     continue
                 reasoning = dict(d.agent_reasoning or {})
                 reasoning[rule_id] = upd["rule_entry"]
+
+                # Recompute top-level so agent_verdict/triggered_rules don't drift
+                # from the per-rule reasoning we just wrote.
+                rule_results = [
+                    {"verdict": v.get("verdict", "approve"), "confidence": v.get("confidence", 0.5)}
+                    for k, v in reasoning.items()
+                    if k != "__community_norms__"
+                ]
+                if rule_results:
+                    agg_verdict, agg_confidence = resolve_verdict(rule_results)
+                else:
+                    agg_verdict, agg_confidence = "approve", 1.0
+                norms = reasoning.get("__community_norms__")
+                if norms and agg_verdict == "approve":
+                    agg_verdict = "review"
+                    agg_confidence = norms.get("confidence", agg_confidence)
+                triggered_rules = [
+                    rid for rid, r in reasoning.items()
+                    if rid != "__community_norms__" and r.get("verdict") in ("remove", "warn")
+                ]
+
                 d.agent_reasoning = reasoning
                 flag_modified(d, "agent_reasoning")
+                d.agent_verdict = agg_verdict
+                d.agent_confidence = agg_confidence
+                d.triggered_rules = triggered_rules
+                flag_modified(d, "triggered_rules")
                 updated += 1
 
             await db.commit()
@@ -288,8 +337,7 @@ async def _reevaluate_pending_queue(rule_id: str, generation: int) -> None:
         logger.debug(f"Skipping debounced pending-queue re-eval for rule {rule_id} (superseded)")
         return
 
-    from ..core.actions import resolve_verdict
-    from ..db.database import AsyncSessionLocal, write_session
+    from ..db.database import AsyncSessionLocal
 
     # ── Read phase ─────────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:
@@ -332,6 +380,26 @@ async def _reevaluate_pending_queue(rule_id: str, generation: int) -> None:
     if not candidate_decisions:
         logger.info(f"No pending decisions to re-evaluate for rule {rule_id}")
         return
+
+    _mark_reeval_running(rule.community_id, rule_id)
+    try:
+        await _run_reeval_llm_and_write(
+            rule, checklist, community_name, candidate_decisions
+        )
+    finally:
+        _clear_reeval_running(rule.community_id, rule_id)
+
+
+async def _run_reeval_llm_and_write(
+    rule: Rule,
+    checklist: list,
+    community_name: str,
+    candidate_decisions: list[dict],
+) -> None:
+    from ..core.actions import resolve_verdict
+    from ..db.database import write_session
+
+    rule_id = rule.id
 
     # ── LLM phase (no session, no lock) ────────────────────────────────
     client = get_anthropic_client()

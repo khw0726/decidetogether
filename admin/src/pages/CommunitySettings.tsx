@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings, Plus, Trash2, AlertTriangle, Loader2, Link, RefreshCw } from 'lucide-react'
+import { Settings, Plus, Trash2, AlertTriangle, Loader2, Link, RefreshCw, ExternalLink } from 'lucide-react'
 import {
   getCommunity,
   generateCommunityContext,
   updateCommunityContext,
-  listSamplePosts,
   addSamplePost,
-  deleteSamplePost,
   importSamplePostFromUrl,
   type CommunitySamplePost,
   type CommunityContext,
@@ -27,12 +25,6 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
     enabled: !!communityId,
   })
 
-  const { data: samplePosts = [] } = useQuery({
-    queryKey: ['sample-posts', communityId],
-    queryFn: () => listSamplePosts(communityId),
-    enabled: !!communityId,
-  })
-
   const contextMutation = useMutation({
     mutationFn: () => generateCommunityContext(communityId),
     onSuccess: () => {
@@ -46,16 +38,6 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
       queryClient.invalidateQueries({ queryKey: ['community', communityId] })
     },
   })
-
-  const deleteMutation = useMutation({
-    mutationFn: (postId: string) => deleteSamplePost(communityId, postId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sample-posts', communityId] })
-      queryClient.invalidateQueries({ queryKey: ['community', communityId] })
-    },
-  })
-
-  const committedSamples = samplePosts.filter(p => p.status === 'committed')
 
   if (!communityId) {
     return (
@@ -87,23 +69,6 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
           </p>
         </div>
 
-        {community?.context_stale && (
-          <div className="mb-3 flex items-center justify-between gap-3 px-3 py-2 rounded border border-amber-200 bg-amber-50 text-amber-900 text-sm">
-            <span className="flex items-center gap-2">
-              <RefreshCw size={14} />
-              Sample posts have changed since this context was generated.
-            </span>
-            <button
-              className="btn-primary text-xs flex items-center gap-1.5"
-              onClick={() => contextMutation.mutate()}
-              disabled={contextMutation.isPending}
-            >
-              {contextMutation.isPending && <Loader2 size={11} className="animate-spin" />}
-              Regenerate
-            </button>
-          </div>
-        )}
-
         {contextMutation.isPending && !community?.community_context ? (
           <div className="card p-8 flex flex-col items-center justify-center gap-3 text-gray-500">
             <Loader2 size={24} className="animate-spin text-indigo-500" />
@@ -113,8 +78,6 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
           <ContextDimensionsView
             context={community.community_context}
             communityId={communityId}
-            onRegenerate={() => contextMutation.mutate()}
-            isRegenerating={contextMutation.isPending}
             onSaveDimension={async (key: keyof CommunityContext, dim: CommunityContextDimension) => {
               await contextUpdateMutation.mutateAsync({ [key]: dim })
             }}
@@ -134,41 +97,26 @@ export default function CommunitySettings({ communityId }: CommunitySettingsProp
         )}
       </section>
 
-      {/* Sample Posts */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-base font-semibold text-gray-800">Sample Posts</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Representative posts that shape this community's context (and through it, every rule).
-            </p>
-          </div>
-          <AddSamplePostButton
-            communityId={communityId}
-            onAdded={() => {
-              queryClient.invalidateQueries({ queryKey: ['sample-posts', communityId] })
-              queryClient.invalidateQueries({ queryKey: ['community', communityId] })
-            }}
-          />
-        </div>
+      {/* Sample posts & comments link (hypothetical communities only) */}
+      {(() => {
+        const scenarioId = (community?.platform_config as Record<string, unknown> | null)?.scenario_id as string | undefined
+        if (!scenarioId) return null
+        const href = `http://internal.kixlab.org:7888/study/scenario/${scenarioId}`
+        return (
+          <section>
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-secondary w-full flex items-center justify-center gap-2 text-sm py-2.5"
+            >
+              <ExternalLink size={14} />
+              View sample posts &amp; comments for this scenario
+            </a>
+          </section>
+        )
+      })()}
 
-        {committedSamples.length === 0 ? (
-          <div className="card p-6 text-center text-gray-400 text-sm">
-            No sample posts yet. Add manually or import a Reddit URL.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {committedSamples.map(post => (
-              <SamplePostCard
-                key={post.id}
-                post={post}
-                onDelete={() => deleteMutation.mutate(post.id)}
-                deleting={deleteMutation.isPending}
-              />
-            ))}
-          </div>
-        )}
-      </section>
     </div>
   )
 }

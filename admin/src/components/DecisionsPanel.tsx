@@ -19,6 +19,11 @@ interface DecisionsPanelProps {
   useTestSet?: boolean
   onToggleUseTestSet?: (next: boolean) => void
   onToggleTestSetMember?: (decisionId: string) => void
+  // Click-through filter from the rule-wide health panel. When set, only decisions
+  // whose IDs appear in errorDecisionIds are shown.
+  errorTypeFilter?: 'wrongly_flagged' | 'missed' | null
+  errorDecisionIds?: string[] | null
+  onClearErrorFilter?: () => void
 }
 
 const VERDICT_BADGE: Record<string, string> = {
@@ -62,20 +67,30 @@ export default function DecisionsPanel({
   useTestSet = false,
   onToggleUseTestSet,
   onToggleTestSetMember,
+  errorTypeFilter = null,
+  errorDecisionIds = null,
+  onClearErrorFilter,
 }: DecisionsPanelProps) {
   const navigate = useNavigate()
   const testSetSet = new Set(testSetIds)
-  const { data: decisions = [], isLoading } = useQuery({
-    queryKey: ['decisions-for-rule', communityId, ruleId, checklistItemId],
+  // When an error filter is active, bump the limit so the requested IDs are
+  // present in the fetched window (some may be older than the default 50 most
+  // recent). The downstream filter narrows back to the requested set.
+  const fetchLimit = errorTypeFilter ? 500 : 50
+  const { data: allDecisions = [], isLoading } = useQuery({
+    queryKey: ['decisions-for-rule', communityId, ruleId, checklistItemId, fetchLimit],
     queryFn: () =>
       listDecisions(communityId, {
         status: 'resolved',
         rule_id: ruleId ?? undefined,
         checklist_item_id: checklistItemId ?? undefined,
-        limit: 50,
+        limit: fetchLimit,
       }),
     enabled: !!communityId && !!ruleId,
   })
+  const decisions = errorTypeFilter && errorDecisionIds
+    ? allDecisions.filter(d => errorDecisionIds.includes(d.id))
+    : allDecisions
 
   if (!ruleId) {
     return (
@@ -121,15 +136,39 @@ export default function DecisionsPanel({
     return (
       <div className="flex-1 flex items-center justify-center text-xs text-gray-400 italic gap-2">
         <Inbox size={14} />
-        {checklistItemId
-          ? 'No resolved decisions matched this checklist item.'
-          : 'No resolved decisions for this rule yet.'}
+        {errorTypeFilter
+          ? `No ${errorTypeFilter === 'wrongly_flagged' ? 'wrongly flagged' : 'missed'} decisions to show.`
+          : checklistItemId
+            ? 'No resolved decisions matched this checklist item.'
+            : 'No resolved decisions for this rule yet.'}
       </div>
     )
   }
 
   return (
     <div className="flex-1 overflow-auto p-3 space-y-3">
+      {errorTypeFilter && (
+        <div className={`flex items-center gap-2 text-[11px] border rounded px-2 py-1.5 sticky top-0 z-10 ${
+          errorTypeFilter === 'wrongly_flagged'
+            ? 'bg-red-50 border-red-200 text-red-700'
+            : 'bg-amber-50 border-amber-200 text-amber-800'
+        }`}>
+          <span className="font-semibold uppercase tracking-wide">
+            Filter: {errorTypeFilter === 'wrongly_flagged' ? 'Wrongly flagged' : 'Missed'}
+          </span>
+          <span className="opacity-70">{decisions.length} decision{decisions.length === 1 ? '' : 's'}</span>
+          {onClearErrorFilter && (
+            <button
+              type="button"
+              data-log="decisions.error-filter.clear"
+              className="ml-auto text-[11px] underline hover:opacity-80"
+              onClick={onClearErrorFilter}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
       {onToggleTestSetMember && (
         <div className="flex items-center gap-3 text-[11px] bg-gray-50 border border-gray-200 rounded px-2 py-1.5 sticky top-0 z-10">
           <span className="font-semibold text-gray-600 uppercase tracking-wide">Test set</span>
@@ -137,6 +176,7 @@ export default function DecisionsPanel({
           <label className="ml-auto flex items-center gap-1.5 cursor-pointer">
             <input
               type="checkbox"
+              data-log="decisions.test-set.toggle-use"
               checked={useTestSet}
               onChange={e => onToggleUseTestSet?.(e.target.checked)}
               disabled={testSetIds.length === 0}
@@ -183,11 +223,15 @@ function DecisionRow({
     | { verdict?: string; confidence?: number; rule_title?: string; item_reasoning?: Record<string, unknown> }
     | undefined
   return (
-    <div className={`border rounded-lg p-3 bg-white ${isPinned ? 'border-indigo-300 ring-1 ring-indigo-100' : 'border-gray-200'}`}>
+    <div
+      className={`border rounded-lg p-3 bg-white ${isPinned ? 'border-indigo-300 ring-1 ring-indigo-100' : 'border-gray-200'}`}
+      data-log-context={JSON.stringify({ decision_id: decision.id, rule_id: ruleId })}
+    >
       <div className="flex items-center gap-2 mb-2">
         {onTogglePinned && (
           <input
             type="checkbox"
+            data-log="decisions.test-set.toggle-pin"
             checked={!!isPinned}
             onChange={() => onTogglePinned(decision.id)}
             title="Pin to live test set"
@@ -202,6 +246,7 @@ function DecisionRow({
         {onOpenInQueue && (
           <button
             type="button"
+            data-log="decision.open-in-queue"
             onClick={onOpenInQueue}
             className="text-[10px] text-indigo-500 hover:text-indigo-700 inline-flex items-center gap-0.5"
             title="Open this decision in the moderation queue (resolved view)"

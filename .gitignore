@@ -3,3 +3,4 @@
 *.pyc
 *__pycache_
 *node_modules_
+data/

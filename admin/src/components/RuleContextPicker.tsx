@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Sparkles } from 'lucide-react'
+import { Plus, Trash2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
 import Tooltip from './Tooltip'
 import type {
   CommunityContext,
@@ -93,6 +93,9 @@ function RuleContextPicker({
   )
   const [matching, setMatching] = useState(false)
   const [matchError, setMatchError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(true)
+
+  const activeTagCount = Object.values(weights).filter(w => w > 0).length
 
   useEffect(() => {
     setWeights(initialWeights)
@@ -168,14 +171,21 @@ function RuleContextPicker({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Relevant Community Context
-          </h4>
-        </div>
-        {!readOnly && (
+        <button
+          type="button"
+          className="flex items-center gap-1 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700"
+          onClick={() => setExpanded(e => !e)}
+        >
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          Relevant Community Context
+          <span className="ml-1 normal-case text-gray-400 font-normal">
+            ({activeTagCount} tag{activeTagCount === 1 ? '' : 's'}
+            {customNotes.length > 0 ? ` · ${customNotes.length} note${customNotes.length === 1 ? '' : 's'}` : ''})
+          </span>
+        </button>
+        {expanded && !readOnly && (
           <div className="flex gap-1.5">
             <button
               className="text-xs px-2 py-0.5 rounded border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-1 disabled:opacity-50"
@@ -205,11 +215,11 @@ function RuleContextPicker({
         )}
       </div>
 
-      {matchError && (
+      {expanded && matchError && (
         <div className="text-xs text-rose-600">{matchError}</div>
       )}
 
-      {DIMENSIONS.map(({ label, key }) => {
+      {expanded && DIMENSIONS.map(({ label, key }) => {
         const bundles = allBundles.filter(b => b.dim === key)
         if (bundles.length === 0) return null
         return (
@@ -259,7 +269,7 @@ function RuleContextPicker({
       })}
 
       {/* Custom rule notes */}
-      {(!readOnly || customNotes.length > 0) && (
+      {expanded && (!readOnly || customNotes.length > 0) && (
         <div>
           <div className="flex items-center justify-between mb-1">
             <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">

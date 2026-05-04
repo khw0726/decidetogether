@@ -60,13 +60,18 @@ class EvaluationEngine:
         all_rules = list(rules_result.scalars().all())
         actionable_rules = [r for r in all_rules if r.rule_type == "actionable"]
 
-        # Filter by applies_to based on content type
+        # Filter by applies_to based on content type. Treat anything that isn't
+        # explicitly a comment as a post — different platforms / scenario files
+        # spell post types differently ("self"/"link" on Reddit, "post" in our
+        # scenarios, "" when missing) and an enum-style allowlist silently dropped
+        # rules whenever the spelling didn't match.
         post_type = post.get("context", {}).get("post_type", "")
+        is_comment = post_type == "comment"
         actionable_rules = [
             r for r in actionable_rules
             if r.applies_to == "both"
-            or (r.applies_to == "posts" and post_type in ("self", "link", ""))
-            or (r.applies_to == "comments" and post_type == "comment")
+            or (r.applies_to == "posts" and not is_comment)
+            or (r.applies_to == "comments" and is_comment)
         ]
 
         # 3. Build rules summary for context

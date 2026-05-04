@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { ChecklistItem, PreviewRecompileResult } from '../api/client'
 
 interface ChecklistPreviewProps {
@@ -85,9 +87,35 @@ function pickThreshold(logic: unknown): number | null {
   return null
 }
 
+function pickString(logic: unknown, key: string): string | null {
+  if (!logic || typeof logic !== 'object') return null
+  const v = (logic as Record<string, unknown>)[key]
+  return typeof v === 'string' ? v : null
+}
+
+function TextDiffBlock({ from, to }: { from: string | null; to: string }) {
+  // Compact before/after block — full text shown for both so the moderator can
+  // judge the actual semantic change, not just whether something differs.
+  return (
+    <div className="space-y-1 text-[11px] leading-snug">
+      {from != null && from.length > 0 && (
+        <div className="border-l-2 border-red-300 pl-2 text-red-700/90 bg-red-50/50 rounded-r py-0.5">
+          <span className="text-[9px] uppercase tracking-wider text-red-500/70 mr-1">prev</span>
+          {from}
+        </div>
+      )}
+      <div className="border-l-2 border-emerald-400 pl-2 text-emerald-800 bg-emerald-50/50 rounded-r py-0.5">
+        <span className="text-[9px] uppercase tracking-wider text-emerald-600/80 mr-1">new</span>
+        {to}
+      </div>
+    </div>
+  )
+}
+
 function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
   const indent = depth * 16
   const effectiveOp = forceDelete ? 'delete' : op.op
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
   // For updates, show the compiler's new description; otherwise keep existing
   const newDescription =
@@ -161,6 +189,82 @@ function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
       updateRows.push({
         label: 'threshold',
         node: <ConfidenceBar from={0} to={newThreshold} />,
+      })
+    }
+    // Long-form fields (prompt, rubric, patterns) — by default we just signal
+    // that they're changing. The moderator can expand to inspect the diff,
+    // since the full text is too long to read inline at a glance.
+    const oldPrompt = pickString(item.logic, 'prompt_template')
+    const newPrompt = pickString(op.logic, 'prompt_template')
+    const promptChanged = !!(newPrompt && newPrompt !== oldPrompt)
+
+    const oldRubric = pickString(item.logic, 'rubric')
+    const newRubric = pickString(op.logic, 'rubric')
+    const rubricChanged = !!(newRubric && newRubric !== oldRubric)
+
+    const oldPatterns = JSON.stringify((item.logic as Record<string, unknown>)?.patterns ?? null)
+    const newPatterns = JSON.stringify((op.logic as Record<string, unknown>)?.patterns ?? null)
+    const patternsChanged = !!(op.logic && newPatterns !== 'null' && newPatterns !== oldPatterns)
+
+    const longFieldChanges: { label: string; from: string | null; to: string }[] = []
+    if (promptChanged) longFieldChanges.push({ label: 'prompt', from: oldPrompt, to: newPrompt! })
+    if (rubricChanged) longFieldChanges.push({ label: 'rubric', from: oldRubric, to: newRubric! })
+    if (patternsChanged) {
+      longFieldChanges.push({
+        label: 'patterns',
+        from: oldPatterns === 'null' ? null : oldPatterns,
+        to: newPatterns,
+      })
+    }
+
+    if (longFieldChanges.length > 0) {
+      updateRows.push({
+        label: 'changes',
+        node: (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              {longFieldChanges.map(c => (
+                <span
+                  key={c.label}
+                  className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-200/60 text-amber-900 font-semibold"
+                >
+                  {c.label} updated
+                </span>
+              ))}
+              <button
+                type="button"
+                onClick={() => setDetailsOpen(v => !v)}
+                className="text-[11px] flex items-center gap-0.5 text-amber-700 hover:text-amber-900 hover:underline"
+              >
+                {detailsOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                {detailsOpen ? 'Hide diff' : 'Inspect diff'}
+              </button>
+            </div>
+            {detailsOpen && (
+              <div className="space-y-2 pt-1">
+                {longFieldChanges.map(c => (
+                  <div key={c.label}>
+                    <div className="text-[10px] uppercase tracking-wider text-amber-700/80 mb-0.5">{c.label}</div>
+                    <TextDiffBlock from={c.from} to={c.to} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ),
+      })
+    }
+    // The recompile sometimes attaches a context_note explaining *why* the item
+    // changed — surface it so the rationale is visible at a glance.
+    const newContextNote = op.context_note
+    if (newContextNote && newContextNote !== item.context_note) {
+      updateRows.push({
+        label: 'rationale',
+        node: (
+          <div className="text-[11px] leading-snug italic text-amber-900/90 bg-amber-100/40 border border-amber-200 rounded px-2 py-1">
+            {newContextNote}
+          </div>
+        ),
       })
     }
     if (op.children) {

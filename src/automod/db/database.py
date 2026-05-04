@@ -186,6 +186,9 @@ async def _migrate_rule_two_pass_fields(conn) -> None:
 async def _migrate_context_summary_to_json(conn) -> None:
     """Convert legacy string context_adjustment_summary to JSON array."""
     import json as _json
+    cols = await conn.execute(text("PRAGMA table_info(rules)"))
+    if not {r[1] for r in cols.fetchall()}:
+        return
     rows = await conn.execute(text(
         "SELECT id, context_adjustment_summary FROM rules "
         "WHERE context_adjustment_summary IS NOT NULL AND context_adjustment_summary != ''"
@@ -234,6 +237,9 @@ async def _migrate_community_context_prose_to_notes(conn) -> None:
     import json as _json
     import re as _re
 
+    cols = await conn.execute(text("PRAGMA table_info(communities)"))
+    if not {r[1] for r in cols.fetchall()}:
+        return
     rows = await conn.execute(
         text("SELECT id, community_context FROM communities WHERE community_context IS NOT NULL")
     )
@@ -378,6 +384,9 @@ async def _migrate_reference_corpus_fields(conn) -> None:
 
 async def _migrate_flag_to_warn(conn) -> None:
     """Rename action='flag' to 'warn' in checklist_items and verdict='review' to 'warn' in decisions."""
+    cols = await conn.execute(text("PRAGMA table_info(checklist_items)"))
+    if not {r[1] for r in cols.fetchall()}:
+        return
     # Checklist items
     await conn.execute(text(
         "UPDATE checklist_items SET action = 'warn' WHERE action = 'flag'"

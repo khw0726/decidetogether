@@ -1,8 +1,10 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Shield, Settings, Inbox, BookOpen, AlertTriangle, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Shield, Settings, Inbox, BookOpen, Plus, Trash2, ChevronDown, Loader2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { listCommunities, deleteCommunity, Community } from '../api/client'
+import { useImportProgress } from '../contexts/ImportProgress'
+import { useReevalStatus } from '../contexts/ReevalStatus'
 
 interface LayoutProps {
   communityId: string
@@ -13,7 +15,6 @@ const NAV_ITEMS = [
   { to: '/settings', icon: Settings, label: 'Community Profile' },
   { to: '/decisions', icon: Inbox, label: 'Moderation Queue' },
   { to: '/editor', icon: BookOpen, label: 'Rules & Logics Editor' },
-  { to: '/overrides', icon: AlertTriangle, label: 'Unlinked Overrides' },
 ]
 
 export default function Layout({ communityId, onCommunityChange }: LayoutProps) {
@@ -36,6 +37,11 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
   })
 
   const activeCommunity = communities.find((c: Community) => c.id === communityId) ?? null
+  const { importInFlight, arrivedCount } = useImportProgress()
+  // Only show the global banner when the import targets the active community —
+  // otherwise it's noise across an unrelated workspace.
+  const importBannerVisible = importInFlight && importInFlight.communityId === communityId
+  const { status: reevalStatus } = useReevalStatus()
 
   useEffect(() => {
     if (!communityMenuOpen) return
@@ -139,6 +145,30 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
           </div>
         </div>
       </header>
+
+      {/* Global reeval/compile-progress banner — also persists across pages. */}
+      {reevalStatus?.in_progress && (
+        <div className="flex items-center gap-2 px-4 py-1.5 border-b border-amber-200 bg-amber-50 text-amber-800 text-xs flex-shrink-0">
+          <Loader2 size={12} className="animate-spin" />
+          {reevalStatus.rules_compiling.length > 0 && reevalStatus.rules_reevaluating.length === 0
+            ? `Compiling rule logic (${reevalStatus.rules_compiling.length})…`
+            : reevalStatus.rules_reevaluating.length > 0 && reevalStatus.rules_compiling.length === 0
+              ? `Re-evaluating queue against updated rule logic (${reevalStatus.rules_reevaluating.length} rule${reevalStatus.rules_reevaluating.length === 1 ? '' : 's'})…`
+              : `Compiling and re-evaluating rules (${reevalStatus.rules_compiling.length + reevalStatus.rules_reevaluating.length})…`}
+          <span className="text-amber-700/70">Verdicts will refresh automatically when this finishes.</span>
+        </div>
+      )}
+
+      {/* Global import-progress banner — visible from any page so polling and
+          progress feedback survive page changes. */}
+      {importBannerVisible && (
+        <div className="flex items-center gap-2 px-4 py-1.5 border-b border-indigo-200 bg-indigo-50 text-indigo-800 text-xs flex-shrink-0">
+          <Loader2 size={12} className="animate-spin" />
+          Importing and evaluating {importInFlight!.expected} new post{importInFlight!.expected === 1 ? '' : 's'}
+          {' '}({Math.min(arrivedCount, importInFlight!.expected)} ready)…
+          <span className="text-indigo-700/70">Decisions will appear in the moderation queue as they finish.</span>
+        </div>
+      )}
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">

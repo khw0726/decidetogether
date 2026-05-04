@@ -114,10 +114,14 @@ Additionally, classify what type of content the rule applies to:
 Return ONLY valid JSON with no markdown formatting or code blocks."""
 
 
-def build_triage_prompt(rule_text: str, community_name: str, platform: str) -> str:
+def build_triage_prompt(rule_title: str, rule_text: str, community_name: str, platform: str) -> str:
     return f"""Classify this community rule for the "{community_name}" community on {platform}.
 
+Rule title: {rule_title}
 Rule text: {rule_text}
+
+The title often carries the rule's scope (e.g. "Top-level comments must..."). Treat the \
+title and text together as the rule's full statement when classifying both rule_type and applies_to.
 
 Return JSON in exactly this format:
 {{

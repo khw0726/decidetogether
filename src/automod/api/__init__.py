@@ -7,6 +7,8 @@ from .decisions import router as decisions_router
 from .evaluation import router as evaluation_router
 from .health import router as health_router
 from .intent import router as intent_router
+from .scenarios import router as scenarios_router
+from .telemetry import router as telemetry_router
 
 __all__ = [
     "communities_router",
@@ -18,4 +20,6 @@ __all__ = [
     "evaluation_router",
     "health_router",
     "intent_router",
+    "scenarios_router",
+    "telemetry_router",
 ]

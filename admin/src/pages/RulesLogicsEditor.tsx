@@ -5,6 +5,7 @@ import {
   BookOpen,
   Check,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Loader2,
   MessageSquare,
@@ -18,7 +19,6 @@ import {
   CommunityContext,
   CommunityContextNote,
   DecisionPreviewResult,
-  ItemHealthMetrics,
   PreviewRecompileResult,
   ReviseRuleTextResponse,
   Rule,
@@ -49,6 +49,7 @@ import { RuleTextSuggestion } from '../components/RuleTextSuggestion'
 import TestModal from '../components/TestModal'
 import { showErrorToast } from '../components/Toast'
 import Tooltip from '../components/Tooltip'
+import { logEvent } from '../telemetry'
 
 function extractErrorMessage(error: unknown): string {
   if (error && typeof error === 'object') {
@@ -211,6 +212,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
   const [showNewRule, setShowNewRule] = useState(false)
   const [decisionsExpanded, setDecisionsExpanded] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [errorTypeFilter, setErrorTypeFilter] = useState<'wrongly_flagged' | 'missed' | null>(null)
 
   const { data: rules = [], isLoading: rulesLoading } = useQuery({
     queryKey: ['rules', communityId],
@@ -260,17 +262,13 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     enabled: !!selectedRuleId,
   })
 
-  const itemHealthById = useMemo(() => {
-    const m: Record<string, ItemHealthMetrics> = {}
-    for (const it of ruleHealth?.items || []) m[it.item_id] = it
-    return m
-  }, [ruleHealth])
-
   const createRuleMutation = useMutation({
     mutationFn: ({ title, text, relevant_context }: { title: string; text: string; relevant_context: RuleContextTag[] | null }) =>
       createRule(communityId, { title, text, priority: rules.length, relevant_context }),
     onSuccess: rule => {
       queryClient.invalidateQueries({ queryKey: ['rules', communityId] })
+      queryClient.invalidateQueries({ queryKey: ['decisions', communityId] })
+      queryClient.invalidateQueries({ queryKey: ['reeval-status', communityId] })
       setSelectedRuleId(rule.id)
       setEditingText(rule.text)
       setEditingTitle(rule.title)
@@ -312,6 +310,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     setActiveSuggestion(null)
     setRevisedTextSuggestion(null)
     setDecisionPreview(null)
+    setErrorTypeFilter(null)
   }
 
   // Whenever the selected rule's persisted context changes (e.g., after a commit
@@ -321,6 +320,15 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     setDraftRelevantContext(selectedRule.relevant_context ?? null)
     setDraftCustomNotes(selectedRule.custom_context_notes ?? [])
   }, [selectedRule?.id, selectedRule?.relevant_context, selectedRule?.custom_context_notes])
+
+  // Same for text/title: resync drafts when the persisted rule changes externally
+  // (e.g., after accepting a rule_text suggestion). Without this, editingText goes
+  // stale, textDirty flips true, and the editor falsely enters preview/edit mode.
+  useEffect(() => {
+    if (!selectedRule) return
+    setEditingText(selectedRule.text)
+    setEditingTitle(selectedRule.title)
+  }, [selectedRule?.id, selectedRule?.text, selectedRule?.title])
 
   const textDirty = !!selectedRule && editingText !== selectedRule.text
   const titleDirty = !!selectedRule && editingTitle !== selectedRule.title
@@ -516,11 +524,21 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
 
   const handleAcceptRevision = () => {
     if (!revisedTextSuggestion) return
+    logEvent('rule.text-revision.accept', {
+      rule_id: selectedRuleId,
+      old_text: selectedRule?.text,
+      revised_text: revisedTextSuggestion.revised_text,
+      change_summary: revisedTextSuggestion.change_summary,
+    })
     setEditingText(revisedTextSuggestion.revised_text)
     setRevisedTextSuggestion(null)
   }
 
   const handleDismissRevision = () => {
+    logEvent('rule.text-revision.dismiss', {
+      rule_id: selectedRuleId,
+      revised_text: revisedTextSuggestion?.revised_text,
+    })
     setRevisedTextSuggestion(null)
   }
 
@@ -606,7 +624,11 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       <div className="w-64 flex-shrink-0 border-r border-gray-200 bg-white flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <h2 className="font-semibold text-sm">Rules</h2>
-          <button className="btn-primary text-xs py-1" onClick={() => setShowNewRule(true)}>
+          <button
+            data-log="rule.new.open-modal"
+            className="btn-primary text-xs py-1"
+            onClick={() => setShowNewRule(true)}
+          >
             <Plus size={12} />
             New
           </button>
@@ -627,6 +649,8 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
               return (
                 <div
                   key={rule.id}
+                  data-log="rule.select"
+                  data-log-context={JSON.stringify({ rule_id: rule.id, rule_title: rule.title, rule_type: rule.rule_type })}
                   className={`px-3 py-2 cursor-pointer hover:bg-gray-50 transition-colors border-l-2 ${selectedRuleId === rule.id ? 'border-indigo-500 bg-indigo-50' : 'border-transparent'}`}
                   onClick={() => handleSelectRule(rule)}
                 >
@@ -677,7 +701,10 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {selectedRule ? (
-          <>
+          <div
+            className="contents"
+            data-log-context={JSON.stringify({ rule_id: selectedRule.id, rule_title: selectedRule.title, rule_type: selectedRule.rule_type })}
+          >
             {/* Header */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
               <input
@@ -698,6 +725,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 }}
               />
               <button
+                data-log="rule.chat.toggle"
                 className={`btn-secondary text-xs ${chatOpen ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : ''}`}
                 onClick={() => setChatOpen(v => !v)}
                 title="Casually describe how this rule should be interpreted; get a proposed rule-text edit"
@@ -706,6 +734,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 Moderator chat
               </button>
               <button
+                data-log="rule.test.open-modal"
                 className="btn-secondary text-xs"
                 onClick={() => setShowTestModal(true)}
                 title="Test a hypothetical post against the automod"
@@ -714,6 +743,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 Test Rule with a Post
               </button>
               <button
+                data-log="rule.delete"
                 className="btn-secondary text-xs text-red-600 hover:bg-red-50"
                 onClick={() => selectedRule && handleDeleteRule(selectedRule)}
                 disabled={deleteRuleMutation.isPending}
@@ -734,7 +764,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   {/* Context comes first — title + context are now the primary inputs that
                       drive the rule text suggestion below. */}
                   {selectedRule.rule_type === 'actionable' && (
-                    <div className="max-h-48 overflow-auto flex-shrink-0">
+                    <div className="max-h-48 overflow-auto flex-shrink-0 border-b border-gray-100 pb-2">
                       <RuleContextPicker
                         key={selectedRule.id}
                         rule={{
@@ -780,12 +810,14 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                       </div>
                       <div className="flex items-center gap-1.5 flex-shrink-0">
                         <button
+                          data-log="rule.text-revision.accept"
                           className="text-[11px] px-2 py-0.5 rounded bg-emerald-600 text-white hover:bg-emerald-700"
                           onClick={handleAcceptRevision}
                         >
                           Accept
                         </button>
                         <button
+                          data-log="rule.text-revision.dismiss"
                           className="text-[11px] px-2 py-0.5 rounded border border-emerald-300 text-emerald-700 hover:bg-emerald-100"
                           onClick={handleDismissRevision}
                         >
@@ -810,12 +842,29 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   )}
                   {anyDirty && (
                     <div className="flex gap-2 justify-end flex-shrink-0">
-                      <button className="btn-secondary text-xs" onClick={handleDiscardEdit}>
+                      <button
+                        data-log="rule.edit.discard"
+                        className="btn-secondary text-xs"
+                        onClick={handleDiscardEdit}
+                      >
                         <X size={12} /> Discard edits
                       </button>
                       <button
+                        data-log="rule.edit.confirm-save"
+                        data-log-context={JSON.stringify({ text_dirty: textDirty, title_dirty: titleDirty, context_dirty: contextDirty })}
                         className="btn-primary text-xs"
-                        onClick={handleConfirmSave}
+                        onClick={() => {
+                          logEvent('rule.edit.confirm-save', {
+                            rule_id: selectedRuleId,
+                            text_dirty: textDirty,
+                            title_dirty: titleDirty,
+                            context_dirty: contextDirty,
+                            new_title: editingTitle,
+                            new_text: editingText,
+                            operation_count: previewResult?.operations?.length ?? 0,
+                          })
+                          handleConfirmSave()
+                        }}
                         disabled={isSaving || isPreviewLoading}
                       >
                         {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
@@ -824,15 +873,16 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                     </div>
                   )}
 
-                  {/* Type + applies-to controls (context picker moved above textarea) */}
-                  <div className="border-t border-gray-100 pt-2 flex flex-col gap-2 flex-shrink-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-500">Type:</span>
+                  {/* Type + applies-to controls (foldable to give the textarea more room) */}
+                  <div className="border-t border-gray-100 pt-2 flex flex-col gap-1 flex-shrink-0">
+                    <FoldableControl label="Type" value={selectedRule.rule_type}>
                       {['actionable', 'procedural', 'meta', 'informational'].map(type => {
                         const active = selectedRule.rule_type === type
                         return (
                           <button
                             key={type}
+                            data-log="rule.type.override"
+                            data-log-context={JSON.stringify({ new_type: type, prev_type: selectedRule.rule_type })}
                             className={`text-xs px-2 py-0.5 rounded border ${
                               active
                                 ? 'bg-indigo-600 text-white border-indigo-600 transition-colors'
@@ -847,15 +897,16 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                           </button>
                         )
                       })}
-                    </div>
+                    </FoldableControl>
 
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-500">Applies to:</span>
+                    <FoldableControl label="Applies to" value={selectedRule.applies_to || 'both'}>
                       {(['posts', 'comments', 'both'] as const).map(target => {
                         const active = (selectedRule.applies_to || 'both') === target
                         return (
                           <button
                             key={target}
+                            data-log="rule.applies-to.set"
+                            data-log-context={JSON.stringify({ applies_to: target, prev: selectedRule.applies_to || 'both' })}
                             className={`text-xs px-2 py-0.5 rounded border ${
                               active
                                 ? 'bg-emerald-600 text-white border-emerald-600 transition-colors'
@@ -870,7 +921,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                           </button>
                         )
                       })}
-                    </div>
+                    </FoldableControl>
                   </div>
                 </div>
               </div>
@@ -881,10 +932,14 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 <div className="flex-shrink-0 border-b border-gray-200 bg-gray-50/50">
                   <RuleHealthPanel
                     ruleId={selectedRuleId!}
-                    highlightItemId={selectedChecklistItemId}
                     onActiveSuggestionChange={setActiveSuggestion}
                     userDraftDirty={textDirty || contextDirty}
                     compact
+                    errorTypeFilter={errorTypeFilter}
+                    onErrorTypeFilterChange={(next) => {
+                      setErrorTypeFilter(next)
+                      if (next) setDecisionsExpanded(true)
+                    }}
                   />
                 </div>
 
@@ -903,6 +958,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                           : 'Error-Pattern Preview'}
                       </span>
                       <button
+                        data-log="logic.preview.exit"
                         className="btn-secondary text-xs py-0.5"
                         title="Exit preview and return to the current logic view"
                         onClick={() => {
@@ -962,7 +1018,6 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                         selectedItemId={selectedChecklistItemId}
                         onItemSelect={setSelectedChecklistItemId}
                         highlightedItemId={null}
-                        itemHealthById={itemHealthById}
                       />
                     )
                   ) : (
@@ -988,6 +1043,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 <PanelHeader title="Decisions">
                   {selectedChecklistItemId && (
                     <button
+                      data-log="decisions.checklist-filter.clear"
                       className="btn-secondary text-xs py-0.5"
                       onClick={() => setSelectedChecklistItemId(null)}
                       title="Clear checklist item filter"
@@ -1013,6 +1069,15 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   useTestSet={useTestSet}
                   onToggleUseTestSet={setUseTestSet}
                   onToggleTestSetMember={toggleTestSetMember}
+                  errorTypeFilter={errorTypeFilter}
+                  errorDecisionIds={
+                    errorTypeFilter === 'wrongly_flagged'
+                      ? ruleHealth?.overall.wrongly_flagged_decision_ids ?? []
+                      : errorTypeFilter === 'missed'
+                        ? ruleHealth?.overall.missed_decision_ids ?? []
+                        : null
+                  }
+                  onClearErrorFilter={() => setErrorTypeFilter(null)}
                 />
               </div>
             ) : (
@@ -1033,7 +1098,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 <span className="text-[10px] text-gray-400">click to expand</span>
               </button>
             )}
-          </>
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-gray-400">
             <BookOpen size={40} className="mb-3 opacity-30" />
@@ -1133,7 +1198,7 @@ function HighlightedTextarea({
       </div>
       <textarea
         ref={taRef}
-        className={`${shared} ${previewing ? 'border-emerald-400' : 'border-indigo-300'} bg-transparent text-transparent caret-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 ${previewing ? 'pointer-events-none' : ''}`}
+        className={`${shared} ${previewing ? 'border-emerald-400' : 'border-indigo-300'} bg-transparent text-transparent caret-gray-800 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500`}
         style={{ WebkitTextFillColor: 'transparent' }}
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -1173,6 +1238,36 @@ function renderRuleTextDiff(oldText: string, newText: string): React.ReactNode {
     }
   }
   return <>{out}</>
+}
+
+function FoldableControl({
+  label,
+  value,
+  children,
+}: {
+  label: string
+  value: string
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 self-start"
+        onClick={() => setOpen(o => !o)}
+      >
+        {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <span>{label}:</span>
+        <span className="text-gray-700 font-medium">{value}</span>
+      </button>
+      {open && (
+        <div className="flex items-center gap-2 flex-wrap pl-4">
+          {children}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function PanelHeader({ title, children }: { title: string; children?: React.ReactNode }) {
@@ -1308,7 +1403,7 @@ function NewRuleModal({
                       <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
                         {dim}
                       </div>
-                      <div className="space-y-1">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                         {bundles.map(b => {
                           const k = keyOf(b.dim, b.tag)
                           const w = tagWeights[k] ?? 0
@@ -1369,9 +1464,10 @@ function NewRuleModal({
           </div>
 
           <div className="flex gap-2 justify-end">
-            <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button type="button" data-log="rule.new.cancel" className="btn-secondary" onClick={onClose}>Cancel</button>
             <button
               type="submit"
+              data-log="rule.new.create"
               className="btn-primary"
               disabled={loading || !title.trim() || !text.trim()}
             >

@@ -286,11 +286,45 @@ export const getCommunityContext = (communityId: string) =>
 export const updateCommunityContext = (communityId: string, data: Partial<CommunityContext>) =>
   api.put<CommunityContext>(`/communities/${communityId}/context`, data).then(r => r.data)
 
+export interface AtmospherePost {
+  bucket: 'hot' | 'top' | 'controversial' | 'ignored'
+  title: string
+  body: string
+  score: number
+  num_comments: number
+  upvote_ratio: number | null
+}
+
+export interface AtmosphereComment {
+  body: string
+  score: number
+  post_title?: string | null
+}
+
+export interface AtmosphereResponse {
+  community_name: string
+  description: string
+  posts: AtmospherePost[]
+  comments: AtmosphereComment[]
+}
+
+export const getScenarioAtmosphere = (scenarioId: string) =>
+  api.get<AtmosphereResponse>(`/scenarios/${scenarioId}/atmosphere`).then(r => r.data)
+
 export const generateCommunityContext = (communityId: string) =>
   api.post<{ community_context: CommunityContext }>(`/communities/${communityId}/context/generate`).then(r => r.data)
 
 export const reapplyContext = (communityId: string) =>
   api.post<{ rules_updated: number; summaries: Record<string, string> }>(`/communities/${communityId}/reapply-context`).then(r => r.data)
+
+export interface ReevalStatus {
+  rules_compiling: string[]
+  rules_reevaluating: string[]
+  in_progress: boolean
+}
+
+export const getReevalStatus = (communityId: string) =>
+  api.get<ReevalStatus>(`/communities/${communityId}/reeval-status`).then(r => r.data)
 
 export interface ContextPreviewImpact {
   rules_affected: number
@@ -741,12 +775,15 @@ export interface ItemHealthMetrics {
 
 export interface RuleHealthOverall {
   total_decisions: number
+  rule_denominator: number
   override_rate: number
   covered_by_examples: number
   wrongly_flagged_count: number
   wrongly_flagged_rate: number
+  wrongly_flagged_decision_ids: string[]
   missed_count: number
   missed_rate: number
+  missed_decision_ids: string[]
 }
 
 export interface RuleHealth {
@@ -870,3 +907,45 @@ export interface RedditImportResponse {
 
 export const importRedditPosts = (communityId: string, data: RedditImportRequest) =>
   api.post<RedditImportResponse>(`/communities/${communityId}/import-reddit`, data).then(r => r.data)
+
+// ── Scenarios (hypothetical-community user studies) ──────────────────────────
+
+export interface ScenarioSummary {
+  id: string
+  filename: string
+  community_name: string
+  base_subreddit: string
+  rule_count: number
+  queue_post_count: number
+  context_cached: boolean
+}
+
+export interface FromScenarioResponse {
+  community_id: string
+  community_name: string
+  scenario_id: string
+  rules_inserted: number
+  queue_posts_scheduled: number
+  context_cached: boolean
+}
+
+export const listScenarios = () =>
+  api.get<ScenarioSummary[]>('/scenarios').then(r => r.data)
+
+export const createCommunityFromScenario = (filename: string, communityName?: string) =>
+  api.post<FromScenarioResponse>('/communities/from-scenario', {
+    filename,
+    community_name: communityName?.trim() || undefined,
+  }).then(r => r.data)
+
+export interface ScenarioImportNextResponse {
+  imported_count: number
+  remaining_count: number
+  total_count: number
+}
+
+export const scenarioImportNext = (communityId: string) =>
+  api.post<ScenarioImportNextResponse>(`/communities/${communityId}/scenario-import-next`).then(r => r.data)
+
+export const scenarioImportStatus = (communityId: string) =>
+  api.get<ScenarioImportNextResponse>(`/communities/${communityId}/scenario-import-status`).then(r => r.data)

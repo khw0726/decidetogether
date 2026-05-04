@@ -65,16 +65,12 @@ async def list_decisions(
     if verdict:
         query = query.where(Decision.agent_verdict == verdict)
 
-    # Filter by rule_id (check JSON column)
+    # Filter by rule_id: keep decisions where the rule was actually violated.
+    # Match if the agent's per-rule verdict is non-approve (remove/warn/review)
+    # OR the moderator linked this rule on resolution. We can't use mere
+    # presence in agent_reasoning because every actionable rule's tree is
+    # walked for every post (so that test matches ~all decisions).
     if rule_id:
-        # Include decisions where:
-        #   (a) the agent evaluated this rule (rule_id is a key in agent_reasoning), OR
-        #   (b) the moderator linked this rule when resolving the override
-        #       (Example from moderator_decision → ExampleRuleLink to this rule,
-        #        where example.content.id == decision.post_platform_id).
-        # Note: we use agent_reasoning, not triggered_rules — a rule whose tree
-        # resolved to "approve"/"review" but had ≥1 item fire is still relevant
-        # (it's the same set the health endpoints walk to count FP/FN).
         linked_post_ids_result = await db.execute(
             select(Example.content)
             .join(ExampleRuleLink, Example.id == ExampleRuleLink.example_id)
@@ -87,15 +83,16 @@ async def list_decisions(
             for (content,) in linked_post_ids_result.all()
             if (content or {}).get("id")
         }
-        evaluated_clause = func.json_extract(
-            Decision.agent_reasoning, f'$."{rule_id}"'
-        ).isnot(None)
+        per_rule_verdict = func.json_extract(
+            Decision.agent_reasoning, f'$."{rule_id}".verdict'
+        )
+        violated_clause = per_rule_verdict.in_(("remove", "warn", "review"))
         if linked_post_ids:
             query = query.where(
-                or_(evaluated_clause, Decision.post_platform_id.in_(linked_post_ids))
+                or_(violated_clause, Decision.post_platform_id.in_(linked_post_ids))
             )
         else:
-            query = query.where(evaluated_clause)
+            query = query.where(violated_clause)
 
     result = await db.execute(query)
     decisions = list(result.scalars().all())
