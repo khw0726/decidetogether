@@ -115,12 +115,14 @@ function FixCarousel({
   itemDescById,
   acceptingAll,
   onActiveSuggestionChange,
+  siblingRulesById,
 }: {
   suggestions: Suggestion[]
   ruleId: string
   itemDescById: Map<string, string>
   acceptingAll: boolean
   onActiveSuggestionChange?: (suggestion: Suggestion | null) => void
+  siblingRulesById?: Map<string, { title: string }>
 }) {
   const slides = useMemo(() => buildSlides(suggestions), [suggestions])
   const [index, setIndex] = useState(0)
@@ -182,6 +184,7 @@ function FixCarousel({
         itemDescById={itemDescById}
         acceptingAll={acceptingAll}
         onAfterResolve={handleAdvance}
+        siblingRulesById={siblingRulesById}
       />
     </div>
   )
@@ -193,12 +196,14 @@ function FixSlide({
   itemDescById,
   acceptingAll,
   onAfterResolve,
+  siblingRulesById,
 }: {
   slide: Slide
   ruleId: string
   itemDescById: Map<string, string>
   acceptingAll: boolean
   onAfterResolve: () => void
+  siblingRulesById?: Map<string, { title: string }>
 }) {
   const queryClient = useQueryClient()
   const [applyPhase, setApplyPhase] = useState<null | 'accepting' | 'reevaluating'>(null)
@@ -268,14 +273,14 @@ function FixSlide({
   const typeBadge = TYPE_BADGES[primary.suggestion_type] ?? { label: primary.suggestion_type, color: 'bg-gray-100 text-gray-700' }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-3 bg-white space-y-2">
-      {/* Badges */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${typeBadge.color}`}>
+    <div className="border border-gray-200 rounded-lg p-2 bg-white space-y-1">
+      {/* Badges + reasoning on one row to keep the slide tall*/}
+      <div className="flex items-start gap-2 flex-wrap">
+        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${typeBadge.color}`}>
           {typeBadge.label}
         </span>
         {action && (
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ACTION_COLORS[action] || 'bg-gray-100 text-gray-700'}`}>
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${ACTION_COLORS[action] || 'bg-gray-100 text-gray-700'}`}>
             {ACTION_LABELS[action] || action}
           </span>
         )}
@@ -284,68 +289,78 @@ function FixSlide({
             paired
           </span>
         )}
+        {reasoning && (
+          <span className="text-[11px] text-gray-700 flex-1 min-w-0">{reasoning}</span>
+        )}
       </div>
-
-      {/* Purpose — prefer the human `reasoning` (≤25-word explanation of why this fix
-          addresses the observed errors); fall back to the codified `level_reasoning`
-          only if the LLM didn't produce a human one. */}
-      {(reasoning || levelReasoning) && (
-        <p className="text-xs text-gray-700">{reasoning || levelReasoning}</p>
-      )}
 
       {/* For rule_text and L1 (checklist) slides, the live preview is shown in the
           rule text editor and Automod Logic panel through the unified preview pipeline.
           The slide just shows purpose + paired badge + accept/dismiss. */}
       {primary.suggestion_type === 'rule_text' && proposedText && (
-        <p className="text-[11px] text-emerald-700 italic">
-          ↖ Diff appears in the rule text editor; resulting logic in the Automod Logic panel.
+        <p className="text-[10px] text-emerald-700 italic leading-tight">
+          ↖ Diff in rule text editor; resulting logic in Automod Logic.
         </p>
       )}
       {primary.suggestion_type === 'checklist' && (
-        <p className="text-[11px] text-blue-700 italic">
-          ↘ Logic update appears in the Automod Logic panel
-          {logicTargetDesc && <span className="text-gray-400"> · target: {logicTargetDesc}</span>}.
+        <p className="text-[10px] text-blue-700 italic leading-tight">
+          ↘ Logic update in Automod Logic
+          {logicTargetDesc && <span className="text-gray-400"> · {logicTargetDesc}</span>}.
         </p>
       )}
 
       {/* Context body */}
       {primary.suggestion_type === 'context' && proposedNote && (
         <div className="text-xs bg-purple-50 border border-purple-100 rounded p-2 space-y-1">
+          <p className="text-[11px] text-purple-700 font-medium">
+            Add a new rule-specific context note:
+          </p>
+          {proposedNote.text && (
+            <p className="text-gray-700 bg-white border border-purple-100 rounded px-2 py-1 italic">
+              "{proposedNote.text}"
+            </p>
+          )}
           <div className="flex items-center gap-2 flex-wrap">
             {proposedNote.tag && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
-                {proposedNote.tag}
+              <span className="text-[10px] text-purple-700">
+                tag:{' '}
+                <span className="font-medium px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-800">
+                  {proposedNote.tag}
+                </span>
               </span>
             )}
             {l2Trigger && (
               <span className="text-[10px] text-purple-700 italic">
-                {l2Trigger === 'against_existing_context' ? 'against existing context' : 'applies across rules'}
+                {l2Trigger === 'against_existing_context'
+                  ? 'reason: contradicts an existing community-context note'
+                  : 'reason: this calibration likely applies to multiple rules'}
               </span>
             )}
           </div>
-          {proposedNote.text && (
-            <p className="text-gray-700">{proposedNote.text}</p>
-          )}
           {affectsRules.length > 0 && (
             <div className="border-t border-purple-100 pt-1 mt-1">
-              <p className="text-[11px] font-medium text-purple-700 mb-0.5">May also apply to:</p>
+              <p className="text-[11px] font-medium text-purple-700 mb-0.5">
+                Also attach this note to these rules?
+              </p>
               <ul className="space-y-0.5">
-                {affectsRules.map(r => (
-                  <li key={r.rule_id} className="flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
-                      checked={optedIn.has(r.rule_id)}
-                      onChange={() => setOptedIn(prev => {
-                        const next = new Set(prev)
-                        if (next.has(r.rule_id)) next.delete(r.rule_id)
-                        else next.add(r.rule_id)
-                        return next
-                      })}
-                    />
-                    <span className="font-mono text-gray-700">{r.rule_id.slice(0, 8)}</span>
-                    <span className="text-gray-400">score {r.score.toFixed(2)}</span>
-                  </li>
-                ))}
+                {affectsRules.map(r => {
+                  const title = siblingRulesById?.get(r.rule_id)?.title ?? `(unknown rule ${r.rule_id.slice(0, 6)})`
+                  return (
+                    <li key={r.rule_id} className="flex items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={optedIn.has(r.rule_id)}
+                        onChange={() => setOptedIn(prev => {
+                          const next = new Set(prev)
+                          if (next.has(r.rule_id)) next.delete(r.rule_id)
+                          else next.add(r.rule_id)
+                          return next
+                        })}
+                      />
+                      <span className="text-gray-700 truncate">{title}</span>
+                    </li>
+                  )
+                })}
               </ul>
             </div>
           )}
@@ -354,16 +369,16 @@ function FixSlide({
 
 
       {/* Actions */}
-      <div className="flex justify-end gap-1 pt-1">
+      <div className="flex justify-end gap-1">
         <button
-          className="btn-secondary text-xs py-1 px-2"
+          className="btn-secondary text-[11px] py-0.5 px-2"
           onClick={() => dismissMutation.mutate()}
           disabled={busy}
         >
           Dismiss
         </button>
         <button
-          className="btn-success text-xs py-1 px-2"
+          className="btn-success text-[11px] py-0.5 px-2"
           onClick={() => applyMutation.mutate()}
           disabled={busy}
         >
@@ -380,11 +395,13 @@ function SuggestedFixesPanel({
   ruleId,
   items,
   onActiveSuggestionChange,
+  siblingRulesById,
 }: {
   suggestions: Suggestion[]
   ruleId: string
   items: ItemHealthMetrics[]
   onActiveSuggestionChange?: (suggestion: Suggestion | null) => void
+  siblingRulesById?: Map<string, { title: string }>
 }) {
   const queryClient = useQueryClient()
   const [acceptAllPhase, setAcceptAllPhase] = useState<null | 'accepting' | 'reevaluating'>(null)
@@ -455,10 +472,10 @@ function SuggestedFixesPanel({
   const acceptingAll = acceptAllPhase !== null
 
   return (
-    <div className="border border-indigo-200 rounded-lg bg-indigo-50/30 p-4 space-y-3">
+    <div className="border border-indigo-200 rounded-lg bg-indigo-50/30 p-2 space-y-1.5 max-h-48 overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
           Suggested Fixes ({suggestions.length})
         </p>
         <div className="flex gap-1.5">
@@ -495,6 +512,7 @@ function SuggestedFixesPanel({
         itemDescById={itemDescById}
         acceptingAll={acceptingAll}
         onActiveSuggestionChange={onActiveSuggestionChange}
+        siblingRulesById={siblingRulesById}
       />
 
       {/* Impact preview */}
@@ -560,6 +578,10 @@ interface RuleHealthPanelProps {
   // parent, which then narrows the Decisions panel to those decision IDs.
   errorTypeFilter?: 'wrongly_flagged' | 'missed' | null
   onErrorTypeFilterChange?: (next: 'wrongly_flagged' | 'missed' | null) => void
+  // Map of all sibling rules in the community, used to render rule titles
+  // in suggestion bodies (e.g. "May also apply to: <rule title>") instead of
+  // raw rule_id substrings, which moderators can't read.
+  siblingRulesById?: Map<string, { title: string }>
 }
 
 export default function RuleHealthPanel({
@@ -570,6 +592,7 @@ export default function RuleHealthPanel({
   compact = false,
   errorTypeFilter = null,
   onErrorTypeFilterChange,
+  siblingRulesById,
 }: RuleHealthPanelProps) {
   const queryClient = useQueryClient()
 
@@ -650,7 +673,7 @@ export default function RuleHealthPanel({
         </div>
 
         {/* Rule-level FP/FN metrics */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             disabled={!onErrorTypeFilterChange || overall.wrongly_flagged_count === 0}
@@ -665,8 +688,12 @@ export default function RuleHealthPanel({
             title={overall.wrongly_flagged_count > 0 ? 'Filter the Decisions panel to these cases' : ''}
           >
             <p className="text-[10px] text-red-500 font-semibold uppercase tracking-wider">Wrongly Flagged</p>
-            <p className="text-lg font-bold text-red-700 leading-tight">{pct(overall.wrongly_flagged_rate)}</p>
-            <p className="text-[10px] text-red-400">{overall.wrongly_flagged_count}/{overall.rule_denominator ?? overall.total_decisions}</p>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-red-700 leading-tight">{pct(overall.wrongly_flagged_rate)}</span>
+              <span className="text-[10px] text-red-400">
+                ({overall.wrongly_flagged_count} of {overall.rule_denominator ?? overall.total_decisions} decisions)
+              </span>
+            </div>
           </button>
           <button
             type="button"
@@ -682,14 +709,13 @@ export default function RuleHealthPanel({
             title={overall.missed_count > 0 ? 'Filter the Decisions panel to these cases' : ''}
           >
             <p className="text-[10px] text-amber-600 font-semibold uppercase tracking-wider">Missed</p>
-            <p className="text-lg font-bold text-amber-700 leading-tight">{pct(overall.missed_rate)}</p>
-            <p className="text-[10px] text-amber-500">{overall.missed_count}/{overall.rule_denominator ?? overall.total_decisions}</p>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-base font-bold text-amber-700 leading-tight">{pct(overall.missed_rate)}</span>
+              <span className="text-[10px] text-amber-500">
+                ({overall.missed_count} of {overall.rule_denominator ?? overall.total_decisions} decisions)
+              </span>
+            </div>
           </button>
-          <div className="bg-gray-50 border border-gray-200 rounded p-2">
-            <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Decisions</p>
-            <p className="text-lg font-bold text-gray-700 leading-tight">{overall.total_decisions}</p>
-            <p className="text-[10px] text-gray-400">{pct(overall.override_rate)} override</p>
-          </div>
         </div>
 
         {overall.total_decisions === 0 && (
@@ -705,6 +731,7 @@ export default function RuleHealthPanel({
             ruleId={ruleId}
             items={items}
             onActiveSuggestionChange={onActiveSuggestionChange}
+            siblingRulesById={siblingRulesById}
           />
         )}
       </div>

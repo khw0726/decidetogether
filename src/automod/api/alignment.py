@@ -1081,7 +1081,15 @@ async def preview_decisions(
 
         post = decision.post_content or {}
         inner = post.get("content", {}) if isinstance(post, dict) else {}
-        post_title = (inner.get("title") if isinstance(inner, dict) else "") or "(no title)"
+        title = (inner.get("title") if isinstance(inner, dict) else "") or ""
+        body = (inner.get("body") if isinstance(inner, dict) else "") or ""
+        if title:
+            post_title = title
+        elif body:
+            snippet = body.strip().replace("\n", " ")
+            post_title = snippet[:140] + ("…" if len(snippet) > 140 else "")
+        else:
+            post_title = "(no content)"
 
         results.append({
             "decision_id": decision.id,

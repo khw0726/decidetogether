@@ -69,9 +69,16 @@ class AtmosphereComment(BaseModel):
     post_title: str | None = None
 
 
+class AtmosphereRule(BaseModel):
+    title: str
+    text: str
+
+
 class AtmosphereResponse(BaseModel):
     community_name: str
     description: str
+    rules: list[AtmosphereRule]
+    problem: str = ""
     posts: list[AtmospherePost]
     comments: list[AtmosphereComment]
 
@@ -132,6 +139,8 @@ async def get_scenario_atmosphere(scenario_id: str) -> AtmosphereResponse:
     return AtmosphereResponse(
         community_name=scenario.community.name,
         description=scenario.community.description or "",
+        rules=[AtmosphereRule(title=r.title, text=r.text or "") for r in scenario.rules],
+        problem=scenario.problem or "",
         posts=posts,
         comments=comments,
     )

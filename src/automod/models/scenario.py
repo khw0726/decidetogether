@@ -43,6 +43,7 @@ class ScenarioFile(BaseModel):
     base_subreddit: str = Field(..., description="Real subreddit crawled once for community context")
     community: ScenarioCommunity
     rules: list[ScenarioRule] = []
+    problem: str = ""
     queue_posts: list[ScenarioQueuePost] = []
 
 

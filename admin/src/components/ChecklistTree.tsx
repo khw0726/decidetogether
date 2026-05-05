@@ -265,7 +265,7 @@ function LogicEditor({
           value={threshold}
           onChange={e => onChange({ ...logic, threshold: Number(e.target.value) })}
         />
-        <span className="text-gray-400">(0–1; higher = stricter)</span>
+        <span className="text-gray-400">(0–1; min confidence to flag — lower = stricter, higher = more permissive)</span>
       </label>
       <div>
         <label className="block text-gray-500 mb-1">Rubric</label>
@@ -753,7 +753,7 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
     const matchMode = (logic.match_mode as string) ?? 'any'
     const negate = Boolean(logic.negate)
     return (
-      <div className="mt-2 text-xs space-y-2">
+      <div className="mt-1 text-xs space-y-1">
         <div className="flex gap-4 text-gray-500">
           <span>Match mode: <span className="font-mono text-gray-700">{matchMode}</span></span>
           <span>Negate: <span className="font-mono text-gray-700">{negate ? 'true' : 'false'}</span></span>
@@ -762,7 +762,7 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
           <p className="text-gray-500 mb-1">Patterns ({patterns.length}):</p>
           <div className="space-y-1">
             {patterns.map((p, i) => (
-              <div key={i} className="flex items-center gap-2 bg-gray-50 rounded px-2 py-1 border border-gray-200">
+              <div key={i} className="flex items-center gap-2 bg-gray-50 rounded px-2 py-0.5 border border-gray-200">
                 <code className="flex-1 text-indigo-700 break-all">{p.regex}</code>
                 {p.case_sensitive && (
                   <span className="text-gray-400 whitespace-nowrap">case-sensitive</span>
@@ -780,7 +780,7 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
     const checks = (logic.checks as Array<{ field: string; operator: string; value: unknown }>) ?? []
     const matchMode = (logic.match_mode as string) ?? 'all'
     return (
-      <div className="mt-2 text-xs space-y-2">
+      <div className="mt-1 text-xs space-y-1">
         <div className="text-gray-500">
           Match mode: <span className="font-mono text-gray-700">{matchMode}</span>
         </div>
@@ -807,7 +807,7 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
     const threshold = logic.threshold as number ?? 0.7
     const examplesCount = logic.examples_to_include as number ?? 5
     return (
-      <div className="mt-2 text-xs space-y-2">
+      <div className="mt-1 text-xs space-y-1">
         <div className="flex gap-4 text-gray-500">
           <span>Confidence threshold: <span className="font-mono text-gray-700">{threshold}</span></span>
           <span>Examples to include: <span className="font-mono text-gray-700">{examplesCount}</span></span>
@@ -815,13 +815,13 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
         {prompt && (
           <div>
             <p className="text-gray-500 mb-1">Prompt template:</p>
-            <p className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 leading-relaxed text-gray-700 whitespace-pre-wrap">{prompt}</p>
+            <p className="bg-gray-50 border border-gray-200 rounded px-2 py-1 leading-snug text-gray-700 whitespace-pre-wrap">{prompt}</p>
           </div>
         )}
         {rubric && (
           <div>
             <p className="text-gray-500 mb-1">Rubric:</p>
-            <p className="bg-gray-50 border border-gray-200 rounded px-2 py-1.5 leading-relaxed text-gray-700 whitespace-pre-wrap">{rubric}</p>
+            <p className="bg-gray-50 border border-gray-200 rounded px-2 py-1 leading-snug text-gray-700 whitespace-pre-wrap">{rubric}</p>
           </div>
         )}
       </div>
@@ -1004,7 +1004,7 @@ function ChecklistNode({ item, ruleId, depth, onAnchorHover, selectedItemId, onI
   return (
     <div style={{ marginLeft: indent }}>
       <div
-        className={`border rounded-lg p-3 transition-colors cursor-pointer ${
+        className={`border rounded-lg px-2 py-1.5 transition-colors cursor-pointer ${
           isContextAdded
             ? 'bg-emerald-50/30 border-dashed border-emerald-300 hover:border-emerald-400'
             : isSelected ? 'bg-white border-indigo-400 ring-1 ring-indigo-300'

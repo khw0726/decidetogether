@@ -301,9 +301,16 @@ export interface AtmosphereComment {
   post_title?: string | null
 }
 
+export interface AtmosphereRule {
+  title: string
+  text: string
+}
+
 export interface AtmosphereResponse {
   community_name: string
   description: string
+  rules: AtmosphereRule[]
+  problem?: string
   posts: AtmospherePost[]
   comments: AtmosphereComment[]
 }

@@ -44,7 +44,7 @@ function VerdictBadge({ label, verdict }: { label: string; verdict: string }) {
   )
 }
 
-function classifyPreview(ev: DecisionPreviewResult): 'fixed' | 'regressed' | 'unchanged' {
+export function classifyPreview(ev: DecisionPreviewResult): 'fixed' | 'regressed' | 'unchanged' {
   const modActed = ev.moderator_verdict === 'remove' || ev.moderator_verdict === 'warn'
   const oldActed = ev.old_verdict !== 'approve'
   const newActed = ev.new_verdict !== 'approve' && ev.new_verdict !== 'error'

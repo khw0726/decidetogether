@@ -61,6 +61,12 @@ export default function CommunityFeedView() {
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-6">
+        {data.problem && (
+          <div className="mb-6 bg-white border border-gray-200 rounded-md p-4">
+            <div className="text-xs uppercase tracking-wide text-gray-500 mb-3">The problem</div>
+            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{data.problem}</p>
+          </div>
+        )}
         <div className="text-xs uppercase tracking-wide text-gray-500 mb-3">A sample of recent posts</div>
         <div className="space-y-2">
           {data.posts.map((p, i) => <PostCard key={i} post={p} />)}

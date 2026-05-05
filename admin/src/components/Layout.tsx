@@ -57,7 +57,7 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Top nav */}
-      <header className="flex items-center bg-gray-900 text-gray-100 h-12 flex-shrink-0 shadow-sm">
+      <header className="flex items-center bg-gray-900 text-gray-100 h-9 flex-shrink-0 shadow-sm">
         {/* Logo */}
         <div className="flex items-center gap-2 px-4 h-full border-r border-gray-800">
           <Shield size={18} className="text-indigo-400 flex-shrink-0" />

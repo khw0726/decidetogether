@@ -41,6 +41,7 @@ interface PreviewNodeProps {
   op: Op
   depth: number
   forceDelete?: boolean
+  opByExistingId?: Map<string, Op>
 }
 
 function ConfidenceBar({ from, to }: { from: number; to: number }) {
@@ -112,10 +113,11 @@ function TextDiffBlock({ from, to }: { from: string | null; to: string }) {
   )
 }
 
-function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
+function PreviewNode({ item, op, depth, forceDelete, opByExistingId }: PreviewNodeProps) {
   const indent = depth * 16
   const effectiveOp = forceDelete ? 'delete' : op.op
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [logicJsonOpen, setLogicJsonOpen] = useState(false)
 
   // For updates, show the compiler's new description; otherwise keep existing
   const newDescription =
@@ -131,14 +133,11 @@ function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
   const oldThreshold = pickThreshold(item.logic)
   const newThreshold = effectiveOp === 'update' ? pickThreshold(op.logic) : null
 
-  const opMeta = OP_LABEL[effectiveOp]
-  const nodeClass = NODE_CLASSES[effectiveOp] ?? NODE_CLASSES.keep
-  const descClass =
-    effectiveOp === 'delete'
-      ? 'line-through text-red-700'
-      : effectiveOp === 'keep'
-      ? 'text-gray-500'
-      : 'text-gray-800'
+  // displayOp drives the visual treatment (badge, border, dimming). It's set
+  // after we know whether the parent has any *real* surface diffs — an `update`
+  // op whose only "change" is its children array gets demoted to `keep` so the
+  // parent doesn't read as edited when the actual edits live on a child.
+  let displayOp: typeof effectiveOp = effectiveOp
 
   // Build a list of changed-field rows for `update` ops so the moderator can see
   // what specifically changed without diffing the JSON in their head.
@@ -181,14 +180,31 @@ function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
       })
     }
     if (newThreshold != null && oldThreshold != null && Math.abs(newThreshold - oldThreshold) > 1e-6) {
+      const direction = newThreshold > oldThreshold
+        ? 'raised → fewer flags, more permissive'
+        : 'lowered → flags more readily, stricter'
       updateRows.push({
         label: 'threshold',
-        node: <ConfidenceBar from={oldThreshold} to={newThreshold} />,
+        node: (
+          <div className="space-y-0.5">
+            <ConfidenceBar from={oldThreshold} to={newThreshold} />
+            <div className="text-[10px] text-gray-500 italic">
+              min confidence to flag · {direction}
+            </div>
+          </div>
+        ),
       })
     } else if (newThreshold != null && oldThreshold == null) {
       updateRows.push({
         label: 'threshold',
-        node: <ConfidenceBar from={0} to={newThreshold} />,
+        node: (
+          <div className="space-y-0.5">
+            <ConfidenceBar from={0} to={newThreshold} />
+            <div className="text-[10px] text-gray-500 italic">
+              min confidence to flag · lower = stricter, higher = more permissive
+            </div>
+          </div>
+        ),
       })
     }
     // Long-form fields (prompt, rubric, patterns) — by default we just signal
@@ -267,21 +283,64 @@ function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
         ),
       })
     }
-    if (op.children) {
+    // Children render inline below via opByExistingId — no need for a "X child
+    // item(s) replaced" placeholder row that doesn't carry information.
+
+    // Always-available raw logic diff so nothing is hidden — covers fields the
+    // granular detectors above don't know about (or cases where the LLM marked
+    // an item updated without obvious surface changes).
+    const oldLogicStr = JSON.stringify(item.logic ?? {}, null, 2)
+    const newLogicStr = JSON.stringify(op.logic ?? {}, null, 2)
+    if (oldLogicStr !== newLogicStr) {
       updateRows.push({
-        label: 'children',
+        label: 'full logic',
         node: (
-          <span className="text-[11px] text-amber-700">
-            {(op.children as unknown[]).length} child item(s) replaced
-          </span>
+          <div className="space-y-1">
+            <button
+              type="button"
+              onClick={() => setLogicJsonOpen(v => !v)}
+              className="text-[11px] flex items-center gap-0.5 text-amber-700 hover:text-amber-900 hover:underline"
+            >
+              {logicJsonOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+              {logicJsonOpen ? 'Hide full logic JSON' : 'Show full logic JSON'}
+            </button>
+            {logicJsonOpen && (
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-red-500/70 mb-0.5">prev</div>
+                  <pre className="text-[10px] leading-tight bg-red-50/60 border-l-2 border-red-300 rounded-r p-2 overflow-x-auto whitespace-pre-wrap break-words text-red-900/80">
+                    {oldLogicStr}
+                  </pre>
+                </div>
+                <div>
+                  <div className="text-[10px] uppercase tracking-wider text-emerald-600/80 mb-0.5">new</div>
+                  <pre className="text-[10px] leading-tight bg-emerald-50/60 border-l-2 border-emerald-400 rounded-r p-2 overflow-x-auto whitespace-pre-wrap break-words text-emerald-900">
+                    {newLogicStr}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </div>
         ),
       })
     }
   }
 
+  if (effectiveOp === 'update' && updateRows.length === 0) {
+    displayOp = 'keep'
+  }
+  const opMeta = OP_LABEL[displayOp]
+  const nodeClass = NODE_CLASSES[displayOp] ?? NODE_CLASSES.keep
+  const descClass =
+    displayOp === 'delete'
+      ? 'line-through text-red-700'
+      : displayOp === 'keep'
+      ? 'text-gray-500'
+      : 'text-gray-800'
+
   return (
     <div style={{ marginLeft: indent }}>
-      <div className={`border rounded-lg p-3 ${nodeClass} ${effectiveOp === 'keep' ? 'opacity-60' : ''}`}>
+      <div className={`border rounded-lg p-3 ${nodeClass} ${displayOp === 'keep' ? 'opacity-60' : ''}`}>
         <div className="flex items-start gap-2">
           {/* spacer matching ChecklistTree's expand toggle */}
           <div className="w-4 flex-shrink-0" />
@@ -323,9 +382,10 @@ function PreviewNode({ item, op, depth, forceDelete }: PreviewNodeProps) {
             <PreviewNode
               key={child.id}
               item={child}
-              op={{ op: 'keep' }}
+              op={opByExistingId?.get(child.id) ?? { op: 'keep' }}
               depth={depth + 1}
               forceDelete={effectiveOp === 'delete'}
+              opByExistingId={opByExistingId}
             />
           ))}
         </div>
@@ -348,7 +408,7 @@ export default function ChecklistPreview({ operations, existingItems }: Checklis
     <div className="space-y-1">
       {existingItems.map(item => {
         const op = opByExistingId.get(item.id) ?? { op: 'keep' as const }
-        return <PreviewNode key={item.id} item={item} op={op} depth={0} />
+        return <PreviewNode key={item.id} item={item} op={op} depth={0} opByExistingId={opByExistingId} />
       })}
 
       {addOps.map((op, i) => (

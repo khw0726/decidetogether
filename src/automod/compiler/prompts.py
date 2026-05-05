@@ -719,12 +719,25 @@ def build_generate_context_prompt(
         lines = []
         for s in items:
             content = s.get("content") or {}
-            inner = content.get("content") if isinstance(content, dict) else None
+            inner = content.get("content") if isinstance(content, dict) else {}
+            ctx = content.get("context") if isinstance(content, dict) else {}
+            tc = content.get("thread_context") if isinstance(content, dict) else []
             title = (inner or {}).get("title", "") if isinstance(inner, dict) else ""
             body = (inner or {}).get("body", "") if isinstance(inner, dict) else ""
+            is_comment = (ctx or {}).get("post_type") == "comment" or bool(tc)
             note = s.get("note") or ""
-            snippet = (title or body or "")[:200]
-            line = f"    - {snippet}"
+            if is_comment:
+                op_title = ""
+                for t in (tc or []):
+                    if t.get("role") == "op":
+                        op_title = (t.get("content") or {}).get("title", "")
+                        break
+                snippet = (body or "")[:200]
+                prefix = f'[COMMENT replying to "{op_title[:120]}"] ' if op_title else "[COMMENT] "
+                line = f"    - {prefix}{snippet}"
+            else:
+                snippet = (title or body or "")[:200]
+                line = f"    - [POST] {snippet}"
             if note:
                 line += f"  (mod note: {note})"
             lines.append(line)
@@ -1170,10 +1183,13 @@ When emitting "context", set `context_change.proposed_note` to a `{text, tag}` c
 
 L2 is a NARROW side-channel. If neither trigger fires, do NOT include "context" in proposed_levels.
 
-REASONING STYLE — keep all rationale fields TERSE and EDIT-PURPOSE-FOCUSED. The moderator already sees the diff; the reasoning should answer "why this edit, in one breath" — not restate metrics or the diff.
-- `reasoning`: ≤ 15 words. State the *purpose* of the edit (e.g., "disambiguate satire from low-effort", "add satire-tolerance calibration"). No metric recap, no preamble like "Based on the data...".
-- `level_reasoning`: ≤ 10 words. Action type + (if any) L2 trigger (e.g., "tighten_rubric paired with text", "add_item → text gap", "context: against existing tone:satire-friendly").
-- `text_change.rationale`: ≤ 15 words. What clause changed and why (e.g., "narrows 'inappropriate' to specific behaviors").
+REASONING STYLE — keep all rationale fields TERSE, EDIT-PURPOSE-FOCUSED, and WRITTEN FOR A NON-TECHNICAL MODERATOR. The moderator already sees the diff; the reasoning should answer "why this edit, in one breath" — not restate metrics, internal field names, or the diff.
+
+ABSOLUTELY DO NOT mention any of: `fp_rate`, `fn_rate`, `false_positive_rate`, `false_negative_rate`, `threshold`, `decision_count`, `avg_confidence_*`, "0.7", "0.15", percentages, or any other internal metric/parameter name or numeric value. Talk about *moderation behavior* in plain English ("the rule is flagging satire posts it shouldn't", "moderators keep removing X but the rule misses it") instead of statistics. If your sentence contains a number or an underscore_word, rewrite it.
+
+- `reasoning`: ≤ 15 words. State the *purpose* of the edit in plain language (e.g., "disambiguate satire from low-effort posts", "add satire-tolerance calibration"). No metric recap, no jargon, no preamble like "Based on the data...".
+- `level_reasoning`: ≤ 10 words. Plain-English summary of action + L2 trigger (e.g., "tightens rubric and clarifies rule text", "adds missing rule clause", "calibrates against satire-friendly tone").
+- `text_change.rationale`: ≤ 15 words. What clause changed and why, in plain English (e.g., "narrows 'inappropriate' to specific behaviors").
 - `context_change.rationale`: ≤ 15 words. Which existing note this contradicts, or which sibling rules also benefit.
 
 Return ONLY valid JSON with no markdown formatting or code blocks."""

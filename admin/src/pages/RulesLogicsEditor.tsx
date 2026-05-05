@@ -41,7 +41,7 @@ import {
 } from '../api/client'
 import ChecklistTree from '../components/ChecklistTree'
 import ChecklistPreview from '../components/ChecklistPreview'
-import DecisionsPanel from '../components/DecisionsPanel'
+import DecisionsPanel, { classifyPreview } from '../components/DecisionsPanel'
 import RuleIntentChat from '../components/RuleIntentChat'
 import RuleContextPicker from '../components/RuleContextPicker'
 import RuleHealthPanel from '../components/RuleHealthPanel'
@@ -600,13 +600,6 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
     }
   }, [previewResult, activeLogicOps])
 
-  // Auto-expand the decisions panel when a logic preview kicks off so the
-  // moderator can watch the impact on past decisions without manually opening it.
-  useEffect(() => {
-    if (isPreviewLoading || previewResult || (activeLogicOps && activeLogicOps.length > 0)) {
-      setDecisionsExpanded(true)
-    }
-  }, [isPreviewLoading, previewResult, activeLogicOps])
 
   const isAnyPreviewActive = !!previewResult || (!!activeLogicOps && activeLogicOps.length > 0)
 
@@ -706,9 +699,9 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
             data-log-context={JSON.stringify({ rule_id: selectedRule.id, rule_title: selectedRule.title, rule_type: selectedRule.rule_type })}
           >
             {/* Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
+            <div className="flex items-center gap-2 px-4 py-1.5 border-b border-gray-200 bg-white flex-shrink-0">
               <input
-                className="flex-1 font-semibold text-base bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-500 focus:outline-none px-0.5"
+                className="flex-1 font-semibold text-sm bg-transparent border-b border-transparent hover:border-gray-300 focus:border-indigo-500 focus:outline-none px-0.5"
                 value={editingTitle}
                 onChange={e => setEditingTitle(e.target.value)}
                 onBlur={() => {
@@ -724,16 +717,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   }
                 }}
               />
-              <button
-                data-log="rule.chat.toggle"
-                className={`btn-secondary text-xs ${chatOpen ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : ''}`}
-                onClick={() => setChatOpen(v => !v)}
-                title="Casually describe how this rule should be interpreted; get a proposed rule-text edit"
-              >
-                <MessageSquare size={12} />
-                Moderator chat
-              </button>
-              <button
+<button
                 data-log="rule.test.open-modal"
                 className="btn-secondary text-xs"
                 onClick={() => setShowTestModal(true)}
@@ -764,7 +748,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   {/* Context comes first — title + context are now the primary inputs that
                       drive the rule text suggestion below. */}
                   {selectedRule.rule_type === 'actionable' && (
-                    <div className="max-h-48 overflow-auto flex-shrink-0 border-b border-gray-100 pb-2">
+                    <div className="max-h-32 overflow-auto flex-shrink-0 border-b border-gray-100 pb-2">
                       <RuleContextPicker
                         key={selectedRule.id}
                         rule={{
@@ -874,7 +858,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                   )}
 
                   {/* Type + applies-to controls (foldable to give the textarea more room) */}
-                  <div className="border-t border-gray-100 pt-2 flex flex-col gap-1 flex-shrink-0">
+                  <div className="border-t border-gray-100 pt-2 flex flex-row gap-4 flex-shrink-0">
                     <FoldableControl label="Type" value={selectedRule.rule_type}>
                       {['actionable', 'procedural', 'meta', 'informational'].map(type => {
                         const active = selectedRule.rule_type === type
@@ -940,6 +924,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                       setErrorTypeFilter(next)
                       if (next) setDecisionsExpanded(true)
                     }}
+                    siblingRulesById={new Map(rules.map(r => [r.id, { title: r.title }]))}
                   />
                 </div>
 
@@ -1039,7 +1024,7 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
 
             {/* Decisions panel — collapsible drawer at bottom (default collapsed) */}
             {decisionsExpanded ? (
-              <div className="flex flex-col overflow-hidden bg-white min-h-0" style={{ flex: '2 2 0%' }}>
+              <div className="flex flex-col overflow-hidden bg-white min-h-0" style={{ flex: '1.5 1.5 0%' }}>
                 <PanelHeader title="Decisions">
                   {selectedChecklistItemId && (
                     <button
@@ -1081,22 +1066,57 @@ export default function RulesLogicsEditor({ communityId }: RulesLogicsEditorProp
                 />
               </div>
             ) : (
-              <button
-                className="flex-shrink-0 px-3 py-2 border-t border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-between transition-colors"
-                onClick={() => setDecisionsExpanded(true)}
-                title="Expand decisions panel"
-              >
-                <div className="flex items-center gap-1.5">
-                  <ChevronUp size={13} className="text-gray-400" />
-                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Decisions</span>
-                  {selectedChecklistItemId && (
-                    <span className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5 normal-case">
-                      filtered by checklist item
-                    </span>
-                  )}
-                </div>
-                <span className="text-[10px] text-gray-400">click to expand</span>
-              </button>
+              (() => {
+                const previewSummary = decisionPreview
+                  ? decisionPreview.reduce(
+                      (acc, ev) => {
+                        acc[classifyPreview(ev)] += 1
+                        return acc
+                      },
+                      { fixed: 0, regressed: 0, unchanged: 0 },
+                    )
+                  : null
+                const hasPreviewSignal = !!previewSummary && (previewSummary.fixed > 0 || previewSummary.regressed > 0)
+                const barCls = hasPreviewSignal
+                  ? 'flex-shrink-0 px-3 py-2 border-t border-indigo-300 bg-indigo-50 hover:bg-indigo-100 flex items-center justify-between transition-colors'
+                  : 'flex-shrink-0 px-3 py-2 border-t border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-between transition-colors'
+                return (
+                  <button
+                    className={barCls}
+                    onClick={() => setDecisionsExpanded(true)}
+                    title="Expand decisions panel"
+                  >
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <ChevronUp size={13} className={hasPreviewSignal ? 'text-indigo-600' : 'text-gray-400'} />
+                      <span className={`text-xs font-semibold uppercase tracking-wider ${hasPreviewSignal ? 'text-indigo-700' : 'text-gray-500'}`}>
+                        Decisions
+                      </span>
+                      {decisionPreviewLoading && (
+                        <span className="text-[10px] text-indigo-600 italic normal-case">re-evaluating…</span>
+                      )}
+                      {previewSummary && !decisionPreviewLoading && (
+                        <span className="flex items-center gap-2 text-[10px] normal-case">
+                          {previewSummary.fixed > 0 && (
+                            <span className="text-green-700 font-semibold">{previewSummary.fixed} fixed</span>
+                          )}
+                          {previewSummary.unchanged > 0 && (
+                            <span className="text-gray-500">{previewSummary.unchanged} unchanged</span>
+                          )}
+                          {previewSummary.regressed > 0 && (
+                            <span className="text-red-700 font-semibold">{previewSummary.regressed} regressed</span>
+                          )}
+                        </span>
+                      )}
+                      {selectedChecklistItemId && (
+                        <span className="text-[10px] text-indigo-600 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5 normal-case">
+                          filtered by checklist item
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-400">click to expand</span>
+                  </button>
+                )
+              })()
             )}
           </div>
         ) : (
