@@ -1,5 +1,6 @@
 """Rule health metrics computation + LLM-based diagnosis."""
 
+import json
 import logging
 import re
 from collections import defaultdict
@@ -541,10 +542,83 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
 
     created: list[Suggestion] = []
 
+    def _try_parse_list_string(raw: str) -> list | None:
+        candidates = [raw, raw.strip()]
+        # Strip code fences if present.
+        stripped = raw.strip()
+        if stripped.startswith("```"):
+            unfenced = re.sub(r"^```(?:json)?\s*", "", stripped)
+            unfenced = re.sub(r"\s*```$", "", unfenced)
+            candidates.append(unfenced)
+        # Unescape double-escaped output (\\n, \\", etc. → real chars).
+        try:
+            unescaped = stripped.encode("utf-8").decode("unicode_escape")
+            candidates.append(unescaped)
+        except UnicodeDecodeError:
+            pass
+        for c in candidates:
+            try:
+                parsed = json.loads(c)
+                if isinstance(parsed, list):
+                    return parsed
+            except (json.JSONDecodeError, ValueError):
+                continue
+        # Last resort: Python literal.
+        try:
+            import ast
+            parsed = ast.literal_eval(stripped)
+            if isinstance(parsed, list):
+                return parsed
+        except (ValueError, SyntaxError):
+            pass
+        return None
+
+    def _coerce_diag_list(raw: Any, kind: str) -> list:
+        if isinstance(raw, list):
+            return raw
+        if isinstance(raw, str):
+            parsed = _try_parse_list_string(raw)
+            if parsed is not None:
+                logger.info(f"Recovered {kind} list from string ({len(parsed)} entries)")
+                return parsed
+            preview = raw[:500].replace("\n", "\\n")
+            logger.warning(
+                f"Could not parse {kind} list string (len={len(raw)}); "
+                f"preview: {raw}; treating as empty"
+            )
+            return []
+        if raw is None:
+            return []
+        logger.warning(f"{kind} list of unexpected type {type(raw).__name__}; treating as empty")
+        return []
+
+    diagnoses_list = _coerce_diag_list(diagnoses.get("diagnoses", []), "diagnoses")
+    new_items_list = _coerce_diag_list(diagnoses.get("new_items", []), "new_items")
+
     # Index new_items by split_from so split halves can be merged into one suggestion
     new_items_by_split: dict[str, dict] = {}
     standalone_new_items: list[dict] = []
-    for new_item_diag in diagnoses.get("new_items", []):
+    def _coerce_diag_entry(entry: Any, kind: str) -> dict | None:
+        if isinstance(entry, dict):
+            return entry
+        if isinstance(entry, str):
+            try:
+                parsed = json.loads(entry)
+            except (json.JSONDecodeError, ValueError):
+                logger.warning(f"Skipping unparseable {kind} string entry: {entry!r}")
+                return None
+            if isinstance(parsed, dict):
+                logger.info(f"Recovered {kind} entry from JSON-encoded string")
+                return parsed
+            logger.warning(f"Skipping {kind} entry that parsed to non-dict: {parsed!r}")
+            return None
+        logger.warning(f"Skipping {kind} entry of unexpected type {type(entry).__name__}: {entry!r}")
+        return None
+
+    for raw_new_item_diag in new_items_list:
+        new_item_diag = _coerce_diag_entry(raw_new_item_diag, "new_item")
+        if new_item_diag is None:
+            continue
         split_from = new_item_diag.get("split_from")
         if split_from and split_from in items_by_id:
             new_items_by_split[split_from] = new_item_diag
@@ -658,7 +732,10 @@ async def analyze_rule_health(rule_id: str, db: AsyncSession = Depends(get_db)) 
                 db.add(ctx)
                 created.append(ctx)
 
-    for diag in diagnoses.get("diagnoses", []):
+    for raw_diag in diagnoses_list:
+        diag = _coerce_diag_entry(raw_diag, "diagnosis")
+        if diag is None:
+            continue
         item_id = diag.get("item_id")
         if not item_id or item_id not in items_by_id:
             continue

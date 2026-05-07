@@ -14,6 +14,93 @@ from . import prompts
 logger = logging.getLogger(__name__)
 
 
+def _maybe_decode_json_string(value: Any) -> Any:
+    """If value is a string that looks like JSON object/array, parse it.
+
+    Tries strict JSON, then a partial-re-escape unwrap (Bedrock occasionally
+    turns inter-token whitespace into literal `\\n`/`\\t`/`\\r`), then falls
+    back to `json_repair` which tolerates unescaped quotes inside string values
+    — the most common malformation we see in LLM tool inputs.
+    """
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    if not stripped or stripped[0] not in "[{":
+        return value
+    try:
+        return json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    fixed = (
+        stripped.replace("\\n", "\n")
+        .replace("\\t", "\t")
+        .replace("\\r", "\r")
+    )
+    try:
+        parsed = json.loads(fixed)
+        logger.info("Recovered tool input field from partially-re-escaped JSON string")
+        return parsed
+    except (json.JSONDecodeError, ValueError):
+        pass
+    try:
+        import json_repair
+        parsed = json_repair.loads(fixed)
+        if isinstance(parsed, (dict, list)):
+            logger.warning(
+                "Recovered tool input field via json_repair "
+                "(LLM emitted malformed JSON — likely unescaped quotes in a string value)"
+            )
+            return parsed
+    except ImportError:
+        logger.warning("json_repair not installed; cannot recover malformed LLM JSON")
+    except Exception as e:
+        logger.warning(f"json_repair failed: {e}")
+    return value
+
+
+def _normalize_tool_input(node: Any) -> Any:
+    """Recursively walk a tool_use input and JSON-decode any stringified
+    objects/arrays in place. Returns a normalized copy."""
+    decoded = _maybe_decode_json_string(node)
+    if isinstance(decoded, dict):
+        return {k: _normalize_tool_input(v) for k, v in decoded.items()}
+    if isinstance(decoded, list):
+        return [_normalize_tool_input(v) for v in decoded]
+    return decoded
+
+
+def _extract_tool_input(response: Any, expected_tool_name: str) -> dict:
+    """Find the tool_use block matching expected_tool_name in the response and
+    return its normalized input. Raises ValueError with a useful preview if no
+    matching tool_use block is present."""
+    blocks = getattr(response, "content", None) or []
+    for block in blocks:
+        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == expected_tool_name:
+            raw = getattr(block, "input", None)
+            if raw is None:
+                raise ValueError(
+                    f"tool_use block for '{expected_tool_name}' has no input"
+                )
+            normalized = _normalize_tool_input(raw)
+            if not isinstance(normalized, dict):
+                raise ValueError(
+                    f"tool_use input for '{expected_tool_name}' normalized to "
+                    f"{type(normalized).__name__}, expected dict"
+                )
+            return normalized
+    # No tool_use block — surface the text content for debugging.
+    text_preview = ""
+    for block in blocks:
+        if getattr(block, "type", None) == "text":
+            text_preview = (getattr(block, "text", "") or "")[:500]
+            break
+    raise ValueError(
+        f"No tool_use block named '{expected_tool_name}' in Claude response. "
+        f"stop_reason={getattr(response, 'stop_reason', None)!r}; "
+        f"text preview: {text_preview!r}"
+    )
+
+
 def _enforce_action_invariants(items: list[ChecklistItem]) -> None:
     """Coerce actions so non-leaves are always 'continue' and leaves never are.
 
@@ -674,18 +761,38 @@ class RuleCompiler:
         tool: dict,
         model: Optional[str] = None,
     ) -> Any:
-        """Make a Claude API call using structured output and return the parsed result."""
+        """Make a Claude API call using structured output and return the parsed result.
+
+        Defensively normalizes the tool input: locates the tool_use block (Bedrock
+        sometimes prepends a TextBlock), and recursively json-decodes any string
+        whose value looks like a JSON object or array. This works around an
+        intermittent Bedrock quirk where nested arrays/objects in tool inputs
+        arrive as JSON-encoded strings instead of parsed structures.
+        """
         if model is None:
             model = self.settings.compiler_model
         response = await self.client.messages.create(
             model=model,
-            max_tokens=8192,
+            max_tokens=16384,
             system=system,
             messages=[{"role": "user", "content": user}],
             tools=[tool],
             tool_choice={"type": "tool", "name": tool["name"]},
         )
-        return response.content[0].input
+        stop_reason = getattr(response, "stop_reason", None)
+        usage = getattr(response, "usage", None)
+        out_tokens = getattr(usage, "output_tokens", None) if usage else None
+        if stop_reason == "max_tokens":
+            logger.warning(
+                f"Claude tool call '{tool['name']}' hit max_tokens "
+                f"(output_tokens={out_tokens}, max=16384) — output likely truncated"
+            )
+        else:
+            logger.info(
+                f"Claude tool call '{tool['name']}' "
+                f"stop_reason={stop_reason} output_tokens={out_tokens}"
+            )
+        return _extract_tool_input(response, tool["name"])
 
     async def triage_rule(
         self, rule_title: str, rule_text: str, community_name: str, platform: str
