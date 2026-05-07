@@ -1,5 +1,6 @@
 """Rule compiler: translates human-readable rules into executable checklist trees."""
 
+import json
 import logging
 import uuid
 from typing import Any, Optional
@@ -926,15 +927,24 @@ class RuleCompiler:
         adjusted_items = self._apply_context_ops(current_items, operations, rule.id)
         return adjusted_items, summary, operations
 
-    def _items_to_diff_dicts(self, items: list[ChecklistItem]) -> list[dict]:
-        """Build a nested dict tree (with ids) for the diff prompt input."""
+    def _items_to_diff_dicts(
+        self,
+        items: list[ChecklistItem],
+        include_user_edited: bool = False,
+    ) -> list[dict]:
+        """Build a nested dict tree (with ids) for the diff prompt input.
+
+        When include_user_edited is True, each node also carries
+        `user_edited_logic` so the recompile prompt can mark pinned items.
+        """
         children_map: dict[Optional[str], list[ChecklistItem]] = {}
         for item in sorted(items, key=lambda x: x.order):
             children_map.setdefault(item.parent_id, []).append(item)
 
         def build(parent_id: Optional[str]) -> list[dict]:
-            return [
-                {
+            out: list[dict] = []
+            for item in children_map.get(parent_id, []):
+                d: dict = {
                     "id": item.id,
                     "description": item.description,
                     "rule_text_anchor": item.rule_text_anchor,
@@ -943,8 +953,10 @@ class RuleCompiler:
                     "action": item.action,
                     "children": build(item.id),
                 }
-                for item in children_map.get(parent_id, [])
-            ]
+                if include_user_edited:
+                    d["user_edited_logic"] = bool(item.user_edited_logic)
+                out.append(d)
+            return out
 
         return build(None)
 
@@ -1169,6 +1181,15 @@ class RuleCompiler:
         self, items_data: list[dict], rule_id: str
     ) -> list[ChecklistItem]:
         """Parse items recursively, returning a flat list with parent_id set correctly."""
+        if isinstance(items_data, str):
+            try:
+                items_data = json.loads(items_data)
+            except (ValueError, TypeError):
+                items_data = []
+        if not isinstance(items_data, list):
+            raise ValueError(
+                f"Compiler returned non-list checklist_tree for rule {rule_id!r}: {type(items_data).__name__}"
+            )
         result = []
         self._parse_items_recursive(items_data, rule_id, None, result, 0)
         _enforce_action_invariants(result)
@@ -1184,6 +1205,9 @@ class RuleCompiler:
     ) -> int:
         import uuid
         for item_data in items_data:
+            if not isinstance(item_data, dict):
+                logger.warning("Skipping non-dict checklist item from LLM: %r", item_data)
+                continue
             item = ChecklistItem(
                 id=str(uuid.uuid4()),  # set explicitly so parent_id links work in memory (before DB flush)
                 rule_id=rule_id,
@@ -1226,14 +1250,16 @@ class RuleCompiler:
         other_rules_summary = self._make_other_rules_summary(
             [r for r in other_rules if r.id != rule.id]
         )
-        existing_dicts = [self._checklist_item_to_dict(i) for i in existing_items]
+        existing_nested = self._items_to_diff_dicts(
+            existing_items, include_user_edited=True
+        )
 
         user_prompt = prompts.build_recompile_prompt(
             rule_text=rule.text,
             community_name=community.name,
             platform=community.platform,
             other_rules_summary=other_rules_summary,
-            existing_items=existing_dicts,
+            existing_items=existing_nested,
         )
 
         result = await self._call_claude(

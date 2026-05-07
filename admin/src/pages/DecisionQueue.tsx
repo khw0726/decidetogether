@@ -693,7 +693,7 @@ function DecisionCard({
           </div>
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
             <div className={`badge border ${verdictColors[decision.agent_verdict] || verdictColors.pending}`}>
-              Agent: {decision.agent_verdict}
+              Automod: {decision.agent_verdict}
             </div>
             <div className={`text-xs font-mono ${confidenceColor}`}>
               {(decision.agent_confidence * 100).toFixed(0)}% confidence

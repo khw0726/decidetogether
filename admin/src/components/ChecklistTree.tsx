@@ -805,12 +805,10 @@ function LogicInspector({ item }: { item: ChecklistItem }) {
     const prompt = (logic.prompt_template as string) ?? ''
     const rubric = (logic.rubric as string) ?? ''
     const threshold = logic.threshold as number ?? 0.7
-    const examplesCount = logic.examples_to_include as number ?? 5
     return (
       <div className="mt-1 text-xs space-y-1">
         <div className="flex gap-4 text-gray-500">
           <span>Confidence threshold: <span className="font-mono text-gray-700">{threshold}</span></span>
-          <span>Examples to include: <span className="font-mono text-gray-700">{examplesCount}</span></span>
         </div>
         {prompt && (
           <div>

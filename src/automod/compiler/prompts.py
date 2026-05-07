@@ -1058,7 +1058,12 @@ just hygiene.
 
 You will be given:
 - The updated rule text
-- The existing checklist items (each with an id, description, rule_text_anchor, and other fields)
+- The existing checklist items as a NESTED tree (each node has `children`, plus id, description, rule_text_anchor, item_type, logic, action, user_edited_logic)
+
+TREE STRUCTURE — read this before deciding any op:
+The existing checklist is a tree. Items with `action: "continue"` are GATES — their children are evaluated only when the parent fires. Read each parent→child path as a CONJUNCTION:
+    parent.condition ∧ child.condition → child.action
+Example: a parent "Answer lacks a source?" (continue) with child "Is it medical?" (remove) means "remove if unsourced AND medical." The child alone, in isolation, only asks "is it medical?" — it relies on the parent gate for the unsourced half. Always read child descriptions through their parent's condition; do not judge a child's coverage by its description alone.
 
 For each existing item, decide:
 - "keep": The rule text change does not affect this item. Return it unchanged. **THIS IS THE DEFAULT.**
@@ -1086,6 +1091,18 @@ Do NOT add items to "improve" or "complete" the checklist — strictly reflect t
 - Preserve existing items' ids exactly — do not invent new ids for updated items.
 - Children of kept/updated items are handled inline — include them under "children" as before.
 
+GATE-ACTION INVARIANT — applies to every op:
+- An item with children is a GATE. Its `action` MUST be "continue" — it does not carry a verdict of its own; the verdict comes from a leaf below it.
+- Never `update` a parent's `action` away from "continue". If the rule-text edit calls for a stricter verdict on the gated path, change the relevant LEAF's `action` (or add a new leaf), not the parent's.
+- A new `add` that has children must set `action: "continue"`. Only leaves use "warn" or "remove".
+- If an existing item currently has children but you believe it should now carry a verdict directly, the correct move is to delete the children and update the (now-leaf) item's action — not to update a parent-with-children to "warn"/"remove".
+
+HIERARCHICAL COVERAGE CHECK — apply BEFORE emitting any "add":
+- Walk every parent→child path in the existing tree. For each path, form the conjunction of conditions (see TREE STRUCTURE above). Ask: would the new concept already fire under some existing path?
+- If yes, do NOT emit "add". The concept is already covered — even if no single item's description matches, the *combined path* does.
+- When the rule-text edit STRENGTHENS an existing gated path (broadens scope, removes an exemption, raises the action, or extends the anchor phrase with a new emphatic clause), prefer "update" on the relevant node IN that path — typically the child's `rule_text_anchor`, `rubric`, or `action` — instead of introducing a flat parallel item that collapses the conjunction into one node.
+- A flat top-level item that duplicates a parent∧child conjunction is the most common diff failure mode. Default to extending the existing path.
+
 USER-EDITED ITEMS — items whose `user_edited_logic` is true represent moderator-pinned calibration:
 - ALWAYS emit "keep" for them. Never "update" their description/logic/item_type/action, never "delete".
 - Treat them as fixed coverage when deciding whether to "add" new items: their `logic` JSON shows what \
@@ -1106,21 +1123,23 @@ def build_recompile_prompt(
     import json
 
     # Tag pinned items so the system prompt's USER-EDITED rule attaches to a
-    # visible marker. We also keep the full logic JSON so the model can
-    # reason about coverage without needing to re-derive it from the description.
-    annotated = []
-    for it in existing_items:
-        d = dict(it)
+    # visible marker. The input is a nested tree — recurse so children inherit
+    # the same treatment.
+    def _annotate(node: dict) -> dict:
+        d = dict(node)
         if d.get("user_edited_logic"):
             d["__marker__"] = "USER-EDITED — keep-only; do not duplicate coverage"
-        annotated.append(d)
+        d["children"] = [_annotate(c) for c in node.get("children", []) or []]
+        return d
+
+    annotated = [_annotate(n) for n in existing_items]
 
     return f"""Update the checklist tree for the "{community_name}" community on {platform} to reflect the updated rule text.
 
 Community context (other rules, for background):
 {other_rules_summary if other_rules_summary else "No other rules yet."}
 
-Existing checklist items (with ids):
+Existing checklist tree (nested; `children` shows gating structure):
 {json.dumps(annotated, indent=2)}
 
 Updated rule text:

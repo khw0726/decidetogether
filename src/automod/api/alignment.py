@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm.attributes import flag_modified
 
 from ..config import get_anthropic_client, settings
-from ..compiler.compiler import RuleCompiler
+from ..compiler.compiler import RuleCompiler, _enforce_action_invariants
 from ..db.database import get_db
 from ..db.models import ChecklistItem, Community, Decision, Example, ExampleChecklistItemLink, ExampleRuleLink, Rule, Suggestion
 from ..models.schemas import CommunityContextNote, RuleContextTag, SuggestionRead
@@ -842,6 +842,7 @@ def _apply_diff_to_checklist(
                 context_change_types=op.get("context_change_types"),
             ))
 
+    _enforce_action_invariants(hypothetical)
     return hypothetical
 
 

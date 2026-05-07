@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import traceback
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -406,7 +407,8 @@ async def _compile_rules(community_id: str, rule_ids: list[str]) -> None:
 
     for rid, result in zip(actionable_ids, llm_results):
         if isinstance(result, Exception):
-            logger.error("Compile LLM phase failed for %s: %s", rid, result)
+            tb = "".join(traceback.format_exception(type(result), result, result.__traceback__))
+            logger.error("Compile LLM phase failed for %s: %s\n%s", rid, result, tb)
             await _set_compile_status(rid, "failed", str(result))
             continue
         if result is None:

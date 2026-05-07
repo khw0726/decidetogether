@@ -106,7 +106,7 @@ export default function Layout({ communityId, onCommunityChange }: LayoutProps) 
                   {communities.length === 0 && (
                     <p className="text-xs text-gray-500 px-3 py-2">No communities yet.</p>
                   )}
-                  {communities.map((c: Community) => (
+                  {[...communities].reverse().map((c: Community) => (
                     <div
                       key={c.id}
                       className={`flex items-center gap-1 px-3 py-2 cursor-pointer group ${communityId === c.id ? 'bg-indigo-700 text-white' : 'hover:bg-gray-800 text-gray-200'}`}

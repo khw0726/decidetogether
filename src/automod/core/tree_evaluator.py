@@ -166,6 +166,14 @@ class TreeEvaluator:
         # "warn" action → "warn" verdict; "continue" is not a verdict on its own
         _ACTION_TO_VERDICT = {"remove": "remove", "warn": "warn", "continue": "approve"}
         self_verdict = _ACTION_TO_VERDICT.get(item.action, "approve")
+
+        # Confidence gating: a triggered item below its calibrated threshold
+        # is too uncertain to act on — treat it as not-triggered.
+        # Deterministic/structural items have confidence=1.0 and pass trivially.
+        if item.item_type == "subjective":
+            threshold = (item.logic or {}).get("threshold", 0.7)
+            if confidence < threshold:
+                return "approve", confidence, [], visited
         worst_verdict = self_verdict
         worst_confidence = confidence
         triggered_ids = [item.id]

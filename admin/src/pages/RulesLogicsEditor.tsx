@@ -1435,7 +1435,7 @@ function NewRuleModal({
                                 className="w-32"
                               >
                                 <span
-                                  className={`truncate border-b border-dotted border-gray-300 cursor-help ${
+                                  className={`block w-full break-words leading-tight border-b border-dotted border-gray-300 cursor-help ${
                                     w === 0 ? 'text-gray-400' : 'text-gray-700 font-medium'
                                   }`}
                                 >
